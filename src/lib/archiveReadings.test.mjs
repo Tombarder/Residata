@@ -357,8 +357,8 @@ test("a grain for another layout is not shown under this one", () => {
 test("the page asks for the archive grain once the readings are known, and passes what it asks", () => {
   assert.match(PIVOT, /const grainEnabled = configServerable && \(isCurrent \|\| !!readingDays\);/);
   assert.match(PIVOT, /usePivotGrain\(\{ enabled: grainEnabled, spec: pivotSpec, meta: grainMeta,/);
-  assert.match(PIVOT, /usePivotGrain\(\{ enabled: grainEnabled && priceScope, spec: pivotSpecUnscoped, meta: grainMeta,/);
-  assert.match(PIVOT, /\(\{ archive: !isCurrent, dims: specDims, scope: readingScope, days: readingDays \}\)/);
+  assert.match(PIVOT, /usePivotGrain\(\{ enabled: grainEnabled && priceScope, spec: pivotSpecUnscoped, meta: grainUnscopedMetaNow,/);
+  assert.match(PIVOT, /\(\{ archive: !isCurrent, dims: specDims, scope: readingScope,\s*days: readingDays && heldReadingDays\(readingDays, readingHolding, specUsesCube\(pivotSpec, cubeDims\)\) \}\)/);
 });
 
 // ── the record path (median, distinct counts) and the drill-down count flats too ──
@@ -408,11 +408,67 @@ test("the record path's tree, header and the drill-down all count this way", () 
   assert.equal((tree.match(/count: recordCount\((records|items), recordCell\)/g) || []).length, 3);
   assert.match(tree, /compute\(FIELDS\[v\.field\], v\.agg, recs, recordCell\)/);
   assert.match(PIVOT, /buildTree\(filteredRecords, rows, cols, effectiveValues, recordCell\)/);
-  assert.match(PIVOT, /archiveRecordCells\(readingDays, readingScope, gDims\)/);
+  assert.match(PIVOT, /archiveRecordCells\(heldReadingDays\(readingDays, readingHolding, false\), readingScope, gDims\)/);
   assert.match(PIVOT, /const displayCount = useGrain \? \(rawTree\?\.count \|\| 0\) : recordsCount;/);
   assert.match(PIVOT, /configServerable \? displayCount : \(rawTree\?\.count \|\| 0\)/);
   assert.match(PIVOT, /configServerable \? displayCount : recordsCount/);
   assert.match(PIVOT, /const count = isCurrent \? undefined : node\.count;/);
   assert.match(PIVOT, /\(count \?\? records\.length\)\.toLocaleString/);
   assert.match(PIVOT, /useArchiveReadingDays\(\{ enabled: canViewAnalytics && !isCurrent \}\)/);
+});
+
+// ── the cube lags an approval until its refresh ──
+const { specUsesCube, holdingSpecs, archiveHolding, heldReadingDays, monthReadings } = await import("./archiveReadings.js");
+// November SK, read on 2 and 6 November (and a retry of a few projects on the 4th); the
+// cube was last refreshed before the 6th was approved.
+const NOV_DAYS = readingDaysByCountry([{ day: "2026-10-29", country: "SK" },
+  { day: "2026-11-02", country: "SK", readings: 1 }, { day: "2026-11-06", country: "SK", readings: 1 }]);
+const NOV_FACTS = [{ d: ["SK", "2026-11-02"], m: { n: 7500 } }, { d: ["SK", "2026-11-04"], m: { n: 40 } },
+  { d: ["SK", "2026-11-06"], m: { n: 7500 } }];
+
+test("what the cube holds is asked of the cube and the facts, for each market's newest month", () => {
+  const specs = holdingSpecs(NOV_DAYS);
+  assert.deepEqual(specs.cube, { dims: ["country", "snapshot_month"], mode: "archive", filters: { snapshot_month: ["2026-11"] } });
+  assert.deepEqual(specs.facts, { dims: ["country", "datum"], mode: "archive", ranges: { datum: { min: "2026-11-01", max: null, includeEmpty: false } } });
+  assert.equal(specUsesCube(specs.cube, new Set()), true);
+  assert.equal(specUsesCube(specs.facts, new Set()), false, "the facts answer the day question");
+});
+
+test("a reading in archive_days that the cube does not hold yet is not counted for a cube grain", () => {
+  const specs = holdingSpecs(NOV_DAYS);
+  const holding = archiveHolding(specs.from, [{ d: ["SK", "2026-11"], m: { n: 7500 } }], NOV_FACTS);
+  assert.deepEqual(monthReadings(heldReadingDays(NOV_DAYS, holding, true)), { "SK|2026-10": 1, "SK|2026-11": 1 });
+  assert.deepEqual(monthReadings(heldReadingDays(NOV_DAYS, holding, false)), { "SK|2026-10": 1, "SK|2026-11": 2 });
+  // the Pivot's November from the cube: 7 500, not 3 750
+  const scope = archiveReadingScope([{ key: "snapshot_month", mode: "in", values: ["2026-11"] }]);
+  const dims = archiveGrainDims(["country"], scope);
+  const shown = grainViewOfPage([{ d: ["SK"], m: { n: 7500 } }],
+    { archive: true, dims, scope, days: heldReadingDays(NOV_DAYS, holding, true) }, dims);
+  assert.equal(Math.round(nodeOf(shown).n), 7500);
+  // refreshed, it holds both (and the retry's rows)
+  const later = archiveHolding(specs.from, [{ d: ["SK", "2026-11"], m: { n: 15040 } }], NOV_FACTS);
+  assert.deepEqual(monthReadings(heldReadingDays(NOV_DAYS, later, true)), { "SK|2026-10": 1, "SK|2026-11": 2 });
+});
+
+test("a reading the facts do not hold either counts for neither; an unreadable holding changes nothing", () => {
+  const specs = holdingSpecs(NOV_DAYS);
+  const holding = archiveHolding(specs.from, [{ d: ["SK", "2026-11"], m: { n: 7500 } }], NOV_FACTS.slice(0, 1));
+  assert.deepEqual(monthReadings(heldReadingDays(NOV_DAYS, holding, false)), { "SK|2026-10": 1, "SK|2026-11": 1 });
+  assert.equal(heldReadingDays(NOV_DAYS, null, true), NOV_DAYS);
+});
+
+test("which grains read the cube follows the engine's routing", () => {
+  const cube = new Set(["country", "snapshot_month", "cast", "stav", "has_price"]);
+  assert.equal(specUsesCube({ dims: ["cast", "country"], filters: { stav: ["V"] } }, cube), true);
+  assert.equal(specUsesCube({ dims: ["datum", "country"] }, cube), false);
+  assert.equal(specUsesCube({ dims: ["cast"], ranges: { cena_s_dph: { min: "1" } } }, cube), false);
+  assert.equal(specUsesCube({ dims: ["cast"], nulls: { cena_s_dph: "not_empty" } }, cube), false);
+  assert.equal(specUsesCube({ dims: ["cast"], filters: { has_price: ["true"] } }, cube), true);
+});
+
+test("the Pivot divides each grain and the records by the readings their source holds", () => {
+  assert.match(PIVOT, /heldReadingDays\(readingDays, readingHolding, specUsesCube\(pivotSpecUnscoped, cubeDims\)\)/);
+  assert.match(PIVOT, /archiveRecordCells\(heldReadingDays\(readingDays, readingHolding, false\), readingScope, gDims\)/);
+  assert.match(DATA, /holding = archiveHolding\(specs\.from, cube\.data, facts\.data\);/);
+  assert.match(DATA, /const version = `\$\{readingsSignature\(days\)\}\/\$\{holdingSignature\(holding\)\}`;/);
 });

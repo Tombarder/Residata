@@ -229,3 +229,145 @@ export function weightedCount(recs, recordCell, pred) {
   }
   return n;
 }
+
+/* ── THE CUBE LAGS ──────────────────────────────────────────────────────────────────
+ * public.archive_days counts a reading the moment it is approved, and so do the facts
+ * (analytics.unit_facts, written in the approval). analytics.unit_cube — the fast path an
+ * archive grain is read from unless it needs the facts (a Datum row, a range, a measure
+ * filter) — holds it only after its next refresh, which runs concurrently, after the
+ * approval. Until then the newest month of a cube grain was divided by a reading it does
+ * not hold: early in a month read every four days, the second reading made the month read
+ * half its flats. So the divisor counts only the readings the grain's source holds.
+ *
+ * What the cube holds is read from what already answers: analytics_pivot over the cube by
+ * market and month, and over the facts by market and day, for each market's newest month
+ * (holdingSpecs). The cube is the facts at its last refresh, and readings arrive in day
+ * order, so the cube holds a market's days up to the longest run of them whose facts add
+ * up to no more than its month total (archiveHolding). A day the facts do not hold either
+ * — its sync failed — is held by neither. Older months are held by both.
+ */
+
+// analytics.dim_registry's cube dimensions, for when the registry has not been read yet.
+const CUBE_DIMS_FALLBACK = new Set(["country", "market", "city", "cast", "sub_district", "developer",
+  "project_name", "import_status", "lifecycle", "typ", "etapa", "stav", "izby", "poschodie",
+  "kolaudacia", "orientacia", "snapshot_month", "is_home", "has_price"]);
+
+/** Whether analytics_pivot answers `spec` from the cube (its routing, step 1): no median,
+ *  range or distinct, and every dim and filter key a cube dimension. `cubeDims` is the
+ *  registry's (is_cube_dim); empty, the registry's seed. */
+export function specUsesCube(spec, cubeDims) {
+  if (!spec) return false;
+  const cube = cubeDims && cubeDims.size ? cubeDims : CUBE_DIMS_FALLBACK;
+  if (spec.median || (spec.ranges && Object.keys(spec.ranges).length) || (spec.distinct && spec.distinct.length)) return false;
+  const keys = [...(spec.dims || []), ...Object.keys(spec.filters || {}),
+    ...Object.keys(spec.filters_not || {}), ...Object.keys(spec.nulls || {})];
+  return keys.every((k) => cube.has(k));
+}
+
+/** The two analytics_pivot questions that say what the cube and the facts hold, for each
+ *  market's newest month in `days` (readingDaysByCountry), or null with no readings. */
+export function holdingSpecs(days) {
+  const from = new Map();
+  const months = new Set();
+  for (const [c, m] of Object.entries(days || {})) {
+    let last = "";
+    for (const d of m.keys()) if (d > last) last = d;
+    if (!last) continue;
+    months.add(last.slice(0, 7));
+    from.set(c, `${last.slice(0, 7)}-01`);
+  }
+  if (!from.size) return null;
+  const min = [...from.values()].sort()[0];
+  return {
+    from,
+    cube: { dims: ["country", "snapshot_month"], mode: "archive", filters: { snapshot_month: [...months].sort() } },
+    facts: { dims: ["country", "datum"], mode: "archive", ranges: { datum: { min, max: null, includeEmpty: false } } },
+  };
+}
+
+/** From the answers to holdingSpecs: { from, facts: Map(market → Set(days with rows)),
+ *  cubeThrough: Map('SK|2026-11' → the last day the cube holds, '' for none) }. */
+export function archiveHolding(from, cubeRows, factRows) {
+  const factsN = new Map();
+  for (const g of factRows || []) {
+    const c = g?.d?.[0];
+    const day = g?.d?.[1] == null ? null : String(g.d[1]).slice(0, 10);
+    const n = Number(g?.m?.n) || 0;
+    if (!c || !day || !(n > 0)) continue;
+    if (!factsN.has(c)) factsN.set(c, new Map());
+    factsN.get(c).set(day, (factsN.get(c).get(day) || 0) + n);
+  }
+  const cubeN = new Map();
+  for (const g of cubeRows || []) {
+    const k = `${g?.d?.[0]}|${g?.d?.[1]}`;
+    cubeN.set(k, (cubeN.get(k) || 0) + (Number(g?.m?.n) || 0));
+  }
+  const facts = new Map();
+  const cubeThrough = new Map();
+  for (const [c, byDay] of factsN) {
+    facts.set(c, new Set(byDay.keys()));
+    const byMonth = new Map();
+    for (const d of [...byDay.keys()].sort()) {
+      const mo = d.slice(0, 7);
+      if (!byMonth.has(mo)) byMonth.set(mo, []);
+      byMonth.get(mo).push(d);
+    }
+    for (const [mo, ds] of byMonth) {
+      const total = cubeN.get(`${c}|${mo}`) || 0;
+      let acc = 0;
+      let through = "";
+      for (const d of ds) {
+        if (acc + byDay.get(d) > total) break;
+        acc += byDay.get(d);
+        through = d;
+      }
+      cubeThrough.set(`${c}|${mo}`, through);
+    }
+  }
+  return { from, facts, cubeThrough };
+}
+
+/** `days` (readingDaysByCountry) without the readings a grain's source does not hold yet:
+ *  in each market's newest month, a day the facts have no rows of, and — `viaCube` — a day
+ *  after the last the cube holds. With no holding (it could not be read), `days` as is. */
+export function heldReadingDays(days, holding, viaCube) {
+  if (!holding) return days;
+  const out = {};
+  for (const [c, m] of Object.entries(days || {})) {
+    const from = holding.from.get(c);
+    const kept = new Map();
+    for (const [d, n] of m) {
+      if (from && d >= from) {
+        if (!holding.facts.get(c)?.has(d)) continue;
+        if (viaCube) {
+          const through = holding.cubeThrough.get(`${c}|${d.slice(0, 7)}`);
+          if (!through || d > through) continue;
+        }
+      }
+      kept.set(d, n);
+    }
+    if (kept.size) out[c] = kept;
+  }
+  return out;
+}
+
+/** A holding's fingerprint, part of the readings' version: a cube refresh changes it. */
+export function holdingSignature(holding) {
+  if (!holding) return "-";
+  const parts = [];
+  for (const [k, t] of [...holding.cubeThrough].sort()) parts.push(`${k}:${t}`);
+  for (const [c, s] of [...holding.facts].sort()) parts.push(`${c}:${[...s].sort().pop() || ""}:${s.size}`);
+  return parts.join(",");
+}
+
+/** Readings per market-month ({ 'SK|2026-10': 8 }) from readingDaysByCountry(). */
+export function monthReadings(days) {
+  const out = {};
+  for (const [c, m] of Object.entries(days || {})) {
+    for (const [d, n] of m) {
+      const k = `${c}|${d.slice(0, 7)}`;
+      out[k] = (out[k] || 0) + n;
+    }
+  }
+  return out;
+}

@@ -11,7 +11,7 @@
 import { strict as assert } from "node:assert";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { readingDaysByCountry, readingsSignature } from "./archiveReadings.js";
+import { readingDaysByCountry, readingsSignature, holdingSpecs, archiveHolding, holdingSignature } from "./archiveReadings.js";
 
 const SRC = readFileSync(new URL("./useData.js", import.meta.url), "utf8");
 const BLOCK = SRC.slice(SRC.indexOf("const ARCHIVE_READINGS_TTL_MS"), SRC.indexOf("/** Full readings of every market ("));
@@ -20,7 +20,9 @@ function harness(answers) {
   let now = Date.UTC(2026, 10, 2, 9, 0);
   const asked = [];
   const sbReadAll = async (make) => make(0, 999);
+  const sbRead = (b) => b;
   const supabaseData = {
+    rpc: () => Promise.resolve({ data: null, error: { message: "what the cube holds is another test's" } }),
     from: () => {
       let cols = "";
       const b = {
@@ -44,9 +46,11 @@ function harness(answers) {
   ]);
   const clock = { now: () => now };
   const { _loadArchiveReadings } = new Function(
-    "sbReadAll", "supabaseData", "readingDaysByCountry", "readingsSignature", "_pivotGrainCache", "Date",
+    "sbReadAll", "sbRead", "supabaseData", "readingDaysByCountry", "readingsSignature",
+    "holdingSpecs", "archiveHolding", "holdingSignature", "_pivotGrainCache", "Date", "console",
     `${BLOCK}\nreturn { _loadArchiveReadings };`,
-  )(sbReadAll, supabaseData, readingDaysByCountry, readingsSignature, grains, clock);
+  )(sbReadAll, sbRead, supabaseData, readingDaysByCountry, readingsSignature,
+    holdingSpecs, archiveHolding, holdingSignature, grains, clock, { error() {} });
   return { load: () => _loadArchiveReadings("u"), asked, grains, advance: (ms) => { now += ms; } };
 }
 const NOV1 = { rows: [{ day: "2026-11-02", country: "SK", readings: 1 }] };
@@ -101,7 +105,7 @@ test("the hook asks again while the page is open, and the Pivot's grain key foll
   const PIVOT = readFileSync(new URL("../pages/PivotV2.jsx", import.meta.url), "utf8");
   assert.match(PIVOT, /const grainVersion = isCurrent \? "" : readingsVersion;/);
   assert.match(PIVOT, /usePivotGrain\(\{ enabled: grainEnabled, spec: pivotSpec, meta: grainMeta, version: grainVersion \}\)/);
-  assert.match(PIVOT, /usePivotGrain\(\{ enabled: grainEnabled && priceScope, spec: pivotSpecUnscoped, meta: grainMeta, version: grainVersion \}\)/);
+  assert.match(PIVOT, /usePivotGrain\(\{ enabled: grainEnabled && priceScope, spec: pivotSpecUnscoped, meta: grainUnscopedMetaNow, version: grainVersion \}\)/);
 });
 
 test("the readings signature changes with a reading and not otherwise", () => {

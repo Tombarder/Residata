@@ -55,6 +55,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { isTrustedRequest as isTrustedOrigin } from "../_lib/origin.js";
 import { archiveGroups, fetchMarketReadings } from "../_lib/archiveCounts.js";
+import { specUsesCube } from "../../src/lib/archiveReadings.js";
 
 export const maxDuration = 60; // tool loop = a few model round-trips
 
@@ -310,7 +311,9 @@ async function toolMarketStats(admin, a, allowHistorical) {
     const [{ data, error }, readings] = await Promise.all([
       admin.rpc("analytics_pivot", { p_spec: spec }), marketReadings(admin)]);
     if (error) throw new Error(error.message);
-    const groups = archiveGroups(data, dims, gkey, readings);
+    // Divided by the readings the answer's source holds: the cube lags an approval until
+    // its refresh, the facts (a range filter) do not.
+    const groups = archiveGroups(data, dims, gkey, specUsesCube(spec) ? readings.cube : readings.facts);
     groups.sort((x, y) => y.units - x.units);
     return { mode, group_by: a.group_by || "none", groups: groups.slice(0, 60) };
   }

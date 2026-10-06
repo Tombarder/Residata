@@ -5,6 +5,7 @@
  * api/_lib/archiveCounts.js divides each market-month by its readings.
  */
 import { test } from "node:test";
+import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import { archiveGroups, readingsPerMonth, fetchMarketReadings } from "../../api/_lib/archiveCounts.js";
 
@@ -148,8 +149,14 @@ test("a day without a readings column is one reading; a day of none is none", ()
 
 // A stand-in for the service-key client's public.archive_days, paged the way PostgREST
 // pages (1 000 rows at most), optionally as the view was before it carried `readings`.
-function fakeAdmin({ days = [], withoutReadings = false } = {}) {
+function fakeAdmin({ days = [], withoutReadings = false, cubeRows = null, factRows = null } = {}) {
   const calls = [];
+  // analytics_pivot: what the cube and the facts hold; without them given, unreadable.
+  const rpc = (name, { p_spec: spec }) => {
+    calls.push(`rpc ${spec.dims.join(",")}`);
+    const rows = spec.dims[1] === "snapshot_month" ? cubeRows : factRows;
+    return Promise.resolve(rows ? { data: rows, error: null } : { data: null, error: { message: "not here" } });
+  };
   const from = (name) => {
     let cols = "";
     const b = {
@@ -166,7 +173,7 @@ function fakeAdmin({ days = [], withoutReadings = false } = {}) {
     };
     return b;
   };
-  return { calls, from };
+  return { calls, from, rpc };
 }
 
 test("the assistant reads every page of archive_days, with its readings", async () => {
@@ -175,7 +182,7 @@ test("the assistant reads every page of archive_days, with its readings", async 
   }));
   many[1499].readings = 2;
   const admin = fakeAdmin({ days: many });
-  const counts = await fetchMarketReadings(admin);
+  const { cube: counts } = await fetchMarketReadings(admin);
   assert.equal(Object.values(counts).reduce((a, b) => a + b, 0), 1501);
   assert.ok(admin.calls.includes("archive_days day,country,readings 1000-1999"), "the second page was not read");
 });
@@ -183,5 +190,33 @@ test("the assistant reads every page of archive_days, with its readings", async 
 test("before archive_days carries readings, each day is one reading", async () => {
   const admin = fakeAdmin({ withoutReadings: true, days: [
     { day: "2026-10-05", country: "SK", readings: 2 }, { day: "2026-10-09", country: "SK", readings: 1 }] });
-  assert.deepEqual(await fetchMarketReadings(admin), { "SK|2026-10": 2 });
+  assert.deepEqual((await fetchMarketReadings(admin)).cube, { "SK|2026-10": 2 });
+});
+
+// ── the cube lags an approval until its refresh ──
+// November SK: readings on 2 and 6 November, both approved — archive_days and the facts
+// hold both. The cube was last refreshed between them: its November is one reading.
+const NOV = [{ day: "2026-10-29", country: "SK", readings: 1 },
+  { day: "2026-11-02", country: "SK", readings: 1 }, { day: "2026-11-06", country: "SK", readings: 1 }];
+const NOV_CUBE = [{ d: ["SK", "2026-11"], m: { n: 7500 } }];
+const NOV_FACTS = [{ d: ["SK", "2026-11-02"], m: { n: 7500 } }, { d: ["SK", "2026-11-04"], m: { n: 40 } },
+  { d: ["SK", "2026-11-06"], m: { n: 7500 } }];
+
+test("a reading archive_days counts but the cube does not hold yet is not counted for the cube", async () => {
+  const admin = fakeAdmin({ days: NOV, cubeRows: NOV_CUBE, factRows: NOV_FACTS });
+  const r = await fetchMarketReadings(admin);
+  assert.deepEqual(r.cube, { "SK|2026-10": 1, "SK|2026-11": 1 });
+  assert.deepEqual(r.facts, { "SK|2026-10": 1, "SK|2026-11": 2 }, "the facts hold both");
+  const [g] = archiveGroups([row("2026-11", "SK", 7500)], dims, "snapshot_month", r.cube);
+  assert.equal(g.units, 7500, "divided by both readings it read 3 750");
+});
+
+test("once the cube is refreshed, it counts the reading again", async () => {
+  const admin = fakeAdmin({ days: NOV, cubeRows: [{ d: ["SK", "2026-11"], m: { n: 15040 } }], factRows: NOV_FACTS });
+  assert.deepEqual((await fetchMarketReadings(admin)).cube, { "SK|2026-10": 1, "SK|2026-11": 2 });
+});
+
+test("the assistant divides a cube answer by the cube's readings and a range answer by the facts'", () => {
+  const SRC = readFileSync(new URL("../../api/ai/chat.js", import.meta.url), "utf8");
+  assert.match(SRC, /archiveGroups\(data, dims, gkey, specUsesCube\(spec\) \? readings\.cube : readings\.facts\)/);
 });

@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { supabaseData, supabasePublic, isSupabaseReady } from "./supabase";
 import { useAuth } from "./useAuth";
 import { useCountry, isAllCountries } from "./useCountry";
-import { readingDaysByCountry, readingsSignature } from "./archiveReadings";
+import { readingDaysByCountry, readingsSignature, holdingSpecs, archiveHolding, holdingSignature } from "./archiveReadings";
 
 /**
  * sbRead — the single settle-guarantee wrapper every RLS-gated read goes through.
@@ -1654,10 +1654,22 @@ function _loadArchiveReadings(key) {
       throw error;
     }
     const days = readingDaysByCountry(data);
-    const version = readingsSignature(days);
+    // What the cube and the facts hold of each market's newest month (archiveReadings.js,
+    // THE CUBE LAGS). Unreadable, the readings are used as they are.
+    const specs = holdingSpecs(days);
+    let holding = null;
+    if (specs) {
+      const [cube, facts] = await Promise.all([
+        sbRead(supabaseData.rpc("analytics_pivot", { p_spec: specs.cube })),
+        sbRead(supabaseData.rpc("analytics_pivot", { p_spec: specs.facts })),
+      ]);
+      if (cube.error || facts.error) console.error("[archive readings] what the cube holds", cube.error || facts.error);
+      else holding = archiveHolding(specs.from, cube.data, facts.data);
+    }
+    const version = `${readingsSignature(days)}/${holdingSignature(holding)}`;
     if (kept && kept.version === version) { kept.at = Date.now(); return kept; }
     if (kept) _dropArchiveGrains();
-    const entry = { days, version, at: Date.now() };
+    const entry = { days, holding, version, at: Date.now() };
     _archiveReadingsCache.set(key, entry);
     return entry;
   })().finally(() => _archiveReadingsInflight.delete(key));
@@ -1670,7 +1682,8 @@ function _loadArchiveReadings(key) {
  *  its own readings. Every page of it — a day per market per reading outgrows PostgREST's
  *  1 000-row cap within the year. Keyed and gated by identity like useArchiveDays.
  *  `days` is null while loading, when not enabled, and when it could not be read;
- *  `version` changes whenever they do. */
+ *  `holding` says which of them the cube and the facts hold yet (heldReadingDays);
+ *  `version` changes whenever either does. */
 export function useArchiveReadingDays({ enabled = false } = {}) {
   const { loading: authLoading, user, profile } = useAuth();
   const key = `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}`;
@@ -1701,7 +1714,7 @@ export function useArchiveReadingDays({ enabled = false } = {}) {
   const entry = enabled ? _archiveReadingsCache.get(key) : null;
   const days = entry ? entry.days : null;
   const error = !!enabled && !days && failedKey === key;
-  return { days, version: entry ? entry.version : "", loading: !!enabled && !days && !error, error };
+  return { days, holding: entry ? entry.holding : null, version: entry ? entry.version : "", loading: !!enabled && !days && !error, error };
 }
 
 let _pivotGrainCache = new Map();

@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef, useLayoutEffect, Fragment } from 
 import { createPortal } from "react-dom";
 import { useSpecifics, SpecificsMark } from "../lib/projectSpecifics";
 import { useAnalyticsRegistry, useProjects, useFlatsArchive, useFlatsCurrent, useArchiveMonths, useArchiveDays, useArchiveReadingDays, usePivotGrain, usePivotDistinct, usePivotFieldStats, fetchFlatsForProjects } from "../lib/useData";
-import { archiveGrainDims, archiveReadingScope, normaliseArchiveGrain, periodFactors, scaleComponents, archiveRecordCells, weightedCount } from "../lib/archiveReadings";
+import { archiveGrainDims, archiveReadingScope, normaliseArchiveGrain, periodFactors, scaleComponents, archiveRecordCells, weightedCount, specUsesCube, heldReadingDays } from "../lib/archiveReadings";
 import { useCountry, isAllCountries, countryName } from "../lib/useCountry";
 import { useCapabilities } from "../lib/useCapabilities";
 import { useAuth } from "../lib/useAuth";
@@ -1860,13 +1860,20 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // flat-reading count is the number this replaces.
   const archiveGrain = configServerable && !isCurrent;
   // The record path (median, distinct counts) counts its flats by the same readings.
-  const { days: readingDays, version: readingsVersion, loading: readingsLoading, error: readingsError } = useArchiveReadingDays({ enabled: canViewAnalytics && !isCurrent });
+  const { days: readingDays, holding: readingHolding, version: readingsVersion, loading: readingsLoading, error: readingsError } = useArchiveReadingDays({ enabled: canViewAnalytics && !isCurrent });
+  // A grain is divided only by the readings its source holds yet: the cube lags the
+  // approvals until its refresh (heldReadingDays, src/lib/archiveReadings.js).
+  const cubeDims = useMemo(
+    () => new Set((registry.dimensions || []).filter((d) => d.is_cube_dim).map((d) => d.key)),
+    [registry.dimensions]
+  );
   const grainVersion = isCurrent ? "" : readingsVersion;
   // What a grain answers, handed back with it: a grain still on screen while the next
   // loads is read as the question IT answers (grainView), not the one now being asked.
   const grainMeta = useMemo(
-    () => ({ archive: !isCurrent, dims: specDims, scope: readingScope, days: readingDays }),
-    [isCurrent, specDims, readingScope, readingDays]
+    () => ({ archive: !isCurrent, dims: specDims, scope: readingScope,
+      days: readingDays && heldReadingDays(readingDays, readingHolding, specUsesCube(pivotSpec, cubeDims)) }),
+    [isCurrent, specDims, readingScope, readingDays, readingHolding, pivotSpec, cubeDims]
   );
   const grainEnabled = configServerable && (isCurrent || !!readingDays);
   const { grain: grainRaw, meta: grainRawMeta, loading: grainRawLoading, error: grainRawError } = usePivotGrain({ enabled: grainEnabled, spec: pivotSpec, meta: grainMeta, version: grainVersion });
@@ -1878,7 +1885,12 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
     () => (priceScope ? buildPivotSpec({ dims: specDims, filters, country, isCurrent }) : null),
     [priceScope, specDims, filters, country, isCurrent]
   );
-  const { grain: grainUnscopedRaw, meta: grainUnscopedMeta } = usePivotGrain({ enabled: grainEnabled && priceScope, spec: pivotSpecUnscoped, meta: grainMeta, version: grainVersion });
+  const grainUnscopedMetaNow = useMemo(
+    () => ({ ...grainMeta,
+      days: readingDays && heldReadingDays(readingDays, readingHolding, specUsesCube(pivotSpecUnscoped, cubeDims)) }),
+    [grainMeta, readingDays, readingHolding, pivotSpecUnscoped, cubeDims]
+  );
+  const { grain: grainUnscopedRaw, meta: grainUnscopedMeta } = usePivotGrain({ enabled: grainEnabled && priceScope, spec: pivotSpecUnscoped, meta: grainUnscopedMetaNow, version: grainVersion });
   const grain = useMemo(() => grainView(grainRaw, grainRawMeta, specDims), [grainRaw, grainRawMeta, specDims]);
   const grainUnscoped = useMemo(() => grainView(grainUnscopedRaw, grainUnscopedMeta, specDims), [grainUnscopedRaw, grainUnscopedMeta, specDims]);
   const grainLoading = grainRawLoading || (archiveGrain && readingsLoading);
@@ -1938,8 +1950,9 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   const useGrain = configServerable;
   // In the archive a record is a flat at one reading; this weighs it (recordCount).
   const recordCell = useMemo(
-    () => (canViewAnalytics && !isCurrent && readingDays ? archiveRecordCells(readingDays, readingScope, gDims) : null),
-    [canViewAnalytics, isCurrent, readingDays, readingScope, gDims]
+    () => (canViewAnalytics && !isCurrent && readingDays
+      ? archiveRecordCells(heldReadingDays(readingDays, readingHolding, false), readingScope, gDims) : null),
+    [canViewAnalytics, isCurrent, readingDays, readingHolding, readingScope, gDims]
   );
   const rawTree = useMemo(
     () => useGrain

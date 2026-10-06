@@ -22,7 +22,11 @@
 // 240 000 € in October averaged 203 200 €, not the average month's 210 000 €. The sums
 // behind them are divided by the readings too, so every month weighs by its flats.
 // Minimum and maximum are a flat's own price and need nothing.
-//
+
+import {
+  readingDaysByCountry, holdingSpecs, archiveHolding, heldReadingDays, monthReadings,
+} from "../../src/lib/archiveReadings.js";
+
 // rows:      analytics_pivot rows { d: [dim values…], m: { n, avail, sold, res, s_cs,
 //            n_cs, mn_cs, mx_cs, s_pw, s_lw } } over dims that include 'country' and
 //            'snapshot_month'
@@ -107,18 +111,37 @@ async function readAll(page) {
   throw new Error("archive readings: more than 100 000 rows");
 }
 
-/** Full readings per market-month (readingsPerMonth) from public.archive_days, every
- *  page of it. A view that does not carry `readings` yet is read without it — each day
- *  then one reading, as before. */
+/** Full readings per market-month from public.archive_days, every page of it, as two
+ *  maps: { cube, facts } — the readings the cube holds yet and those the facts hold
+ *  (src/lib/archiveReadings.js, THE CUBE LAGS): an answer read from the cube is divided by
+ *  `cube`, one read from the facts (a range filter) by `facts`. If what they hold cannot be
+ *  read, both are every reading. A view that does not carry `readings` yet is read without
+ *  it — each day then one reading, as before. */
 export async function fetchMarketReadings(admin) {
   const read = (cols) => readAll((from, to) => admin.from("archive_days")
     .select(cols).order("day").order("country").range(from, to));
-  let days;
+  let rows;
   try {
-    days = await read("day,country,readings");
+    rows = await read("day,country,readings");
   } catch (e) {
     console.error("[archive readings] archive_days without readings, counting its days", e?.message || e);
-    days = await read("day,country");
+    rows = await read("day,country");
   }
-  return readingsPerMonth(days);
+  const days = readingDaysByCountry(rows);
+  const specs = holdingSpecs(days);
+  let holding = null;
+  if (specs) {
+    try {
+      const [cube, facts] = await Promise.all([
+        admin.rpc("analytics_pivot", { p_spec: specs.cube }), admin.rpc("analytics_pivot", { p_spec: specs.facts })]);
+      if (cube.error || facts.error) throw new Error((cube.error || facts.error).message);
+      holding = archiveHolding(specs.from, cube.data, facts.data);
+    } catch (e) {
+      console.error("[archive readings] what the cube holds", e?.message || e);
+    }
+  }
+  return {
+    cube: monthReadings(heldReadingDays(days, holding, true)),
+    facts: monthReadings(heldReadingDays(days, holding, false)),
+  };
 }
