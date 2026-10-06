@@ -1,5 +1,6 @@
 import { Component } from 'react'
 import { reportError } from '../lib/errorReport'
+import { reloadingFor, RELOAD_WAIT_MS } from '../lib/staleChunkReload'
 
 /**
  * Top-level error boundary — wraps the ENTIRE app (App + every context provider),
@@ -18,10 +19,30 @@ class RootErrorBoundary extends Component {
   }
 
   static getDerivedStateFromError(err) {
-    return { err }
+    // A chunk of a build replaced by a deploy: the page reloads into the current
+    // build (lib/staleChunkReload), and nothing is shown or reported meanwhile.
+    return { err, reloading: reloadingFor(err) }
   }
 
   componentDidCatch(err, info) {
+    if (this.state.reloading) {
+      // The reload did not happen (e.g. a "leave site?" prompt answered "stay"):
+      // the screen and the report, as for any other error.
+      clearTimeout(this.reloadTimer)
+      this.reloadTimer = setTimeout(() => {
+        this.setState({ reloading: false })
+        this.report(err, info)
+      }, RELOAD_WAIT_MS)
+      return
+    }
+    this.report(err, info)
+  }
+
+  componentWillUnmount() {
+    clearTimeout(this.reloadTimer)
+  }
+
+  report(err, info) {
     // eslint-disable-next-line no-console
     console.error('[RootErrorBoundary]', err, info)
     // A crash a signed-in user sees is one we would otherwise never hear about.
@@ -31,6 +52,7 @@ class RootErrorBoundary extends Component {
 
   render() {
     if (!this.state.err) return this.props.children
+    if (this.state.reloading) return null
 
     let sk = false
     try {
