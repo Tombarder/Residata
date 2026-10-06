@@ -21,17 +21,20 @@
 // Minimum and maximum are a flat's own price and need nothing.
 //
 // rows:      analytics_pivot rows { d: [dim values…], m: { n, avail, sold, res, s_cs,
-//            n_cs, mn_cs, mx_cs, s_pw, s_lw } } over dims that include 'country' and
+//            n_cs, mn_cs, mx_cs, s_pw, s_lw } } over dims that include `cellKey` and
 //            'snapshot_month'
-// readings:  { 'SK|2026-09': 30, 'SK|2026-10': 8, … } — full readings per market-month
+// readings:  { 'sk-ba|2026-09': 30, 'sk-ba|2026-10': 8, … } — full readings per
+//            market-month, keyed by the value of `cellKey` (see fetchMarketReadings)
 // groupKey:  the dimension the answer is grouped by (null for one overall group)
-export function archiveGroups(rows, dims, groupKey, readings) {
+// cellKey:   'market' (readings counted from the snapshots) or 'country' (from the
+//            archive's days)
+export function archiveGroups(rows, dims, groupKey, readings, cellKey = "country") {
   const at = (row, k) => row.d?.[dims.indexOf(k)];
   const groups = new Map();
   for (const row of rows || []) {
-    const country = at(row, "country");
+    const cell = at(row, cellKey);
     const month = at(row, "snapshot_month");
-    const r = readings[`${country}|${month}`];
+    const r = readings[`${cell}|${month}`];
     if (!r) continue;                     // no full reading of that market that month
     const key = groupKey ? (at(row, groupKey) != null ? String(at(row, groupKey)) : "(none)") : "ALL";
     const m = row.m || {};
@@ -65,6 +68,68 @@ export function archiveGroups(rows, dims, groupKey, readings) {
       max_price: g.mx_cs == null ? null : Math.round(g.mx_cs),
     };
   });
+}
+
+/** Full readings per market-month from final.snapshots rows { id, market_key,
+ *  scraped_at, status, is_partial }, leaving out the withdrawn ones.
+ *
+ *  A reading is a full snapshot, not a day. A day can hold two: 2026-08-31 SK holds two
+ *  complete markets three hours apart (07:56 and 10:58, a manual re-run), and the
+ *  archive holds every row of both — so counted as distinct days, August had 31
+ *  readings against 32 readings' flat-rows, and its stock read 7 742 for 7 500. Neither
+ *  a held-back sibling (is_partial, sharing its reading's scraped_at — the rest of that
+ *  reading) nor a repair of the projects a reading missed (is_partial, its own time —
+ *  the rest of the reading before it) is a reading of its own: their rows complete one.
+ *  The month is the UTC month, as the archive's snapshot_month files it. */
+export function readingsFromSnapshots(snaps, withdrawnIds) {
+  const gone = new Set(withdrawnIds || []);
+  const out = {};
+  for (const s of snaps || []) {
+    if (!s || !s.market_key || !s.scraped_at || s.is_partial || gone.has(s.id)) continue;
+    if (s.status != null && s.status !== "approved") continue;
+    const t = new Date(s.scraped_at);
+    if (Number.isNaN(t.getTime())) continue;
+    const k = `${s.market_key}|${t.toISOString().slice(0, 7)}`;
+    out[k] = (out[k] || 0) + 1;
+  }
+  return out;
+}
+
+// PostgREST returns at most 1 000 rows a request (db-max-rows) and says nothing when
+// it stops there, so every list here is read page by page until a short page.
+const PAGE = 1000;
+async function readAll(page) {
+  const out = [];
+  for (let from = 0; from < 100 * PAGE; from += PAGE) {
+    const { data, error } = await page(from, from + PAGE - 1);
+    if (error) throw new Error(error.message || String(error));
+    const rows = Array.isArray(data) ? data : [];
+    out.push(...rows);
+    if (rows.length < PAGE) return out;
+  }
+  throw new Error("archive readings: more than 100 000 rows");
+}
+
+/** Full readings per market-month for archiveGroups, with the service key:
+ *  { by: 'market', counts } from final.snapshots (exact — see readingsFromSnapshots), or,
+ *  if that schema cannot be read, { by: 'country', counts } from public.archive_days,
+ *  which counts a day with two full readings once. `by` is the dimension to ask
+ *  analytics_pivot for and to pass to archiveGroups as its cellKey. */
+export async function fetchMarketReadings(admin) {
+  try {
+    const snaps = await readAll((from, to) => admin.schema("final").from("snapshots")
+      .select("id,market_key,scraped_at,status,is_partial")
+      .eq("status", "approved").eq("is_partial", false)
+      .order("id").range(from, to));
+    const withdrawn = await readAll((from, to) => admin.schema("final").from("withdrawn_snapshots")
+      .select("snapshot_id").order("snapshot_id").range(from, to));
+    return { by: "market", counts: readingsFromSnapshots(snaps, withdrawn.map((w) => w.snapshot_id)) };
+  } catch (e) {
+    console.error("[archive readings] final.snapshots unreadable, counting the archive's days", e?.message || e);
+    const days = await readAll((from, to) => admin.from("archive_days")
+      .select("day,country").order("day").order("country").range(from, to));
+    return { by: "country", counts: readingsPerMonth(days) };
+  }
 }
 
 /** Full readings per market-month from public.archive_days rows { day, country }. */
