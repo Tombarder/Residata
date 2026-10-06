@@ -1737,9 +1737,13 @@ function _loadArchiveReadings(key) {
     }
     if (cubeMoved || (kept && !sameDays)) _dropArchiveGrains();
     const cubeGen = entry.cubeGen + (cubeMoved ? 1 : 0);
+    // the version this one replaces, with the holding that went with it: a grain asked
+    // under it before its holding was known is divided by that (PivotV2 grainView)
+    const prev = kept && kept.version !== `${daysSig}/${cubeGen}` && kept.holdingKnown
+      ? { prevVersion: kept.version, prevHolding: kept.holding } : { prevVersion: entry.prevVersion, prevHolding: entry.prevHolding };
     entry = {
       ...entry, holding, holdingSig, holdingKnown: true, holdingFailed: failed, failures,
-      lagging, ...lag, cubeGen, version: `${daysSig}/${cubeGen}`, at: now,
+      lagging, ...lag, cubeGen, version: `${daysSig}/${cubeGen}`, at: now, ...prev,
     };
     _archiveReadingsCache.set(key, entry);
     _publishReadings(key);
@@ -1756,7 +1760,8 @@ function _loadArchiveReadings(key) {
  *  `days` is null while loading, when not enabled, and when it could not be read;
  *  `holding` says which of them the cube and the facts hold yet (heldReadingDays) once
  *  `holdingKnown` — it follows the days, read in parallel with the grain; `version`
- *  changes with a new reading and with a refresh of the cube. */
+ *  changes with a new reading and with a refresh of the cube; `prevVersion` and
+ *  `prevHolding` are the version it replaced and that version's holding. */
 export function useArchiveReadingDays({ enabled = false } = {}) {
   const { loading: authLoading, user, profile } = useAuth();
   const key = `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}`;
@@ -1802,7 +1807,8 @@ export function useArchiveReadingDays({ enabled = false } = {}) {
   const error = !!enabled && !days && failedKey === key;
   return {
     days, holding: entry ? entry.holding : null, holdingKnown: !!entry?.holdingKnown,
-    version: entry ? entry.version : "", loading: !!enabled && !days && !error, error,
+    version: entry ? entry.version : "", prevVersion: entry?.prevVersion ?? null, prevHolding: entry?.prevHolding ?? null,
+    loading: !!enabled && !days && !error, error,
   };
 }
 

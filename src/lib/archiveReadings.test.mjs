@@ -284,8 +284,8 @@ test("the Pivot asks the archive for the market and month of every row", () => {
 });
 
 test("everything the Pivot reads from the archive grain is in flats", () => {
-  assert.match(PIVOT, /const grain = useMemo\(\(\) => grainView\(grainRaw, grainRawMeta, specDims, holdingNow\)/);
-  assert.match(PIVOT, /const grainUnscoped = useMemo\(\(\) => grainView\(grainUnscopedRaw, grainUnscopedMeta, specDims, holdingNow\)/);
+  assert.match(PIVOT, /const grain = useMemo\(\(\) => grainView\(grainRaw, grainRawMeta, specDims, readingsNow\)/);
+  assert.match(PIVOT, /const grainUnscoped = useMemo\(\(\) => grainView\(grainUnscopedRaw, grainUnscopedMeta, specDims, readingsNow\)/);
   assert.match(PIVOT, /if \(!meta\.days \|\| held === undefined\) return null;/);
   // past the point where the flats are made, nothing reads the flat-readings
   const after = PIVOT.slice(PIVOT.indexOf("const grainLoading = "));
@@ -312,9 +312,12 @@ test("the readings come from archive_days for every market, every page of it", (
 // ── a grain still on screen while the next loads is read as its own question ──
 const DATA_SRC = readFileSync(new URL("./useData.js", import.meta.url), "utf8");
 const grainViewOfHook = new Function(`${DATA_SRC.match(/function _grainView\([\s\S]*?\n\}/)[0]}\nreturn _grainView;`)();
-const grainViewOfPage = new Function("normaliseArchiveGrain", "heldReadingDays",
-  `${PIVOT.match(/function grainView\(raw, meta, specDims, holding\)[\s\S]*?\n\}/)[0]}\nreturn grainView;`)(
+const grainViewAsWritten = new Function("normaliseArchiveGrain", "heldReadingDays",
+  `${PIVOT.match(/function grainView\(raw, meta, specDims, now\)[\s\S]*?\n\}/)[0]}\nreturn grainView;`)(
   normaliseArchiveGrain, (await import("./archiveReadings.js")).heldReadingDays);
+// one version throughout, its holding `holding` (undefined: not known yet)
+const grainViewOfPage = (raw, meta, dims, holding) =>
+  grainViewAsWritten(raw, { version: "v1", ...meta }, dims, { version: "v1", holding, prevVersion: null, prevHolding: null });
 
 test("the hook hands back the held grain with the request it answers, as loading", () => {
   const held = { key: "k1", grain: [{ d: [], m: { n: 1 } }], meta: { tag: "old" }, error: false };
@@ -359,7 +362,7 @@ test("the page asks for the archive grain once the readings are known, and passe
   assert.match(PIVOT, /const grainEnabled = configServerable && \(isCurrent \|\| !!readingDays\);/);
   assert.match(PIVOT, /usePivotGrain\(\{ enabled: grainEnabled, spec: pivotSpec, meta: grainMeta,/);
   assert.match(PIVOT, /usePivotGrain\(\{ enabled: grainEnabled && priceScope, spec: pivotSpecUnscoped, meta: grainUnscopedMetaNow,/);
-  assert.match(PIVOT, /\(\{ archive: !isCurrent, dims: specDims, scope: readingScope, days: readingDays,\s*holding: holdingNow, viaCube: specUsesCube\(pivotSpec, cubeDims\) \}\)/);
+  assert.match(PIVOT, /\(\{ archive: !isCurrent, dims: specDims, scope: readingScope, days: readingDays,\s*holding: holdingNow, version: readingsVersion, viaCube: specUsesCube\(pivotSpec, cubeDims\) \}\)/);
 });
 
 // ── the record path (median, distinct counts) and the drill-down count flats too ──
@@ -659,8 +662,8 @@ test("a grain asked while the cube lagged stays 7 500 while the refreshed one lo
 });
 
 test("the holding rides in the grain's meta, which no fetch depends on", () => {
-  assert.match(PIVOT, /\(\{ archive: !isCurrent, dims: specDims, scope: readingScope, days: readingDays,\s*holding: holdingNow, viaCube: specUsesCube\(pivotSpec, cubeDims\) \}\)/);
-  assert.match(PIVOT, /const held = meta\.holding !== undefined \? meta\.holding : holding;/);
+  assert.match(PIVOT, /\(\{ archive: !isCurrent, dims: specDims, scope: readingScope, days: readingDays,\s*holding: holdingNow, version: readingsVersion, viaCube: specUsesCube\(pivotSpec, cubeDims\) \}\)/);
+  assert.match(PIVOT, /let held = meta\.holding;\s*\n\s*if \(held === undefined && now\) \{/);
   const hook = DATA.match(/export function usePivotGrain[\s\S]*?\n\}\n/)[0];
   assert.match(hook, /\}, \[key, authLoading, recheck\]\); \/\/ eslint-disable-line react-hooks\/exhaustive-deps/,
     "the grain is asked by its key alone — the meta riding with it never asks again");
@@ -684,4 +687,29 @@ test("a withdrawn reading whose cube refresh failed counts in the cube's divisor
   const drift = archiveHolding(sp.from, [{ d: ["SK", "2026-11"], m: { n: 7526 } }], [{ d: ["SK", "2026-11-06"], m: { n: 7500 } }], D6);
   assert.equal(drift.cubeExtra.size, 0);
   assert.equal(holdingLags(D6, drift), false);
+});
+
+// ── the page's first grain, asked before its holding was known, after a cube refresh ──
+test("a grain asked before its holding was known is divided by its own version's holding, not a later one's", () => {
+  const D26 = readingDaysByCountry([{ day: "2026-11-02", country: "SK", readings: 1 }, { day: "2026-11-06", country: "SK", readings: 1 }]);
+  const sp = holdingSpecs(D26);
+  const facts = [{ d: ["SK", "2026-11-02"], m: { n: 7500 } }, { d: ["SK", "2026-11-06"], m: { n: 7500 } }];
+  const Hlag = archiveHolding(sp.from, [{ d: ["SK", "2026-11"], m: { n: 7500 } }], facts, D26);
+  const Hok = archiveHolding(sp.from, [{ d: ["SK", "2026-11"], m: { n: 15000 } }], facts, D26);
+  const dims = ["country", "snapshot_month"];
+  const first = [{ d: ["SK", "2026-11"], m: { n: 7500 } }];               // asked during the lag
+  const meta = { archive: true, dims, scope: {}, days: D26, holding: undefined, version: "v0", viaCube: true };
+  const n = (rows) => (rows ? Math.round(nodeOf(rows).n) : null);
+  // the holding of v0 arrives: v0's holding
+  assert.equal(n(grainViewAsWritten(first, meta, dims, { version: "v0", holding: Hlag, prevVersion: null, prevHolding: null })), 7500);
+  // the cube refreshed: v1; the first grain is still on screen while v1's loads
+  assert.equal(n(grainViewAsWritten(first, meta, dims, { version: "v1", holding: Hok, prevVersion: "v0", prevHolding: Hlag })), 7500,
+    "divided by the refreshed holding it read 3 750");
+  // a version it cannot place: nothing rather than a wrong number
+  assert.equal(grainViewAsWritten(first, meta, dims, { version: "v2", holding: Hok, prevVersion: "v1", prevHolding: Hok }), null);
+});
+
+test("the readings carry the version they replaced, with its holding", () => {
+  assert.match(DATA, /\{ prevVersion: kept\.version, prevHolding: kept\.holding \}/);
+  assert.match(PIVOT, /\(\{ version: readingsVersion, holding: holdingNow, prevVersion: readingsPrevVersion, prevHolding: readingsPrevHolding \}\)/);
 });

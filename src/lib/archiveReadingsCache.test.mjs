@@ -385,3 +385,15 @@ test("a check that keeps the entry renders nothing again", () => {
   const hook = SRC.match(/export function useArchiveReadingDays[\s\S]*?\n\}\n/)[0];
   assert.match(hook, /if \(cancelled \|\| now === seen\) return;/);
 });
+
+test("a new version keeps the one it replaced, with that version's holding", async () => {
+  const h = stagedHarness();
+  h.st.cube = [{ d: ["SK", "2026-11"], m: { n: 7500 } }];
+  const a = await h._loadArchiveReadings("u");
+  h.st.cube = [{ d: ["SK", "2026-11"], m: { n: 15000 } }];
+  h.advance(2 * MIN);
+  const b = await h._loadArchiveReadings("u");
+  assert.notEqual(b.version, a.version);
+  assert.equal(b.prevVersion, a.version);
+  assert.equal(b.prevHolding, a.holding);
+});
