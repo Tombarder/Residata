@@ -397,3 +397,19 @@ test("a new version keeps the one it replaced, with that version's holding", asy
   assert.equal(b.prevVersion, a.version);
   assert.equal(b.prevHolding, a.holding);
 });
+
+test("an entry published between a render and its effect is shown, not taken as seen", () => {
+  const hook = SRC.match(/export function useArchiveReadingDays[\s\S]*?\n\}\n/)[0];
+  assert.match(hook, /const rendered = _archiveReadingsCache\.get\(key\);/);
+  assert.match(hook, /let seen = rendered;/, "seen starts from what the render showed");
+  assert.match(hook, /_archiveReadingsListeners\.get\(key\)\.add\(landed\);\s*\n\s*landed\(\);/, "and lands at once if the cache moved on");
+  assert.match(hook, /const entry = enabled \? rendered : null;/);
+  // the comparison itself, run as written: rendered A, the cache moved to B before the effect
+  const body = hook.match(/const landed = \(\) => \{[\s\S]*?\n    \};/)[0];
+  const cache = new Map([["u", "B"]]);
+  let renders = 0;
+  const run = new Function("_archiveReadingsCache", "key", "rendered", "setLanded",
+    `let cancelled = false; let seen = rendered; ${body} landed(); landed(); return seen;`);
+  assert.equal(run(cache, "u", "A", () => { renders += 1; }), "B");
+  assert.equal(renders, 1, "one render for the entry it missed, none for the one it has");
+});

@@ -1771,13 +1771,18 @@ export function useArchiveReadingDays({ enabled = false } = {}) {
   // only re-renders when the list lands or changes, or says it failed.
   const [, setLanded] = useState(0);
   const [failedKey, setFailedKey] = useState(null);
+  // The entry this render shows — what the effect below compares the cache with.
+  const rendered = _archiveReadingsCache.get(key);
   useEffect(() => {
     if (!enabled) return;
     if (!isSupabaseReady() || authLoading) return; // wait for the session so RLS returns the caller's real rows
     let cancelled = false;
     // Re-render only when the entry itself changed — a check that kept it (every minute
-    // while the tab is open) is no reason to render the Pivot again.
-    let seen = _archiveReadingsCache.get(key);
+    // while the tab is open) is no reason to render the Pivot again. Compared with the
+    // entry the RENDER showed, not the one in the cache when this effect runs: one
+    // published in between was otherwise taken as seen and never shown — the holding
+    // stayed unknown and the table on its skeleton.
+    let seen = rendered;
     const landed = () => {
       const now = _archiveReadingsCache.get(key);
       if (cancelled || now === seen) return;
@@ -1786,6 +1791,7 @@ export function useArchiveReadingDays({ enabled = false } = {}) {
     };
     if (!_archiveReadingsListeners.has(key)) _archiveReadingsListeners.set(key, new Set());
     _archiveReadingsListeners.get(key).add(landed);
+    landed();                                      // published between the render and now
     const ask = () => _loadArchiveReadings(key).then(
       () => { if (!cancelled) { setFailedKey(null); landed(); } },
       (e) => { console.error("[useArchiveReadingDays]", e); if (!cancelled) setFailedKey(key); },
@@ -1801,8 +1807,8 @@ export function useArchiveReadingDays({ enabled = false } = {}) {
       if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisible);
       clearInterval(timer);
     };
-  }, [enabled, key, authLoading]);
-  const entry = enabled ? _archiveReadingsCache.get(key) : null;
+  }, [enabled, key, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+  const entry = enabled ? rendered : null;
   const days = entry ? entry.days : null;
   const error = !!enabled && !days && failedKey === key;
   return {
