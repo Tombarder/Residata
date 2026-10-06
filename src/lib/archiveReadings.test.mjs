@@ -509,3 +509,9 @@ test("drift does not double the month: November with 26 rows resynced into the 2
   const out = normaliseArchiveGrain([{ d: ["2026-11", "SK"], m: { n: 15000 } }], dims, heldReadingDays(days, h, true), scope);
   assert.equal(out[0].m.n, 7500);
 });
+
+test("kolaudacia is answered from the facts, so it is divided by the facts' readings", () => {
+  assert.equal(specUsesCube({ dims: ["kolaudacia", "country", "snapshot_month"], mode: "archive" }, new Set()), false);
+  assert.equal(specUsesCube({ dims: ["cast", "country"], filters: { kolaudacia: ["2027"] } }, new Set()), false);
+  assert.equal(specUsesCube({ dims: ["orientacia", "country", "snapshot_month"] }, new Set()), true);
+});

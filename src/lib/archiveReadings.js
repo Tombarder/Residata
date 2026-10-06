@@ -253,10 +253,13 @@ export function weightedCount(recs, recordCell, pred) {
  * failed — is held by neither. Older months are held by both.
  */
 
-// analytics.dim_registry's cube dimensions, for when the registry has not been read yet.
+// analytics.dim_registry's cube dimensions (is_cube_dim), for when the registry has not
+// been read — and for the assistant, which never reads it. Not kolaudacia: it has been
+// answered from the facts since 2026-06-29 (2026-06-29_kolaudacia_serving.sql), and taken
+// for a cube dimension, an archive answer by kolaudacia was divided by the cube's readings.
 const CUBE_DIMS_FALLBACK = new Set(["country", "market", "city", "cast", "sub_district", "developer",
   "project_name", "import_status", "lifecycle", "typ", "etapa", "stav", "izby", "poschodie",
-  "kolaudacia", "orientacia", "snapshot_month", "is_home", "has_price"]);
+  "orientacia", "snapshot_month", "is_home", "has_price"]);
 
 /** Whether analytics_pivot answers `spec` from the cube (its routing, step 1): no median,
  *  range or distinct, and every dim and filter key a cube dimension. `cubeDims` is the
