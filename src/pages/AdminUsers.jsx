@@ -165,7 +165,10 @@ export default function AdminUsers({ users, setUsers, selfId, lang = "sk", premi
     body: t(
       `${u.email}${u.full_name ? ` (${u.full_name})` : ""} — účet aj všetky jeho dáta (nastavenia, uložené filtre, história) zmiznú a nedá sa to vrátiť.`,
       `${u.email}${u.full_name ? ` (${u.full_name})` : ""} — the account and all its data (settings, saved filters, history) go, and this cannot be undone.`,
-    ),
+    ) + (u.stripe_subscription_id ? t(
+      " POZOR: platí cez Stripe — vymazaním účtu sa predplatné NEZRUŠÍ a Stripe mu bude ďalej účtovať. Najprv ho zruš v Stripe.",
+      " WARNING: pays through Stripe — deleting the account does NOT cancel the subscription and Stripe keeps charging. Cancel it in Stripe first.",
+    ) : ""),
     okLabel: t("Vymazať natrvalo", "Delete permanently"),
     danger: true,
     run: async () => {
@@ -173,7 +176,7 @@ export default function AdminUsers({ users, setUsers, selfId, lang = "sk", premi
       const r = await callAdmin("/api/admin/delete-user", { user_id: u.id }, lang);
       setBusyId(null);
       if (r.ok) { setUsers((us) => us.filter((x) => x.id !== u.id)); say("ok", t(`Vymazaný: ${u.email}`, `Deleted: ${u.email}`)); }
-      else say("err", r.j?.error && !r.j?.message ? `${t("Vymazanie zlyhalo", "Delete failed")}: ${r.j.error}` : r.text);
+      else say("err", r.text);
     },
   });
 
@@ -252,7 +255,7 @@ export default function AdminUsers({ users, setUsers, selfId, lang = "sk", premi
         </div>
       ) : (
         <div className="rd-card" style={{ padding: 0 }}>
-          <div className="rd-scroll">
+          <EdgeScroll>
             <table className="rd-table rd-table--compact rd-table--stick1">
               <thead>
                 <tr>
@@ -260,6 +263,7 @@ export default function AdminUsers({ users, setUsers, selfId, lang = "sk", premi
                   <SortableTh style={th} sortKey="name"     current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t("Meno", "Name")}</SortableTh>
                   <SortableTh style={th} sortKey="company"  current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t("Firma", "Company")}</SortableTh>
                   <SortableTh style={th} sortKey="position" current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t("Pozícia", "Position")}</SortableTh>
+                  <th style={th}>{t("Kontakt", "Contact")}</th>
                   <SortableTh style={th} sortKey="type"     current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t("Typ účtu", "Account type")}</SortableTh>
                   <SortableTh style={th} sortKey="from"     current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t("Premium od", "Premium from")}</SortableTh>
                   <SortableTh style={th} sortKey="to"       current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t("Premium do", "Premium to")}</SortableTh>
@@ -270,7 +274,7 @@ export default function AdminUsers({ users, setUsers, selfId, lang = "sk", premi
               </thead>
               <tbody>
                 {visible.length === 0 ? (
-                  <tr><td className="rd-td--empty" colSpan={10}>
+                  <tr><td className="rd-td--empty" colSpan={11}>
                     {q ? t(`Nikto nevyhovuje „${search}“.`, `No users match "${search}".`) : t("V tomto filtri nikto nie je.", "Nobody in this filter.")}
                   </td></tr>
                 ) : visible.map((u) => (
@@ -291,7 +295,7 @@ export default function AdminUsers({ users, setUsers, selfId, lang = "sk", premi
                 ))}
               </tbody>
             </table>
-          </div>
+          </EdgeScroll>
         </div>
       )}
 
@@ -360,15 +364,23 @@ function UserRow({ u, lang, now, isSelf, busy, flashing, premiumDomain, onType, 
     <tr style={rowStyle} aria-busy={busy || undefined}>
       <td className="rd-td--key">
         <span style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem", maxWidth: 260 }}>
-          <span style={{ overflow: "hidden", textOverflow: "ellipsis", maxWidth: 200 }} title={u.email}>{u.email}</span>
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", maxWidth: 180 }} title={u.email}>{u.email}</span>
           {isSelf && <span className="rd-badge rd-badge--warn" title={t("To si ty", "That's you")}>{t("ty", "you")}</span>}
           {premiumDomain && !isSelf && <span className="rd-badge rd-badge--ok" title={t("Prémiová doména", "Premium domain")}>★</span>}
           {personal && !isSelf && <span className="rd-badge" style={{ color: "var(--text-dim)", borderColor: "var(--border)" }} title={t("Osobný e-mail (gmail, azet…) — sám sa zaregistrovať nemôže, účet mu vytvára admin.", "Personal e-mail (gmail, …) — cannot self-register; an admin creates the account.")}>{t("osobný", "personal")}</span>}
         </span>
       </td>
-      <td style={{ color: "var(--text)" }}>{u.full_name || <Dash />}</td>
-      <td>{u.company || <Dash />}</td>
-      <td>{u.position || <Dash />}</td>
+      <Clip value={u.full_name} max={150} style={{ color: "var(--text)" }} />
+      <Clip value={u.company} max={140} />
+      <Clip value={u.position} max={110} />
+      <td>
+        {u.phone || u.linkedin_url ? (
+          <span style={{ display: "inline-flex", gap: "0.15rem" }}>
+            {u.phone && <a className="rd-btn rd-btn--sm rd-btn--ghost rd-icon-btn" href={`tel:${u.phone.replace(/[^0-9+]/g, "")}`} title={u.phone} aria-label={`${t("Telefón", "Phone")} ${u.phone}`}><IconPhone /></a>}
+            {u.linkedin_url && <a className="rd-btn rd-btn--sm rd-btn--ghost rd-icon-btn" href={u.linkedin_url} target="_blank" rel="noopener noreferrer" title={u.linkedin_url} aria-label="LinkedIn"><IconLinkedIn /></a>}
+          </span>
+        ) : <Dash />}
+      </td>
       <td>
         <div
           title={isSelf ? t("Vlastný typ účtu meniť nemôžeš", "You can't change your own account type") : undefined}
@@ -400,10 +412,46 @@ function UserRow({ u, lang, now, isSelf, busy, flashing, premiumDomain, onType, 
   );
 }
 
+/** A sideways-scrolling box that SHOWS when there is more to the right:
+ *  on a narrower screen the table scrolls, and a shaded edge says so instead of
+ *  silently hiding the last columns (on a Mac the scrollbar is invisible until used). */
+function EdgeScroll({ children }) {
+  const ref = useRef(null);
+  const [more, setMore] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    const measure = () => {
+      setMore(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+    };
+    measure();
+    el.addEventListener("scroll", measure, { passive: true });
+    window.addEventListener("resize", measure);
+    const ro = typeof ResizeObserver === "function" ? new ResizeObserver(measure) : null;
+    if (ro) { ro.observe(el); if (el.firstElementChild) ro.observe(el.firstElementChild); }
+    return () => { el.removeEventListener("scroll", measure); window.removeEventListener("resize", measure); ro?.disconnect(); };
+  }, []);
+  return (
+    <div className="rd-edge-scroll" data-more-right={more || undefined}>
+      <div ref={ref} className="rd-scroll">{children}</div>
+    </div>
+  );
+}
+
 const Dash = () => <span style={{ color: "var(--text-faint)" }}>—</span>;
+
+/** A text cell that never stretches the table: long values end in "…" and show whole on hover. */
+const Clip = ({ value, max, style }) => (
+  <td title={value && value.length > 18 ? value : undefined}
+    style={{ maxWidth: max, overflow: "hidden", textOverflow: "ellipsis", ...style }}>
+    {value || <Dash />}
+  </td>
+);
 
 const svg = { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true };
 const IconPencil = () => <svg {...svg}><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>;
+const IconPhone = () => <svg {...svg}><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2Z" /></svg>;
+const IconLinkedIn = () => <svg {...svg}><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6Z" /><rect x="2" y="9" width="4" height="12" /><circle cx="4" cy="4" r="2" /></svg>;
 const IconTrash = () => <svg {...svg}><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /></svg>;
 
 /** A line under the type — only when what the person gets differs from the type. */
@@ -469,7 +517,10 @@ function DateCell({ u, field, editable, lang, onSave, status, today }) {
   const ended = isEnd && status?.key === "expired";
   const content = shown
     ? <span style={{ color: ended ? "var(--accent-2)" : (u.tier === "paid" ? "var(--text)" : "var(--text-dim)") }}>{shown}{ended ? ` · ${t("skončilo", "ended")}` : ""}</span>
-    : (isEnd && u.tier === "paid" ? <span style={{ color: "var(--text-dim)", fontStyle: "italic" }}>{t("bez konca", "no end")}</span> : <Dash />);
+    : (isEnd && u.tier === "paid" ? <span style={{ color: "var(--text-dim)", fontStyle: "italic" }}>{t("bez konca", "no end")}</span>
+      // a Premium account with no start on record (older accounts) — ask for it, don't hide it
+      : !isEnd && u.tier === "paid" && editable ? <span style={{ color: "var(--accent-2)", fontStyle: "italic" }}>{t("doplniť", "add")}</span>
+      : <Dash />);
 
   if (!editable) {
     return <span title={u.tier !== "paid" && shown ? t("Posledné obdobie Premium (už neplatí)", "Last Premium period (no longer running)") : undefined}
@@ -477,8 +528,8 @@ function DateCell({ u, field, editable, lang, onSave, status, today }) {
   }
   return (
     <button type="button" onClick={open} className="rd-btn rd-btn--sm rd-btn--ghost rd-date-btn"
-      title={t("Klikni a zmeň dátum", "Click to change the date")}
-      aria-label={`${isEnd ? t("Premium do", "Premium to") : t("Premium od", "Premium from")}: ${shown || (isEnd ? t("bez konca", "no end") : "—")} — ${t("zmeniť", "change")}`}>
+      title={!shown && !isEnd ? t("Premium nemá zapísaný začiatok — klikni a doplň ho", "This Premium has no start date — click to add it") : t("Klikni a zmeň dátum", "Click to change the date")}
+      aria-label={`${isEnd ? t("Premium do", "Premium to") : t("Premium od", "Premium from")}: ${shown || (isEnd ? t("bez konca", "no end") : t("nezadané", "not set"))} — ${t("zmeniť", "change")}`}>
       {content}
     </button>
   );
@@ -524,6 +575,8 @@ function UserForm({ mode, user, isSelf, lang, now, onClose, onSaved }) {
   const problems = [];
   if (creating && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(f.email.trim())) problems.push(t("Zadaj platný e-mail.", "Enter a valid e-mail."));
   if (!f.full_name.trim() && (creating || user?.full_name)) problems.push(t("Meno je povinné.", "Name is required."));
+  // A new Premium period needs its first day (an untouched legacy row without one may stay as it is).
+  if (premium && !f.from && (creating || f.tier !== init.tier || init.from)) problems.push(t("Zadaj, odkedy má Premium.", "Enter when Premium starts."));
   if (premium && f.from && f.from > today) problems.push(t("„Premium od“ nemôže byť v budúcnosti.", "'Premium from' cannot be in the future."));
   if (premium && f.from && f.to && f.to < f.from) problems.push(t("„Premium do“ je skôr ako „Premium od“.", "'Premium to' is earlier than 'Premium from'."));
   const personal = creating && isPersonalEmail(f.email.trim());
@@ -614,9 +667,9 @@ function UserForm({ mode, user, isSelf, lang, now, onClose, onSaved }) {
           </div>
         )}
         {personal && (
-          <div className="rd-form__full rd-alert rd-alert--warn" style={{ fontSize: "0.74rem" }}>
-            {t("Osobný e-mail (gmail, azet…) — sám by sa zaregistrovať nemohol. Účet mu vytvoríme a adresu pustíme cez filter firemných e-mailov, aby sa mohol aj prihlasovať.",
-               "Personal e-mail (gmail, …) — they could not sign up themselves. We create the account and let the address past the business-e-mail filter so they can also sign in.")}
+          <div className="rd-form__full rd-alert" style={{ fontSize: "0.74rem" }}>
+            {t("Osobný e-mail (gmail, azet…): cez web by sa sám nezaregistroval, cez admin je to v poriadku — adresu pustíme cez filter, aby sa vedel aj prihlasovať.",
+               "Personal e-mail (gmail, …): they could not sign up on the web themselves; through admin it is fine — the address is let past the filter so they can also sign in.")}
           </div>
         )}
         {field("full_name", t("Meno a priezvisko", "Full name"), { required: creating || Boolean(user?.full_name), auto: !creating })}
@@ -645,6 +698,11 @@ function UserForm({ mode, user, isSelf, lang, now, onClose, onSaved }) {
               : t("Prihlási sa, ale neuvidí žiadne dáta.", "Can sign in but sees no data.")}
             {wasPremium && f.tier !== "paid" && ` ${t("Bežiace Premium sa ukončí dnes.", "Running Premium ends today.")}`}
           </span>
+          {f.tier === "admin" && !isSelf && (creating || user?.tier !== "admin") && (
+            <span className="rd-form__hint" style={{ color: "var(--accent-2)" }}>
+              {t("Pozor: admin vidí a mení všetko, aj ostatných užívateľov. Daj ho len ľuďom z tímu.", "Careful: an admin sees and changes everything, other users included. Team members only.")}
+            </span>
+          )}
         </div>
 
         {premium && (
@@ -743,5 +801,73 @@ export function UserStats({ users, lang = "sk", now }) {
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "0.7rem", marginTop: "1.5rem", marginBottom: "1rem" }}>
       {cards.map((x) => <Kpi key={x.k} label={x.l} value={x.n} />)}
     </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+
+/**
+ * The newest accounts as they arrived — under the table on the Users tab. Each
+ * row says HOW the account came: a sign-up, a sign-up on a personal e-mail, one of
+ * several from one company (worth a look), or made here by an admin.
+ */
+const EVENT_KINDS = {
+  new_signup:                ["ok",   "registrácia", "sign-up"],
+  new_signup_personal_email: ["warn", "osobný e-mail", "personal e-mail"],
+  new_signup_suspicious_org: ["bad",  "veľa z jednej firmy", "many from one org"],
+  new_signup_admin_created:  ["info", "pridal admin", "added by admin"],
+};
+
+export function SignupEvents({ events, users, lang = "sk" }) {
+  const t = L(lang);
+  if (!events || events.length === 0) return null;
+  const live = new Set((users || []).map((u) => (u.email || "").toLowerCase()));
+  const when = (ts) => new Date(ts).toLocaleString(localeTag(lang), { day: "numeric", month: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: TZ });
+  const th = { padding: "0 0.7rem" };
+  return (
+    <section style={{ marginTop: "2.2rem" }}>
+      <div className="rd-sect" style={{ marginBottom: "0.7rem" }}>
+        <span className="rd-sect__tick" />
+        <span className="rd-sect__name">{t("Nové účty", "New accounts")}</span>
+        <span className="rd-sect__count">{t(`posledných ${events.length}`, `latest ${events.length}`)}</span>
+      </div>
+      <div className="rd-card" style={{ padding: 0 }}>
+        <div className="rd-scroll">
+          <table className="rd-table rd-table--compact">
+            <thead>
+              <tr>
+                <th style={th}>{t("Kedy", "When")}</th>
+                <th style={th}>{t("Ako", "How")}</th>
+                <th style={th}>E-mail</th>
+                <th style={th}>{t("Doména", "Domain")}</th>
+                <th style={{ ...th, textAlign: "right" }} title={t("Koľko účtov už mala táto doména", "How many accounts this domain had")}>{t("Účtov z domény", "From domain")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {events.map((e) => {
+                const [tone, sk, en] = EVENT_KINDS[e.event_type] || ["info", e.event_type, e.event_type];
+                const email = e.new_value?.email || "";
+                const gone = email && !live.has(email.toLowerCase());
+                const cls = tone === "ok" ? "rd-badge rd-badge--ok" : tone === "warn" ? "rd-badge rd-badge--warn" : "rd-badge";
+                const badgeStyle = tone === "bad" ? { color: "var(--danger)", borderColor: "color-mix(in srgb, var(--danger) 40%, transparent)" }
+                  : tone === "info" ? { color: "var(--text-2)", borderColor: "var(--border)" } : undefined;
+                const n = e.new_value?.org_count;
+                return (
+                  <tr key={e.id}>
+                    <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.74rem", color: "var(--text-dim)" }}>{e.detected_at ? when(e.detected_at) : "—"}</td>
+                    <td><span className={cls} style={badgeStyle}>{lang === "sk" ? sk : en}</span></td>
+                    <td style={{ color: gone ? "var(--text-faint)" : "var(--text)" }}>
+                      {email || <Dash />}{gone && <span style={{ marginLeft: 6, fontSize: "0.68rem" }}>({t("vymazaný", "deleted")})</span>}
+                    </td>
+                    <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.74rem" }}>{e.new_value?.domain || <Dash />}</td>
+                    <td style={{ textAlign: "right", fontFamily: "var(--font-mono)", color: n > 3 ? "var(--accent-2)" : "var(--text-dim)" }}>{n ?? "—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
   );
 }

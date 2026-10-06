@@ -19,7 +19,7 @@ import { track } from "../lib/track";
 import UpgradePrompt from "../components/UpgradePrompt";
 import Picker from "../components/Picker";
 import PageHero from "../components/PageHero";
-import AdminUsers, { UserStats } from "./AdminUsers";
+import AdminUsers, { UserStats, SignupEvents } from "./AdminUsers";
 import { useAdminClock } from "../lib/useAdminClock";
 import InfoTip from "../components/InfoTip";
 import { useSpecifics, SpecificsMark, SpecificsPanel, UnitPriceMarks } from "../lib/projectSpecifics";
@@ -3394,35 +3394,7 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
             bumpClock={bumpClock}
           />
 
-          {events.length > 0 && (
-            <>
-              <SectionHeader>{t.admin_events_section}</SectionHeader>
-              <div style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden", marginBottom: "2rem" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
-                  <thead style={{ background: "var(--surface-2)" }}>
-                    <tr style={{ textAlign: "left", color: dim, fontFamily: mono, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                      <th style={th}>When</th>
-                      <th style={th}>Event</th>
-                      <th style={th}>Email</th>
-                      <th style={th}>Domain</th>
-                      <th style={th}>Org count</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {events.map(e => (
-                      <tr key={e.id} style={{ borderTop: `1px solid ${border}` }}>
-                        <td style={{ ...td, color: dim, fontFamily: mono, fontSize: "0.75rem" }}>{e.detected_at ? new Date(e.detected_at).toLocaleString(localeTag(lang), { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Bratislava" }) : "—"}</td>
-                        <td style={td}><EventBadge type={e.event_type} /></td>
-                        <td style={td}>{e.new_value?.email || "—"}</td>
-                        <td style={{ ...td, color: dim, fontFamily: mono }}>{e.new_value?.domain || "—"}</td>
-                        <td style={{ ...td, fontFamily: mono, color: (e.new_value?.org_count || 0) > 3 ? orangeInk : dim }}>{e.new_value?.org_count ?? "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
+          <SignupEvents events={events} users={users} lang={lang} />
         </>
       )}
 
@@ -4330,18 +4302,6 @@ function TierBadge({ tier }) {
   };
   const c = map[tier] || dim;
   return <span style={{ fontFamily: mono, fontSize: "0.7rem", color: c, border: `1px solid ${c}`, padding: "2px 8px", borderRadius: 4, textTransform: "uppercase", fontWeight: 600 }}>{tier}</span>;
-}
-
-function EventBadge({ type }) {
-  const m = {
-    new_signup: { color: "var(--accent)", label: "NEW" },
-    new_signup_personal_email: { color: orangeInk, label: "PERSONAL EMAIL" },
-    new_signup_suspicious_org: { color: redInk, label: "SUSPICIOUS ORG" },
-    // made in admin → Users → "Add user" (api/admin/create-user.js), not a sign-up
-    new_signup_admin_created: { color: greenInk, label: "ADDED BY ADMIN" },
-  };
-  const x = m[type] || { color: dim, label: type };
-  return <span style={{ fontFamily: mono, fontSize: "0.65rem", color: x.color, border: `1px solid ${x.color}`, padding: "1px 6px", borderRadius: 3, fontWeight: 700, letterSpacing: "0.05em" }}>{x.label}</span>;
 }
 
 /* ───────────────────── SHARED STYLES ───────────────────── */

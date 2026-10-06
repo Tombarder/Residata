@@ -158,7 +158,6 @@ export const liveT = {
     admin_pending_section: "Pending approvals",
     admin_new_section: "All users",
     admin_approve: "Approve → free",
-    admin_events_section: "Recent signup events",
     admin_no_pending: "No pending approvals 🎉",
   },
   sk: {
@@ -307,7 +306,6 @@ export const liveT = {
     admin_pending_section: "Čakajúce schválenia",
     admin_new_section: "Všetci užívatelia",
     admin_approve: "Schváliť → free",
-    admin_events_section: "Nedávne signup udalosti",
     admin_no_pending: "Žiadne čakajúce schválenia 🎉",
   },
 };
