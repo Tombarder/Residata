@@ -339,11 +339,15 @@ export function archiveHolding(from, cubeRows, factRows, days) {
       let acc = 0;
       let through = "";
       let one = 0;
+      let oneFull = 0;
       let whole = true;
       for (const d of ds) {
         const rows = byDay.get(d);
         const k = days?.[c]?.get(d) || 1;
         one = rows / k;                                // one reading's rows
+        // one FULL reading's rows — not a not-due morning's retry of a few projects, which
+        // is often the month's last day of facts and no measure of a reading
+        if (!days || days[c]?.has(d)) oneFull = one;
         const held = Math.max(0, Math.min(k, Math.floor((total - acc) / one + 0.5)));
         if (held < k) {
           if (held > 0) cubePartial.set(`${c}|${mo}`, { day: d, readings: held });
@@ -358,8 +362,8 @@ export function archiveHolding(from, cubeRows, factRows, days) {
       // from the facts whose cube refresh failed (withdraw_snapshot carries on without it).
       // Its rows are still in the cube's answers, so they count in the cube's divisor —
       // or a cube grain read 15 000 for 7 500 until the next refresh — and it is a lag.
-      if (whole && one > 0) {
-        const extra = Math.floor((total - acc) / one + 0.5);
+      if (whole && oneFull > 0) {
+        const extra = Math.floor((total - acc) / oneFull + 0.5);
         if (extra > 0) cubeExtra.set(`${c}|${mo}`, extra);
       }
     }
@@ -395,7 +399,11 @@ export function heldReadingDays(days, holding, viaCube) {
       // day the cube holds (a cube answer is by month; a day is asked of the facts)
       for (const [k, extra] of holding.cubeExtra || []) {
         const through = holding.cubeThrough.get(k);
-        if (k.startsWith(`${c}|`) && through && kept.has(through)) kept.set(through, kept.get(through) + extra);
+        if (!k.startsWith(`${c}|`) || !through) continue;
+        // on the month's last FULL reading the cube holds (`through` may be a retry's day)
+        let at = "";
+        for (const d of kept.keys()) if (d.slice(0, 7) === through.slice(0, 7) && d <= through && d > at) at = d;
+        if (at) kept.set(at, kept.get(at) + extra);
       }
     }
     if (kept.size) out[c] = kept;

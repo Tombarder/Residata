@@ -733,3 +733,28 @@ test("records loaded with one October reading stay 7 500 after the 5th is approv
   assert.match(hook, /setFlatsStamp\(_archiveCacheStamp\);/);
   assert.match(hook, /return \{ flats, stamp: flatsStamp,/);
 });
+
+// ── a retry day last in the month is no measure of a reading ──
+// At a collection interval of more than a day the month's last day of facts is often a
+// not-due morning's retry of a few projects, which is not in archive_days.
+const extraCase = (days, cube, facts) => {
+  const sp = holdingSpecs(days);
+  const h = archiveHolding(sp.from, [{ d: ["SK", "2026-11"], m: { n: cube } }], facts.map(([d, n]) => ({ d: ["SK", d], m: { n } })), days);
+  const held = heldReadingDays(days, h, true);
+  const out = normaliseArchiveGrain([{ d: ["SK", "2026-11"], m: { n: cube } }], ["country", "snapshot_month"], held, {});
+  return { extra: h.cubeExtra.get("SK|2026-11") || 0, lags: holdingLags(days, h), shown: Math.round(nodeOf(out).n) };
+};
+const D6_ONLY = readingDaysByCountry([{ day: "2026-11-06", country: "SK", readings: 1 }]);
+const D2_6 = readingDaysByCountry([{ day: "2026-11-02", country: "SK", readings: 1 }, { day: "2026-11-06", country: "SK", readings: 1 }]);
+for (const [name, days, cube, facts, want] of [
+  ["the 2nd withdrawn, refresh failed; the 6th last", D6_ONLY, 15000, [["2026-11-06", 7500]], { extra: 1, lags: true, shown: 7500 }],
+  ["the same, and a 60-row retry on the 7th", D6_ONLY, 15060, [["2026-11-06", 7500], ["2026-11-07", 60]], { extra: 1, lags: true, shown: 7530 }],
+  ["the same, with the retry on the 3rd", D6_ONLY, 15060, [["2026-11-03", 60], ["2026-11-06", 7500]], { extra: 1, lags: true, shown: 7530 }],
+  ["no withdrawal, a retry last, the facts 40 rows under the cube", D2_6, 15100, [["2026-11-02", 7460], ["2026-11-06", 7500], ["2026-11-07", 60]], { extra: 0, lags: false, shown: 7550 }],
+  ["no withdrawal, no retry, the facts 40 rows under the cube", D2_6, 15040, [["2026-11-02", 7460], ["2026-11-06", 7500]], { extra: 0, lags: false, shown: 7520 }],
+  ["the facts 26 rows over the cube (a resync)", D2_6, 15000, [["2026-11-02", 7526], ["2026-11-06", 7500]], { extra: 0, lags: false, shown: 7500 }],
+]) {
+  test(`cube rows the facts lack — ${name}`, () => {
+    assert.deepEqual(extraCase(days, cube, facts), want);
+  });
+}
