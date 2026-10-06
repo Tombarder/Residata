@@ -476,6 +476,33 @@ test("a forced read is no step of a long lag's spacing", async () => {
   assert.equal(forced.lagSince, late.lagSince);
 });
 
+test("a forced read asks the days and the facts, not the cube, and leaves the entry as it is while neither moved", async () => {
+  const h = stagedHarness();
+  const a = await h._loadArchiveReadings("u");
+  const asked = { cube: h.st.cubeAsks, facts: h.st.factsAsks };
+  h.advance(5 * MIN);
+  h.st.cube = [{ d: ["SK", "2026-11"], m: { n: 15100 } }];                  // a refresh the forced read does not see
+  const b = await h._loadArchiveReadings("u", true);
+  assert.equal(b, a, "the same entry");
+  assert.equal(b.at, a.at, "the cube's check keeps its time");
+  assert.equal(h.st.cubeAsks, asked.cube, "the cube not asked");
+  assert.equal(h.st.factsAsks, asked.facts + 1);
+  // the facts moved (a retry of a few projects approved): a whole check, the cube included
+  h.st.facts = [...h.st.facts, { d: ["SK", "2026-11-10"], m: { n: 40 } }];
+  const c = await h._loadArchiveReadings("u", true);
+  assert.notEqual(c, a, "a new entry, published");
+  assert.equal(h.st.cubeAsks, asked.cube + 1);
+  assert.equal(h.st.factsAsks, asked.facts + 2, "the facts read once for it");
+  assert.ok(c.holding.facts.get("SK").has("2026-11-10"));
+  // read seconds ago: not read again when the caller allows it
+  const reads = h.st.reads;
+  assert.equal(await h._loadArchiveReadings("u", true, 10 * 1000), c);
+  assert.equal(h.st.reads, reads);
+  h.advance(11 * 1000);
+  await h._loadArchiveReadings("u", true, 10 * 1000);
+  assert.equal(h.st.reads, reads + 1);
+});
+
 // ── W1: forced reads during a holding outage are no step of the backoff ──
 // The holding RPC failing from 09:00, three records loads (a forced read before and after
 // each) at 09:01:10, 09:01:40 and 09:02:10, the RPC back and the cube refreshed at 09:03:
@@ -774,10 +801,38 @@ test("the records' readings are those of their market and months, as the facts h
   assert.equal(recordReadingsSignature(null, null, {}), "");
 });
 
+// ── W3: a records load costs one read of the days and the facts, not two of everything ──
+test("a records load after a fresh check reads the days and the facts once, and never the cube", async () => {
+  const st = {
+    days: [{ day: "2026-10-01", country: "SK", readings: 1 }, { day: "2026-10-05", country: "SK", readings: 1 }],
+    facts: [["SK", "2026-10-01", 7500], ["SK", "2026-10-05", 7500]],
+    cube: [["SK", "2026-10", 15000]],
+  };
+  const w = readingsWorld(st);
+  const db = { rows: fewRows(30) };
+  const render = flatsHarness(db, "SK");
+  const e = await w.load();                                                // the Pivot's first readings check
+  const at = { ...st };
+  render(null, ["2026-10-05"], true, w.stampOf(e));
+  await settle();
+  const got = render(null, ["2026-10-05"], true, w.stampOf(e));
+  assert.equal(got.flats.length, 30);
+  assert.deepEqual([st.dayReads - at.dayReads, st.factsAsks - at.factsAsks, st.cubeAsks - at.cubeAsks], [1, 1, 0],
+    "the check after the records only");
+  // five minutes on, another day: the check before them too
+  w.advance(5 * MIN);
+  const at2 = { ...st };
+  render(null, ["2026-10-01"], true, w.stampOf(e));
+  await settle();
+  render(null, ["2026-10-01"], true, w.stampOf(e));
+  assert.deepEqual([st.dayReads - at2.dayReads, st.factsAsks - at2.factsAsks, st.cubeAsks - at2.cubeAsks], [2, 2, 0]);
+});
+
 test("the Pivot hands the records its readings and a fresh read; the hook only when enabled", () => {
   const PIVOT = readFileSync(new URL("../pages/PivotV2.jsx", import.meta.url), "utf8");
   assert.match(PIVOT, /\(\{ days: readingDays, holding: holdingNow, refresh: refreshReadings \}\)/);
   assert.match(SRC, /\brefresh: enabled \? refresh : null,/);
+  assert.match(SRC, /const refresh = useCallback\(\(within = 0\) => _loadArchiveReadings\(key, true, within\), \[key\]\);/);
   const hook = SRC.slice(SRC.indexOf("export function useFlatsArchive("), SRC.indexOf("export function useFlatsArchive(") + 9000);
   assert.match(hook, /\$\{enabled \? "1" : "0"\}::\$\{readingsKey\}`/);
 });

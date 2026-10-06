@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { supabaseData, supabasePublic, isSupabaseReady } from "./supabase";
 import { useAuth } from "./useAuth";
 import { useCountry, isAllCountries } from "./useCountry";
-import { readingDaysByCountry, readingsSignature, holdingSpecs, archiveHolding, holdingSignature, holdingLags,
+import { readingDaysByCountry, readingsSignature, holdingSpecs, archiveHolding, holdingSignature, holdingLags, holdingFactsSignature,
   recordReadingsSignature } from "./archiveReadings";
 
 /**
@@ -1302,6 +1302,9 @@ export function useFlatsCurrent(enabled = true) {
 let _archiveCache = null;
 let _archiveCacheKey = null;
 let _archiveCacheStamp = null;
+// Readings read this recently are not read again before a read of the records (the
+// check after it still is): on a first load they were read a moment before.
+const ARCHIVE_RECORDS_READINGS_FRESH_MS = 10 * 1000;
 /*  `stamp` — what the caller wants kept WITH the records: the Pivot passes the archive
  *  readings in force when it asks (days and holding). They are handed back with the
  *  records they were asked with (and cached with them), so a reading that lands later
@@ -1362,19 +1365,19 @@ export function useFlatsArchive(months, dates, enabled = true, stamp = null) {
     setLoading(true);
     setProgress(0);
     setError(null); setTruncated(false); setTooLarge(null);
-    // Whether the readings, read now, no longer divide these records as those they are
-    // kept with do (or this request was dropped meanwhile). A read that fails leaves them
-    // as they were.
-    const readingsMoved = async () => {
+    // Whether the readings, read now (or `within` ms ago), no longer divide these records
+    // as those they are kept with do (or this request was dropped meanwhile). A read that
+    // fails leaves them as they were.
+    const readingsMoved = async (within = 0) => {
       if (!stamp?.refresh) return cancelled;
       let now = null;
-      try { now = await stamp.refresh(); } catch { /* the readings' own state says so */ }
+      try { now = await stamp.refresh(within); } catch { /* the readings' own state says so */ }
       return cancelled || (!!now && readingsOf(now) !== readingsKey);
     };
     (async () => {
       // The readings first, fresh: if they moved on, the caller asks again under the new
       // ones and this request is dropped (see `stamp`).
-      if (await readingsMoved()) return;
+      if (await readingsMoved(ARCHIVE_RECORDS_READINGS_FRESH_MS)) return;
       const all = [];
       let hadError = false;
       let lastError = null;
@@ -1713,14 +1716,20 @@ function _dropArchiveGrains() {
    withdrawn reading changes the first; a refresh of the cube (what it holds moved while
    the days did not) the second. A holding that could not be read keeps the last good one
    and changes neither, so a passing error does not send every grain to be asked again. */
-function _loadArchiveReadings(key, force = false) {
+/* Forced (`force`, the archive's records asking): the days and the facts are read now,
+   whatever the entry's age — or, given `within`, unless they were read that recently. While
+   neither moved, the cube is not asked and the entry stands as it is: the cube's own check
+   keeps its time, its lag's spacing and its failures' count. If either moved, it is a
+   whole check (the cube included), as any other. */
+function _loadArchiveReadings(key, force = false, within = 0) {
   const kept = _archiveReadingsCache.get(key);
   if (!force && kept && kept.holdingKnown && Date.now() - kept.at < _readingsTtl(kept)) return Promise.resolve(kept);
+  if (force && within && kept && kept.holdingKnown && Date.now() - (kept.factsAt || 0) < within) return Promise.resolve(kept);
   if (_archiveReadingsInflight.has(key)) {
     const running = _archiveReadingsInflight.get(key);
     if (!force) return running;
     // a forced read is one that STARTS now: one in flight may have read the days already
-    const again = () => _loadArchiveReadings(key, true);
+    const again = () => _loadArchiveReadings(key, true, within);
     return running.then(again, again);
   }
   const p = (async () => {
@@ -1741,6 +1750,17 @@ function _loadArchiveReadings(key, force = false) {
     const daysSig = readingsSignature(fresh);
     const sameDays = !!kept && kept.daysSig === daysSig;
     const days = sameDays ? kept.days : fresh;
+    const specs = holdingSpecs(days);
+    let factsRead = null;
+    if (force && sameDays && kept.holdingKnown && kept.holding && specs) {
+      factsRead = await sbRead(supabaseData.rpc("analytics_pivot", { p_spec: specs.facts }));
+      if (factsRead.error) return kept;            // as it was; the cube's check says more
+      const factsSig = holdingFactsSignature({ facts: archiveHolding(specs.from, [], factsRead.data, days).facts });
+      if (factsSig === kept.factsSig) {
+        kept.factsAt = startedAt;
+        return kept;
+      }
+    }
     let entry = sameDays ? kept : {
       days, daysSig, holding: null, holdingSig: null, holdingKnown: false, holdingFailed: false,
       failures: 0, lagging: false, lagSince: null, lagLate: 0,     // a new reading's lag counts afresh
@@ -1753,13 +1773,12 @@ function _loadArchiveReadings(key, force = false) {
     // What the cube and the facts hold of each market's newest month (archiveReadings.js,
     // THE CUBE LAGS). Unreadable: the last good holding for these days, else none — the
     // readings as they are.
-    const specs = holdingSpecs(days);
     let holding = null;
     let failed = false;
     if (specs) {
       const [cube, facts] = await Promise.all([
         sbRead(supabaseData.rpc("analytics_pivot", { p_spec: specs.cube })),
-        sbRead(supabaseData.rpc("analytics_pivot", { p_spec: specs.facts })),
+        factsRead || sbRead(supabaseData.rpc("analytics_pivot", { p_spec: specs.facts })),
       ]);
       if (cube.error || facts.error) { console.error("[archive readings] what the cube holds", cube.error || facts.error); failed = true; }
       else holding = archiveHolding(specs.from, cube.data, facts.data, days);
@@ -1774,13 +1793,14 @@ function _loadArchiveReadings(key, force = false) {
       return entry;
     }
     const holdingSig = holdingSignature(holding);
-    const cubeMoved = entry.holdingKnown && !failed && entry.holdingSig !== holdingSig;
+    const factsSig = holdingFactsSignature(holding);
+    const cubeMoved = entry.holdingKnown && !failed && (entry.holdingSig !== holdingSig || entry.factsSig !== factsSig);
     const lagging = holdingLags(days, holding);
     // a forced read (the archive's records asking) is no step of a long lag's spacing
     const lag = force && lagging && entry.lagging ? { lagSince: entry.lagSince, lagLate: entry.lagLate } : _lagState(lagging, entry, now);
     const failures = failed ? (entry.failures || 0) + 1 : 0;
     if (entry.holdingKnown && !cubeMoved) {        // nothing moved: the same entry, kept longer
-      Object.assign(entry, { holdingFailed: false, failures, lagging, ...lag, at: now });
+      Object.assign(entry, { holdingFailed: false, failures, lagging, ...lag, at: now, factsAt: now });
       return entry;
     }
     if (cubeMoved || (kept && !sameDays)) _dropArchiveGrains();
@@ -1792,6 +1812,8 @@ function _loadArchiveReadings(key, force = false) {
     entry = {
       ...entry, holding, holdingSig, holdingKnown: true, holdingFailed: failed, failures,
       lagging, ...lag, cubeGen, version: `${daysSig}/${cubeGen}`, at: now, ...prev,
+      // the facts' side, and when it was last read: what a forced read compares
+      factsSig, factsAt: failed ? 0 : now,
     };
     _archiveReadingsCache.set(key, entry);
     _publishReadings(key);
@@ -1856,9 +1878,9 @@ export function useArchiveReadingDays({ enabled = false } = {}) {
       clearInterval(timer);
     };
   }, [enabled, key, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Read the readings again now, whatever their age — around a read of the archive's
-  // records, so the readings they are kept with are no older than they are.
-  const refresh = useCallback(() => _loadArchiveReadings(key, true), [key]);
+  // Read the days and the facts again now (or unless read `within` ms ago) — around a read
+  // of the archive's records, so the readings they are kept with are no older than they are.
+  const refresh = useCallback((within = 0) => _loadArchiveReadings(key, true, within), [key]);
   const entry = enabled ? rendered : null;
   const days = entry ? entry.days : null;
   const error = !!enabled && !days && failedKey === key;
