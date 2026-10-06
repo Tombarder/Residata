@@ -360,3 +360,59 @@ test("the page asks for the archive grain once the readings are known, and passe
   assert.match(PIVOT, /usePivotGrain\(\{ enabled: grainEnabled && priceScope, spec: pivotSpecUnscoped, meta: grainMeta,/);
   assert.match(PIVOT, /\(\{ archive: !isCurrent, dims: specDims, scope: readingScope, days: readingDays \}\)/);
 });
+
+// ── the record path (median, distinct counts) and the drill-down count flats too ──
+const { archiveRecordCells, weightedCount } = await import("./archiveReadings.js");
+const recordCountOf = new Function("weightedCount", `
+  ${PIVOT.match(/const _STAV = [^\n]*/)[0]}
+  ${PIVOT.match(/function recordCount\(records, recordCell, pred\)[\s\S]*?\n\}/)[0]}
+  return { recordCount, _STAV };
+`)(weightedCount);
+
+// A 100-flat project (60 on offer, 40 sold) seen at each reading of a scope.
+const recordsOver = (dayList) => dayList.flatMap((day) => Array.from({ length: 100 }, (_, i) => ({
+  country: "SK", project_id: "x", unit_id: `u${i}`, batch_timestamp: `${day}T05:12:00+00:00`,
+  snapshot_month: day.slice(0, 7), stav: i < 60 ? "V" : "P",
+})));
+
+test("Počet on the record path is the flats, not the flat-readings: 100, not 700", () => {
+  const sel = ["2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05", "2026-10-09"];
+  const filters = [{ key: "snapshot_month", mode: "in", values: ["2026-10"] }];
+  const recs = recordsOver(sel);
+  const cell = archiveRecordCells(SK_DAYS, archiveReadingScope(filters), ["project_name"]);
+  const { recordCount, _STAV } = recordCountOf;
+  assert.equal(recs.length, 600);
+  assert.equal(recordCount(recs, cell), 100);
+  assert.equal(recordCount(recs, cell, (r) => _STAV(r) === "V"), 60);
+  assert.equal(recordCount(recs, cell, (r) => _STAV(r) === "P"), 40);
+  assert.equal(recordCount(recs, null), 600, "today's market: one record, one flat");
+});
+
+test("the record path averages over the months and days it spans, like the grain path", () => {
+  const { recordCount } = recordCountOf;
+  const recs = recordsOver(["2026-09-29", "2026-09-30", "2026-10-01"]);
+  const scope = archiveReadingScope([{ key: "datum", mode: "in", values: ["2026-09-29", "2026-09-30", "2026-10-01"] }]);
+  assert.equal(recordCount(recs, archiveRecordCells(SK_DAYS, scope, ["project_name"])), 100);
+  assert.equal(recordCount(recs, archiveRecordCells(SK_DAYS, scope, ["datum"])), 100);
+  // a morning that only re-collected a few projects is no reading: its records do not count
+  const retry = recordsOver(["2026-10-07"]).slice(0, 5);
+  assert.equal(recordCount([...recordsOver(["2026-10-05"]), ...retry],
+    archiveRecordCells(SK_DAYS, archiveReadingScope([]), ["datum"])), 100);
+});
+
+test("the record path's tree, header and the drill-down all count this way", () => {
+  assert.match(PIVOT, /if \(agg === "count"\) return recordCount\(records, recordCell\);/);
+  assert.match(PIVOT, /field === FIELDS\.sold_count\) return recordCount\(records, recordCell, \(r\) => _STAV\(r\) === "P"\)/);
+  assert.match(PIVOT, /field === FIELDS\.available_count\) return recordCount\(records, recordCell, \(r\) => _STAV\(r\) === "V"\)/);
+  const tree = PIVOT.match(/function buildTree\(records, rowFields, colFields, valueDefs, recordCell = null\)[\s\S]*?\n\}/)[0];
+  assert.equal((tree.match(/count: recordCount\((records|items), recordCell\)/g) || []).length, 3);
+  assert.match(tree, /compute\(FIELDS\[v\.field\], v\.agg, recs, recordCell\)/);
+  assert.match(PIVOT, /buildTree\(filteredRecords, rows, cols, effectiveValues, recordCell\)/);
+  assert.match(PIVOT, /archiveRecordCells\(readingDays, readingScope, gDims\)/);
+  assert.match(PIVOT, /const displayCount = useGrain \? \(rawTree\?\.count \|\| 0\) : recordsCount;/);
+  assert.match(PIVOT, /configServerable \? displayCount : \(rawTree\?\.count \|\| 0\)/);
+  assert.match(PIVOT, /configServerable \? displayCount : recordsCount/);
+  assert.match(PIVOT, /const count = isCurrent \? undefined : node\.count;/);
+  assert.match(PIVOT, /\(count \?\? records\.length\)\.toLocaleString/);
+  assert.match(PIVOT, /useArchiveReadingDays\(\{ enabled: canViewAnalytics && !isCurrent \}\)/);
+});

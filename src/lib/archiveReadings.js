@@ -40,6 +40,10 @@
  * stays on the cube; they go LAST, after the Rows and the Column, so the tree builder —
  * which reads d[0..] for the Rows and d[rows.length] for the Column — groups over them.
  * The month is asked only when needed: 500 projects over 12 months is 6 000 rows.
+ *
+ * The record path (median, distinct counts) counts the same way: each record weighs
+ * 1 / the readings of its market-month in scope (of its day, by Datum), over the same
+ * periods (archiveRecordCells, weightedCount).
  */
 
 // The grain's additive components (analytics_pivot's m object). mn_*/mx_* are not.
@@ -199,4 +203,29 @@ export function periodFactors(items, cellOf) {
     const D = c.day ? days.get(`${c.mk}|${c.month}`).size : 1;
     return 1 / (M * D);
   });
+}
+
+/** The record path's cell of a flat record (flats_archive: country, batch_timestamp,
+ *  snapshot_month), or null for a weighing that does not apply (by Batch). */
+export function archiveRecordCells(days, scope, dims) {
+  if ((dims || []).includes("batch_timestamp") || scope.perBatch) return null;
+  const cellOf = archiveCells(days, scope, dims);
+  return (r) => {
+    const day = r?.batch_timestamp ? String(r.batch_timestamp).slice(0, 10) : null;
+    return cellOf(r?.country, day, r?.snapshot_month || (day ? day.slice(0, 7) : null));
+  };
+}
+
+/** Flats among `recs` (those passing `pred`), as the grain path counts them: each record
+ *  1 / its cell's readings, averaged over the periods `recs` span. */
+export function weightedCount(recs, recordCell, pred) {
+  const cells = recs.map(recordCell);
+  const f = periodFactors(cells, (c) => c);
+  let n = 0;
+  for (let i = 0; i < recs.length; i += 1) {
+    const c = cells[i];
+    if (!c || (pred && !pred(recs[i]))) continue;
+    n += f[i] / c.r;
+  }
+  return n;
 }

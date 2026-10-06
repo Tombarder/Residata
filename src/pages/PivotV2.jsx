@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef, useLayoutEffect, Fragment } from 
 import { createPortal } from "react-dom";
 import { useSpecifics, SpecificsMark } from "../lib/projectSpecifics";
 import { useAnalyticsRegistry, useProjects, useFlatsArchive, useFlatsCurrent, useArchiveMonths, useArchiveDays, useArchiveReadingDays, usePivotGrain, usePivotDistinct, usePivotFieldStats, fetchFlatsForProjects } from "../lib/useData";
-import { archiveGrainDims, archiveReadingScope, normaliseArchiveGrain, periodFactors, scaleComponents } from "../lib/archiveReadings";
+import { archiveGrainDims, archiveReadingScope, normaliseArchiveGrain, periodFactors, scaleComponents, archiveRecordCells, weightedCount } from "../lib/archiveReadings";
 import { useCountry, isAllCountries, countryName } from "../lib/useCountry";
 import { useCapabilities } from "../lib/useCapabilities";
 import { useAuth } from "../lib/useAuth";
@@ -803,13 +803,27 @@ function summariseFilter(filter, _fieldType, lang) {
   return `${prefix} ${n} hodnôt`;
 }
 
-function compute(field, agg, records) {
+// The record path's count of flats. In the archive a record is one flat at one READING,
+// so `recordCell` (archiveRecordCells, src/lib/archiveReadings.js) weighs each by its
+// readings and averages over the periods the records span, as the grain path counts —
+// adding a median column used to turn Počet 100 into 700. Today's market: one record, one
+// flat.
+const _STAV = (r) => (r.stav || "").trim().toUpperCase();
+function recordCount(records, recordCell, pred) {
+  if (!recordCell) return pred ? records.filter(pred).length : records.length;
+  return Math.round(weightedCount(records, recordCell, pred));
+}
+
+function compute(field, agg, records, recordCell = null) {
   // count doesn't need a field — it's just the record count. This path
   // also serves the default "__count__" measure (values.length===0) where
   // field is null. Used to return null here, which made the default
   // Count column render as "—" on first drop.
-  if (agg === "count") return records.length;
+  if (agg === "count") return recordCount(records, recordCell);
   if (!field) return null;
+  // The two count measures are counts of flats too (see recordCount).
+  if (recordCell && field === FIELDS.sold_count) return recordCount(records, recordCell, (r) => _STAV(r) === "P");
+  if (recordCell && field === FIELDS.available_count) return recordCount(records, recordCell, (r) => _STAV(r) === "V");
   // Measure fields carry their own single calculation
   if (field.type === "measure" && typeof field.measureCompute === "function") {
     return field.measureCompute(records);
@@ -874,7 +888,7 @@ function distinctColValues(records, colField) {
      `colKeys` is attached to the root so the header can enumerate
      columns consistently (including the "Σ" grand-col).
 */
-function buildTree(records, rowFields, colFields, valueDefs) {
+function buildTree(records, rowFields, colFields, valueDefs, recordCell = null) {
   // Enumerate distinct column values globally — same axis across all rows.
   const colKeys = colFields.length
     ? distinctColValues(records, colFields[0])
@@ -882,7 +896,7 @@ function buildTree(records, rowFields, colFields, valueDefs) {
   const colAcc = colFields.length ? FIELDS[colFields[0]]?.accessor : null;
 
   const rollupsFor = (recs) =>
-    valueDefs.map((v) => compute(FIELDS[v.field], v.agg, recs));
+    valueDefs.map((v) => compute(FIELDS[v.field], v.agg, recs, recordCell));
 
   // Per-column rollups: partition `recs` by col key, compute values for each.
   const colRollupsFor = (recs) => {
@@ -904,7 +918,7 @@ function buildTree(records, rowFields, colFields, valueDefs) {
     return {
       label: "Total", path: [], pathKey: "",
       level: -1, colKeys,
-      records, count: records.length,
+      records, count: recordCount(records, recordCell),
       rollups: rollupsFor(records),
       colRollups: colRollupsFor(records),
       children: [],
@@ -930,7 +944,7 @@ function buildTree(records, rowFields, colFields, valueDefs) {
         pathKey: path.join(SEP),
         level: depth,
         records: items,
-        count: items.length,
+        count: recordCount(items, recordCell),
         rollups: rollupsFor(items),
         colRollups: colRollupsFor(items),
         children: isDeepest ? [] : rec(items, depth + 1, path),
@@ -943,7 +957,7 @@ function buildTree(records, rowFields, colFields, valueDefs) {
   return {
     label: "Total", path: [], pathKey: "",
     level: -1, colKeys,
-    records, count: records.length,
+    records, count: recordCount(records, recordCell),
     rollups: rollupsFor(records),
     colRollups: colRollupsFor(records),
     children: rec(records, 0, []),
@@ -1845,7 +1859,8 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // readings it was asked with — and if they cannot be read, the table is not shown: a
   // flat-reading count is the number this replaces.
   const archiveGrain = configServerable && !isCurrent;
-  const { days: readingDays, version: readingsVersion, loading: readingsLoading, error: readingsError } = useArchiveReadingDays({ enabled: archiveGrain });
+  // The record path (median, distinct counts) counts its flats by the same readings.
+  const { days: readingDays, version: readingsVersion, loading: readingsLoading, error: readingsError } = useArchiveReadingDays({ enabled: canViewAnalytics && !isCurrent });
   const grainVersion = isCurrent ? "" : readingsVersion;
   // What a grain answers, handed back with it: a grain still on screen while the next
   // loads is read as the question IT answers (grainView), not the one now being asked.
@@ -1921,15 +1936,22 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // instant. forceRaw loads records in the background to back a drill-down modal
   // (table unchanged) or a non-server-able config (where useGrain is false anyway).
   const useGrain = configServerable;
+  // In the archive a record is a flat at one reading; this weighs it (recordCount).
+  const recordCell = useMemo(
+    () => (canViewAnalytics && !isCurrent && readingDays ? archiveRecordCells(readingDays, readingScope, gDims) : null),
+    [canViewAnalytics, isCurrent, readingDays, readingScope, gDims]
+  );
   const rawTree = useMemo(
     () => useGrain
       ? buildTreeFromGrain(grain, rows, cols, effectiveValues)
-      : buildTree(filteredRecords, rows, cols, effectiveValues),
-    [useGrain, grain, filteredRecords, rows, cols, effectiveValues]
+      : buildTree(filteredRecords, rows, cols, effectiveValues, recordCell),
+    [useGrain, grain, filteredRecords, rows, cols, effectiveValues, recordCell]
   );
+  // The record path's "of all" count, on the same basis as its table.
+  const recordsCount = useMemo(() => recordCount(records, recordCell), [records, recordCell]);
 
   // Header unit count + loading skeleton, source-aware.
-  const displayCount = useGrain ? (rawTree?.count || 0) : records.length;
+  const displayCount = useGrain ? (rawTree?.count || 0) : recordsCount;
 
   // How many flats the price scope kept and how many it set aside — the concrete
   // "27 of 141" that makes the note land instead of sounding like a disclaimer.
@@ -1992,7 +2014,9 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   const isInitialLoading = canViewAnalytics && (
     useGrain
       ? (grainLoading && (grain == null || grain.length === 0))
-      : ((forceRaw || !configServerable) && loadingFlats && (realFlats?.length || 0) === 0)
+      : (((forceRaw || !configServerable) && loadingFlats && (realFlats?.length || 0) === 0)
+        // archive records are counted by the readings: wait for them (recordCount)
+        || (!configServerable && !isCurrent && readingsLoading))
   );
   // The server pivot (analytics_pivot RPC) can fail (cold statement_timeout, RLS,
   // bad spec). Without this the empty grain rendered as a benign "0 units" — a
@@ -2601,8 +2625,11 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
         onDrillDown={async (node) => {
           const title = node.path.length ? node.path.join(" › ") : (lang === "sk" ? "Všetky záznamy" : "All records");
           // Record-mode node already carries its records (non-serverable config).
+          // In the archive the modal lists every reading's row, and states the cell's count
+          // of flats (node.count) rather than the rows' — the two used to read 100 and 3 000.
+          const count = isCurrent ? undefined : node.count;
           if (node.records && node.records.length) {
-            setDrillDown({ title, pathKey: node.pathKey, records: node.records });
+            setDrillDown({ title, pathKey: node.pathKey, records: node.records, count });
             return;
           }
           // Resolve the clicked group's project ids from its project-level path
@@ -2621,10 +2648,10 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
           // client pull so it still works.
           if (candIds == null || candIds.length === 0) {
             if (configServerable) setForceRaw(true);
-            setDrillDown({ title, pathKey: node.pathKey, records: null });
+            setDrillDown({ title, pathKey: node.pathKey, records: null, count });
             return;
           }
-          setDrillDown({ title, pathKey: node.pathKey, records: null, loading: true });
+          setDrillDown({ title, pathKey: node.pathKey, records: null, loading: true, count });
           const raw = await fetchFlatsForProjects(country, candIds, { isCurrent, months: fetchMonths });
           const enriched = raw.map((f) => {
             const p = projectById[f.project_id];
@@ -2675,6 +2702,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
         <DrillDownModal
           title={drillDown.title}
           records={drillRecords}
+          count={drillDown.count}
           loading={drillLoading}
           onClose={() => { setDrillDown(null); }}
           lang={lang}
@@ -2794,8 +2822,8 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
           fontSize: "0.75rem",
         }}>
           <span style={{ color: dim }}>
-            Filtrovaných <strong style={{ color: text }}>{(configServerable ? displayCount : filteredRecords.length).toLocaleString("en-US").replace(/,/g, " ")}</strong>
-            {" "}z {(configServerable ? displayCount : records.length).toLocaleString("en-US").replace(/,/g, " ")}
+            Filtrovaných <strong style={{ color: text }}>{(configServerable ? displayCount : (rawTree?.count || 0)).toLocaleString("en-US").replace(/,/g, " ")}</strong>
+            {" "}z {(configServerable ? displayCount : recordsCount).toLocaleString("en-US").replace(/,/g, " ")}
           </span>
           {filters.filter(isFilterActive).map(f => (
             <span key={f.key} style={{ color: text }}>
@@ -5806,7 +5834,7 @@ function CheckboxRow({ checked, onChange, label }) {
 /* ─── DRILL-DOWN MODAL ────────────────────────────────────────────
    Click a count or subtotal to see the underlying flat records that
    contributed to that cell. Showing 12 cols by default, scrollable. */
-function DrillDownModal({ title, records, loading, onClose, lang }) {
+function DrillDownModal({ title, records, count, loading, onClose, lang }) {
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", onKey);
@@ -5896,7 +5924,7 @@ function DrillDownModal({ title, records, loading, onClose, lang }) {
           </span>
           <strong style={{ color: text, fontSize: "0.9rem" }}>{title}</strong>
           <span style={{ color: dim, fontFamily: mono, fontSize: "0.72rem", marginLeft: "auto" }}>
-            {records.length.toLocaleString("en-US").replace(/,/g, " ")}
+            {(count ?? records.length).toLocaleString("en-US").replace(/,/g, " ")}
           </span>
           <button onClick={downloadCSV} style={{
             background: "transparent", border: `1px solid color-mix(in srgb, var(--accent) 33%, transparent)`, color: accentInk,
