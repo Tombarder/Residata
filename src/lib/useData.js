@@ -1733,6 +1733,20 @@ function _grainView(state, key, meta, cached) {
 }
 const GRAIN_IDLE = Object.freeze({ key: null, grain: null, meta: null, error: false });
 
+// Today's market (mode 'latest') changes with every approval and serving refresh, and
+// nothing tells this cache: a latest grain was kept for the whole session, so a tab left
+// open showed the morning's market in the evening. It is now kept PIVOT_GRAIN_TTL_MS, as
+// the archive readings are, and asked again after that — on the next ask, when the tab
+// comes back into view, and at every PIVOT_GRAIN_CHECK_MS — with the kept one on screen
+// meanwhile. An archive grain changes only with the readings, whose version is in its key.
+const PIVOT_GRAIN_TTL_MS = 15 * 60 * 1000;
+const PIVOT_GRAIN_CHECK_MS = 15 * 60 * 1000;
+const _isArchiveGrainKey = (key) => key.includes('"mode":"archive"');
+/** Whether the cache entry { grain, at } for `key` can be served without asking again. */
+function _grainCurrent(key, entry, now) {
+  return !!entry && (_isArchiveGrainKey(key) || now - entry.at < PIVOT_GRAIN_TTL_MS);
+}
+
 /** Server-aggregated pivot grain rows [{d:[dimVals], m:{components}}] for a full
  *  analytics_pivot spec ({dims, filters, filters_not, ranges, nulls, mode, …}).
  *  The spec is built in PivotV2 (buildPivotSpec) — ALL filters are applied server-side
@@ -1749,22 +1763,44 @@ export function usePivotGrain({ enabled = false, spec = null, meta = null, versi
     ? `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}::${specKey}::${version}`
     : null;
   const [state, setState] = useState(GRAIN_IDLE);
+  // A kept latest grain past its time asks again (see PIVOT_GRAIN_TTL_MS).
+  const [recheck, setRecheck] = useState(0);
+  useEffect(() => {
+    if (!key || _isArchiveGrainKey(key)) return;
+    const ask = () => {
+      const e = _pivotGrainCache.get(key);
+      if (e && !_grainCurrent(key, e, Date.now())) setRecheck((n) => n + 1);
+    };
+    const onVisible = () => { if (typeof document === "undefined" || document.visibilityState === "visible") ask(); };
+    if (typeof document !== "undefined") document.addEventListener("visibilitychange", onVisible);
+    const timer = setInterval(ask, PIVOT_GRAIN_CHECK_MS);
+    return () => {
+      if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisible);
+      clearInterval(timer);
+    };
+  }, [key]);
   useEffect(() => {
     if (!key) { setState(GRAIN_IDLE); return; }
     if (!isSupabaseReady() || authLoading) return;
-    if (_pivotGrainCache.has(key)) { setState({ key, grain: _pivotGrainCache.get(key), meta, error: false }); return; }
+    const kept = _pivotGrainCache.get(key);
+    if (kept) setState({ key, grain: kept.grain, meta, error: false });
+    if (_grainCurrent(key, kept, Date.now())) return;
     let cancelled = false;
     (async () => {
       const { data, error } = await sbRead(supabaseData.rpc("analytics_pivot", { p_spec: spec }));
       if (cancelled) return;
-      if (error) { console.error("[usePivotGrain]", error); setState({ key, grain: [], meta, error: true }); return; }
+      if (error) {
+        console.error("[usePivotGrain]", error);
+        if (!kept) setState({ key, grain: [], meta, error: true });   // a kept grain stays
+        return;
+      }
       const arr = Array.isArray(data) ? data : [];
-      _pivotGrainCache.set(key, arr);
+      _pivotGrainCache.set(key, { grain: arr, at: Date.now() });
       setState({ key, grain: arr, meta, error: false });
     })();
     return () => { cancelled = true; };
-  }, [key, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
-  return _grainView(state, key, meta, key && _pivotGrainCache.has(key) ? _pivotGrainCache.get(key) : undefined);
+  }, [key, authLoading, recheck]); // eslint-disable-line react-hooks/exhaustive-deps
+  return _grainView(state, key, meta, key ? _pivotGrainCache.get(key)?.grain : undefined);
 }
 
 /* useSales — the Analytics → Predaje/Sales engine (public.analytics_sales).

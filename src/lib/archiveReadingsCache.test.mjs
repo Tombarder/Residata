@@ -114,3 +114,31 @@ test("the readings signature changes with a reading and not otherwise", () => {
   assert.notEqual(readingsSignature(a), readingsSignature(readingDaysByCountry(NOV2.rows)));
   assert.notEqual(readingsSignature(a), readingsSignature(readingDaysByCountry([{ day: "2026-11-02", country: "SK", readings: 2 }])));
 });
+
+// ── today's market: the Pivot's latest-mode grains are kept for minutes, not the session ──
+const grainCurrent = new Function(`
+  ${SRC.match(/const PIVOT_GRAIN_TTL_MS = [^\n]*/)[0]}
+  ${SRC.match(/const _isArchiveGrainKey = [^\n]*/)[0]}
+  ${SRC.match(/function _grainCurrent\(key, entry, now\)[\s\S]*?\n\}/)[0]}
+  return _grainCurrent;
+`)();
+
+test("a latest grain is served for 15 minutes, then asked again; an archive grain follows its readings", () => {
+  const t0 = Date.UTC(2026, 10, 2, 9, 0);
+  const latest = 'u::{"dims":["cast"],"mode":"latest"}::';
+  const archive = 'u::{"dims":["cast","country"],"mode":"archive"}::12.abc/-';
+  assert.equal(grainCurrent(latest, { grain: [], at: t0 }, t0 + 14 * MIN), true);
+  assert.equal(grainCurrent(latest, { grain: [], at: t0 }, t0 + 16 * MIN), false, "the morning's market in the evening");
+  assert.equal(grainCurrent(archive, { grain: [], at: t0 }, t0 + 24 * 60 * MIN), true);
+  assert.equal(grainCurrent(latest, undefined, t0), false);
+});
+
+test("the grain hook asks again while the page is open, and keeps the kept grain on screen meanwhile", () => {
+  const hook = SRC.match(/export function usePivotGrain[\s\S]*?\n\}\n/)[0];
+  assert.match(hook, /setInterval\(ask, PIVOT_GRAIN_CHECK_MS\)/);
+  assert.match(hook, /addEventListener\("visibilitychange"/);
+  assert.match(hook, /_pivotGrainCache\.set\(key, \{ grain: arr, at: Date\.now\(\) \}\)/);
+  assert.match(hook, /if \(kept\) setState\(\{ key, grain: kept\.grain, meta, error: false \}\);\s*\n\s*if \(_grainCurrent\(key, kept, Date\.now\(\)\)\) return;/);
+  assert.match(hook, /\}, \[key, authLoading, recheck\]\)/);
+  assert.match(hook, /if \(!kept\) setState\(\{ key, grain: \[\], meta, error: true \}\);/);
+});
