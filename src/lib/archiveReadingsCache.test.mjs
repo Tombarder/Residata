@@ -175,7 +175,7 @@ test("a holding read during the cube's lag is kept a minute, then 15 minutes onc
 
 test("the hook checks every minute, and the assistant keeps lagging readings a minute", () => {
   assert.match(SRC, /const ARCHIVE_READINGS_CHECK_MS = 60 \* 1000;/);
-  assert.match(SRC, /const _readingsTtl = \(entry\) => \(entry\.lagging \|\| entry\.holdingFailed\s*\? Math\.min\(ARCHIVE_READINGS_TTL_MS, ARCHIVE_READINGS_LAG_TTL_MS \* 2 \*\* /);
+  assert.match(SRC, /if \(entry\.lagging\) return entry\.lagLate \? _backoff\(entry\.lagLate\) : ARCHIVE_READINGS_LAG_TTL_MS;/);
   const CHAT = readFileSync(new URL("../../api/ai/chat.js", import.meta.url), "utf8");
   assert.match(CHAT, /const keep = _readings\?\.lagging \? 60 \* 1000 : 10 \* 60 \* 1000;/);
 });
@@ -311,25 +311,74 @@ test("when the days change, the kept entry stays until the new holding is in, th
 });
 
 // ── a lag that lasts backs off ──
-test("a cube that keeps lagging is asked 1, 2, 4, 8, then every 15 minutes; settled, the count starts over", async () => {
+test("a lag is checked every minute for its first 15 minutes, then 2, 4, 8 and 15 apart; settled, the count ends", async () => {
   const h = stagedHarness();
   h.st.cube = [{ d: ["SK", "2026-11"], m: { n: 7500 } }];      // the refresh keeps failing
   await h._loadArchiveReadings("u");
-  let reads = 0;
   const minutes = [];
   for (let m = 1; m <= 60; m += 1) {
     h.advance(MIN);
     const before = h.st.reads;
     await h._loadArchiveReadings("u");
-    if (h.st.reads > before) { reads += 1; minutes.push(m); }
+    if (h.st.reads > before) minutes.push(m);
   }
-  assert.deepEqual(minutes.slice(0, 5), [1, 3, 7, 15, 30], "1, 2, 4, 8, then 15 minutes apart");
-  assert.ok(reads <= 7, `${reads} reads in an hour`);
+  assert.deepEqual(minutes, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 21, 29, 44, 59]);
   h.st.cube = [{ d: ["SK", "2026-11"], m: { n: 15000 } }];      // refreshed at last
   h.advance(15 * MIN);
   const ok = await h._loadArchiveReadings("u");
   assert.equal(ok.lagging, false);
-  assert.equal(ok.unsettled, 0);
+  assert.equal(ok.lagSince, null);
+  assert.equal(ok.lagLate, 0);
+});
+
+test("a cube refreshed within its lag's first 15 minutes is seen within a minute", async () => {
+  for (const [R, seenAt] of [[2, 2], [5, 5], [10, 10], [15, 15], [17, 17], [40, 44]]) {
+    const h = stagedHarness();
+    h.st.cube = [{ d: ["SK", "2026-11"], m: { n: 7500 } }];
+    await h._loadArchiveReadings("u");
+    let seen = null;
+    for (let m = 1; m <= 60 && seen == null; m += 1) {
+      h.advance(MIN);
+      if (m === R) h.st.cube = [{ d: ["SK", "2026-11"], m: { n: 15000 } }];
+      const e = await h._loadArchiveReadings("u");
+      if (!e.lagging) seen = m;
+    }
+    assert.equal(seen, seenAt, `refreshed at +${R} min`);
+  }
+});
+
+test("a holding that cannot be read is asked 1, 2, 4, 8, then 15 minutes apart", async () => {
+  const h = stagedHarness();
+  await h._loadArchiveReadings("u");
+  h.st.rpcFails = true;
+  h.advance(15 * MIN);
+  await h._loadArchiveReadings("u");                           // the first failure
+  const minutes = [];
+  for (let m = 1; m <= 45; m += 1) {
+    h.advance(MIN);
+    const before = h.st.reads;
+    await h._loadArchiveReadings("u");
+    if (h.st.reads > before) minutes.push(m);
+  }
+  assert.deepEqual(minutes, [1, 3, 7, 15, 30, 45]);
+});
+
+test("a new reading during a lag starts its lag's count afresh", async () => {
+  const h = stagedHarness();
+  h.st.cube = [{ d: ["SK", "2026-11"], m: { n: 7500 } }];
+  await h._loadArchiveReadings("u");
+  for (let m = 1; m <= 20; m += 1) { h.advance(MIN); await h._loadArchiveReadings("u"); }
+  assert.ok(h._archiveReadingsCache.get("u").lagLate > 0, "past the window");
+  h.st.days = [...h.st.days, { day: "2026-11-09", country: "SK", readings: 1 }];
+  h.advance(15 * MIN);
+  const e = await h._loadArchiveReadings("u");
+  assert.equal(e.days.SK.get("2026-11-09"), 1);
+  assert.equal(e.lagging, true);
+  assert.equal(e.lagLate, 0, "checked every minute again");
+  h.advance(MIN);
+  const before = h.st.reads;
+  await h._loadArchiveReadings("u");
+  assert.equal(h.st.reads, before + 1);
 });
 
 test("a check that keeps the entry renders nothing again", () => {

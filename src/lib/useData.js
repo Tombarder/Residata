@@ -1632,20 +1632,32 @@ export function useArchiveDays() {
 // the first made November read twice the flats. When an answer differs from the kept one
 // (a reading landed or was withdrawn), every archive grain divided by the old readings
 // leaves the grain cache, and the new version makes a mounted Pivot ask again.
-// While the cube lags an approval (holdingLags), or what it holds could not be read, the
-// answer is kept a minute, then 2, 4 and 8, then 15 again: a lag lasts until the cube's
-// refresh, minutes after the approval, and a holding read during it — "the cube lacks
-// the 6th" — would otherwise divide every new grain wrongly for 15 minutes; a lag that
-// lasts (a refresh that keeps failing) then costs no more reads than a settled cube.
-// Settled again, the count starts over.
+// While the cube lags an approval (holdingLags) the answer is kept a minute for the
+// first ARCHIVE_READINGS_LAG_WINDOW_MS of the lag: it lasts until the cube's refresh,
+// minutes after the approval, and a holding read during it — "the cube lacks the 6th" —
+// divides every grain asked after the refresh by a reading too few until it is read
+// again. A lag that outlasts the window (a refresh that keeps failing) is then asked 2,
+// 4 and 8 minutes apart, then every 15; so is a holding that could not be read, from its
+// first failure. A new reading starts its lag's count afresh; settled, the count ends.
 const ARCHIVE_READINGS_TTL_MS = 15 * 60 * 1000;
 const ARCHIVE_READINGS_LAG_TTL_MS = 60 * 1000;
+const ARCHIVE_READINGS_LAG_WINDOW_MS = 15 * 60 * 1000;
 const ARCHIVE_READINGS_CHECK_MS = 60 * 1000;   // each check a no-op while the kept answer is current
-const _readingsTtl = (entry) => (entry.lagging || entry.holdingFailed
-  ? Math.min(ARCHIVE_READINGS_TTL_MS, ARCHIVE_READINGS_LAG_TTL_MS * 2 ** Math.max(0, (entry.unsettled || 1) - 1))
-  : ARCHIVE_READINGS_TTL_MS);
-// identity → { days, daysSig, holding, holdingSig, holdingKnown, holdingFailed, lagging,
-//              unsettled (checks in a row that found it lagging or unreadable), cubeGen, version, at }
+const _backoff = (n) => Math.min(ARCHIVE_READINGS_TTL_MS, ARCHIVE_READINGS_LAG_TTL_MS * 2 ** Math.max(0, n));
+const _readingsTtl = (entry) => {
+  if (entry.holdingFailed) return _backoff((entry.failures || 1) - 1);
+  if (entry.lagging) return entry.lagLate ? _backoff(entry.lagLate) : ARCHIVE_READINGS_LAG_TTL_MS;
+  return ARCHIVE_READINGS_TTL_MS;
+};
+// The lag's state after a check that found it `lagging`: since when, and how many checks
+// past the window (0 within it).
+function _lagState(lagging, prev, now) {
+  if (!lagging) return { lagSince: null, lagLate: 0 };
+  const lagSince = prev && prev.lagSince != null ? prev.lagSince : now;
+  return { lagSince, lagLate: now - lagSince >= ARCHIVE_READINGS_LAG_WINDOW_MS ? (prev?.lagLate || 0) + 1 : 0 };
+}
+// identity → { days, daysSig, holding, holdingSig, holdingKnown, holdingFailed, failures,
+//              lagging, lagSince, lagLate, cubeGen, version, at }
 let _archiveReadingsCache = new Map();
 const _archiveReadingsInflight = new Map();
 const _archiveReadingsListeners = new Map();   // identity → Set(callback): a new entry landed
@@ -1686,7 +1698,7 @@ function _loadArchiveReadings(key) {
     const days = sameDays ? kept.days : fresh;
     let entry = sameDays ? kept : {
       days, daysSig, holding: null, holdingSig: null, holdingKnown: false, holdingFailed: false,
-      lagging: false, unsettled: kept ? kept.unsettled || 0 : 0,
+      failures: 0, lagging: false, lagSince: null, lagLate: 0,     // a new reading's lag counts afresh
       cubeGen: kept ? kept.cubeGen : 0, version: `${daysSig}/${kept ? kept.cubeGen : 0}`, at: 0,
     };
     if (!kept) {                                   // the first read: the days at once
@@ -1707,28 +1719,27 @@ function _loadArchiveReadings(key) {
       if (cube.error || facts.error) { console.error("[archive readings] what the cube holds", cube.error || facts.error); failed = true; }
       else holding = archiveHolding(specs.from, cube.data, facts.data, days);
     }
+    const now = Date.now();
     if (failed && entry.holdingKnown) {
       entry.holdingFailed = true;
-      entry.unsettled = (entry.unsettled || 0) + 1;
-      entry.at = Date.now();
+      entry.failures = (entry.failures || 0) + 1;
+      entry.at = now;
       return entry;
     }
     const holdingSig = holdingSignature(holding);
     const cubeMoved = entry.holdingKnown && !failed && entry.holdingSig !== holdingSig;
     const lagging = holdingLags(days, holding);
-    const unsettled = lagging || failed ? (entry.unsettled || 0) + 1 : 0;
+    const lag = _lagState(lagging, entry, now);
+    const failures = failed ? (entry.failures || 0) + 1 : 0;
     if (entry.holdingKnown && !cubeMoved) {        // nothing moved: the same entry, kept longer
-      entry.holdingFailed = false;
-      entry.lagging = lagging;
-      entry.unsettled = unsettled;
-      entry.at = Date.now();
+      Object.assign(entry, { holdingFailed: false, failures, lagging, ...lag, at: now });
       return entry;
     }
     if (cubeMoved || (kept && !sameDays)) _dropArchiveGrains();
     const cubeGen = entry.cubeGen + (cubeMoved ? 1 : 0);
     entry = {
-      ...entry, holding, holdingSig, holdingKnown: true, holdingFailed: failed,
-      lagging, unsettled, cubeGen, version: `${daysSig}/${cubeGen}`, at: Date.now(),
+      ...entry, holding, holdingSig, holdingKnown: true, holdingFailed: failed, failures,
+      lagging, ...lag, cubeGen, version: `${daysSig}/${cubeGen}`, at: now,
     };
     _archiveReadingsCache.set(key, entry);
     _publishReadings(key);
