@@ -1693,6 +1693,10 @@ function _loadArchiveReadings(key) {
   if (kept && kept.holdingKnown && Date.now() - kept.at < _readingsTtl(kept)) return Promise.resolve(kept);
   if (_archiveReadingsInflight.has(key)) return _archiveReadingsInflight.get(key);
   const p = (async () => {
+    // The check is dated when it STARTS: the next one is due a TTL after this moment, so a
+    // check that took a few seconds is not skipped at the next minute's tick (dated at its
+    // end, a minute's TTL fell just short at every tick and lag checks ran 2, 3, 5 … apart).
+    const startedAt = Date.now();
     const read = (cols) => sbReadAll((from, to) => supabaseData.from("archive_days")
       .select(cols).order("day", { ascending: false }).order("country").range(from, to));
     // A view that does not carry `readings` yet: each day one reading, as before.
@@ -1729,7 +1733,7 @@ function _loadArchiveReadings(key) {
       if (cube.error || facts.error) { console.error("[archive readings] what the cube holds", cube.error || facts.error); failed = true; }
       else holding = archiveHolding(specs.from, cube.data, facts.data, days);
     }
-    const now = Date.now();
+    const now = startedAt;
     if (failed && entry.holdingKnown) {
       entry.holdingFailed = true;
       entry.failures = (entry.failures || 0) + 1;

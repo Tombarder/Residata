@@ -189,6 +189,7 @@ function stagedHarness() {
   const supabaseData = {
     rpc: async (_n, { p_spec }) => {
       if (st.gate) await st.gate;
+      if (st.latency) now += st.latency;
       if (st.rpcFails) return { data: null, error: { message: "timeout" } };
       return { data: p_spec.dims[1] === "snapshot_month" ? st.cube : facts, error: null };
     },
@@ -412,4 +413,21 @@ test("an entry published between a render and its effect is shown, not taken as 
     `let cancelled = false; let seen = rendered; ${body} landed(); landed(); return seen;`);
   assert.equal(run(cache, "u", "A", () => { renders += 1; }), "B");
   assert.equal(renders, 1, "one render for the entry it missed, none for the one it has");
+});
+
+test("a check that takes a few seconds does not push the next one past the minute's tick", async () => {
+  // every analytics_pivot answer takes 250 ms (a check: two of them)
+  const h = stagedHarness();
+  const slow = h.st;
+  h.st.cube = [{ d: ["SK", "2026-11"], m: { n: 7500 } }];
+  await h._loadArchiveReadings("u");
+  const minutes = [];
+  for (let m = 1; m <= 10; m += 1) {
+    h.advance(MIN - (m === 1 ? 0 : 500));                  // the tick, a minute after the last one began
+    const before = slow.reads;
+    h.st.latency = 250;
+    await h._loadArchiveReadings("u");
+    if (slow.reads > before) minutes.push(m);
+  }
+  assert.deepEqual(minutes, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 });
