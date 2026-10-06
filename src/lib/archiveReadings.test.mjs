@@ -15,7 +15,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   archiveGrainDims, readingDaysByCountry, archiveReadingScope, normaliseArchiveGrain,
+  periodFactors, scaleComponents,
 } from "./archiveReadings.js";
+import { archiveGroups, readingsPerMonth } from "../../api/_lib/archiveCounts.js";
 
 // SK read daily through September and on 1–5 October, then every four days.
 const SEP = Array.from({ length: 30 }, (_, i) => `2026-09-${String(i + 1).padStart(2, "0")}`);
@@ -45,8 +47,9 @@ test("rows by Datum: a full reading is one reading; a morning that only re-colle
   const full = { d: ["2026-10-09", "SK", "2026-10"], m: { n: 7500 } };
   const retry = { d: ["2026-10-10", "SK", "2026-10"], m: { n: 40 } };   // three projects
   const out = normaliseArchiveGrain([full, retry], dims, DAYS, archiveReadingScope([]));
-  assert.deepEqual(out, [full]);
-  assert.equal(out[0], full, "a day's bucket is that reading's flats as they are");
+  assert.equal(out.length, 1);
+  assert.equal(out[0].m, full.m, "a day's bucket is that reading's flats as they are");
+  assert.deepEqual(out[0].cell, { r: 1, mk: "SK", month: "2026-10", day: "2026-10-09" });
 });
 
 test("a Datum filter on one day divides by that one reading, not by the month's", () => {
@@ -149,8 +152,103 @@ test("the Pivot and the assistant divide the same month by the same readings", a
   assert.equal(32 / pivot[0].m.n, readingsPerMonth(rows)["SK|2026-08"]);
 });
 
-// ── the page uses it ──
+// ── a table node averages over the periods it spans ──
+// The Pivot's own node arithmetic (emptyComp / addComp / compOfGrain), run as written.
 const PIVOT = readFileSync(new URL("../pages/PivotV2.jsx", import.meta.url), "utf8");
+const nodeOf = (() => {
+  const grab = (re) => { const m = PIVOT.match(re); assert.ok(m, `not found: ${re}`); return m[0]; };
+  return new Function("periodFactors", "scaleComponents", `
+    ${grab(/const _COMP_PREFIXES = [^\n]*/)}
+    ${grab(/function emptyComp\(\)[\s\S]*?\n\}/)}
+    ${grab(/function addComp\(acc, m\)[\s\S]*?\n\}/)}
+    ${grab(/function compOfGrain\(rows\)[\s\S]*?\n\}/)}
+    return compOfGrain;
+  `)(periodFactors, scaleComponents);
+})();
+// SK read every day of September and on 1–5 and 9 October; one project of 100 flats.
+const SK_DAYS = readingDaysByCountry([...SEP, "2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05", "2026-10-09"]
+  .map((day) => ({ day, country: "SK", readings: 1 })));
+const projectOver = (sel) => {
+  const perMonth = {};
+  for (const d of sel) perMonth[d.slice(0, 7)] = (perMonth[d.slice(0, 7)] || 0) + 1;
+  const filters = [{ key: "datum", mode: "in", values: sel }];
+  const scope = archiveReadingScope(filters);
+  const dims = archiveGrainDims(["project_name"], scope);
+  const grain = Object.entries(perMonth).map(([m, k]) => ({
+    d: dims.map((dim) => (dim === "project_name" ? "Projekt X" : dim === "country" ? "SK" : m)),
+    m: { n: 100 * k, avail: 60 * k, sold: 40 * k, s_cs: 100 * k * 200000, n_cs: 100 * k },
+  }));
+  return nodeOf(normaliseArchiveGrain(grain, dims, SK_DAYS, scope));
+};
+
+test("a scope across two months shows a 100-flat project as 100, not one month-average per month", () => {
+  for (const sel of [["2026-09-29", "2026-09-30"], ["2026-09-30", "2026-10-01"],
+    ["2026-09-28", "2026-09-29", "2026-09-30", "2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04"]]) {
+    const c = projectOver(sel);
+    assert.equal(Math.round(c.n), 100, `Datum ${sel.join(",")}`);
+    assert.equal(Math.round(c.avail), 60);
+    assert.equal(c.s_cs / c.n_cs, 200000);
+  }
+});
+
+test("Mesiac September and October: the Pivot's node and the assistant's group agree", () => {
+  const grain = [
+    { d: ["Projekt X", "SK", "2026-09"], m: { n: 100 * 30 } },
+    { d: ["Projekt X", "SK", "2026-10"], m: { n: 100 * 6 } },
+  ];
+  const dims = ["project_name", "country", "snapshot_month"];
+  const pivot = nodeOf(normaliseArchiveGrain(grain, dims, SK_DAYS,
+    archiveReadingScope([{ key: "snapshot_month", mode: "in", values: ["2026-09", "2026-10"] }])));
+  const days = [...SK_DAYS.SK].map(([day, readings]) => ({ day, country: "SK", readings }));
+  const [assistant] = archiveGroups(grain, dims, "project_name", readingsPerMonth(days));
+  assert.equal(Math.round(pivot.n), 100);
+  assert.equal(assistant.units, 100);
+});
+
+test("a node over two markets adds each market's own average month", () => {
+  // SK 400 flats in September and October; CZ 150 flats, read only in October.
+  const days = readingDaysByCountry([...SEP.map((day) => ({ day, country: "SK" })),
+    ...OCT.map((day) => ({ day, country: "SK" })), ...OCT.map((day) => ({ day, country: "CZ" }))]);
+  const dims = ["country", "snapshot_month"];
+  const grain = [
+    { d: ["SK", "2026-09"], m: { n: 400 * 30 } }, { d: ["SK", "2026-10"], m: { n: 400 * 8 } },
+    { d: ["CZ", "2026-10"], m: { n: 150 * 8 } },
+  ];
+  const total = nodeOf(normaliseArchiveGrain(grain, dims, days, archiveReadingScope([])));
+  assert.equal(Math.round(total.n), 550, "SK's average month plus CZ's");
+  const byCountry = archiveGroups(grain, dims, "country", readingsPerMonth(
+    Object.entries(days).flatMap(([country, m]) => [...m].map(([day, readings]) => ({ day, country, readings })))));
+  const [all] = archiveGroups(grain, dims, null, readingsPerMonth(
+    Object.entries(days).flatMap(([country, m]) => [...m].map(([day, readings]) => ({ day, country, readings })))));
+  assert.equal(all.units, byCountry.reduce((a, g) => a + g.units, 0), "the assistant's whole equals its countries");
+  assert.equal(all.units, 550);
+});
+
+test("by Datum, a node over several days is the average day, and over months the average month", () => {
+  const dims = archiveGrainDims(["datum"]);
+  const rows = ["2026-09-29", "2026-09-30", "2026-10-01"].map((day) => ({ d: [day, "SK", day.slice(0, 7)], m: { n: 100 } }));
+  const out = normaliseArchiveGrain(rows, dims, SK_DAYS, archiveReadingScope([]));
+  assert.equal(Math.round(nodeOf(out).n), 100);
+  assert.equal(Math.round(nodeOf(out.slice(0, 2)).n), 100);
+});
+
+test("today's market is summed as it always was", () => {
+  const c = nodeOf([{ d: ["A"], m: { n: 120, avail: 20 } }, { d: ["B"], m: { n: 80, avail: 30 } }]);
+  assert.equal(c.n, 200);
+  assert.equal(c.avail, 50);
+});
+
+test("every number the Pivot builds from the grain is a node average", () => {
+  const tree = PIVOT.match(/function buildTreeFromGrain\([\s\S]*?\n\}/)[0];
+  assert.match(tree, /const rollupsFor = \(rows\) => \{ const c = compOfGrain\(rows\);/);
+  assert.match(tree, /const compFor = \(rows\) => compOfGrain\(rows\);/);
+  assert.match(tree, /const countFor = \(rows\) => Math\.round\(compOfGrain\(rows\)\.n\);/);
+  assert.match(PIVOT, /included = Math\.round\(compOfGrain\(grain\)\.n\);/);
+  assert.match(PIVOT, /total    = Math\.round\(compOfGrain\(grainUnscoped\)\.n\);/);
+  assert.match(PIVOT, /const m = compOfGrain\(grain \|\| \[\]\);/);
+});
+
+// ── the page uses it ──
 const DATA = readFileSync(new URL("./useData.js", import.meta.url), "utf8");
 
 test("the Pivot asks the archive for the market and month of every row", () => {

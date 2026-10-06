@@ -8,10 +8,13 @@
 // number of full readings of that market in that month, which gives the flats on the
 // market at an average reading of the month. A history grouped by month is then the
 // average stock of each month; any other grouping over the history is that, averaged
-// over the months IN WHICH THAT GROUP HAS ROWS. Averaged over the months of the whole
+// over the months IN WHICH THAT GROUP HAS ROWS — each market over its own months, the
+// markets added (a group over SK since July and CZ since September is SK's average month
+// plus CZ's, as the two read grouped by country). Averaged over the months of the whole
 // answer instead, a project launched in September read 100 by project (its 400
 // flat-months over the four months July–October) and 200 as a filter on the same
 // project; a market read since September was diluted by the other market's summer.
+// The Pivot's history averages its table nodes the same way (src/lib/archiveReadings.js).
 //
 // Prices are ratios of sums — of the same per-reading cells. Left as flat-readings, a
 // month read daily weighed ~4x a month read every four days, so a history's average
@@ -28,6 +31,7 @@
 // groupKey:  the dimension the answer is grouped by (null for one overall group)
 export function archiveGroups(rows, dims, groupKey, readings) {
   const at = (row, k) => row.d?.[dims.indexOf(k)];
+  const SUMS = ["n", "avail", "sold", "res", "s_cs", "n_cs", "s_pw", "s_lw"];
   const groups = new Map();
   for (const row of rows || []) {
     const country = at(row, "country");
@@ -36,32 +40,29 @@ export function archiveGroups(rows, dims, groupKey, readings) {
     if (!r) continue;                     // no full reading of that market that month
     const key = groupKey ? (at(row, groupKey) != null ? String(at(row, groupKey)) : "(none)") : "ALL";
     const m = row.m || {};
-    const g = groups.get(key) || { n: 0, avail: 0, sold: 0, res: 0, s_cs: 0, n_cs: 0, s_pw: 0, s_lw: 0, mn_cs: null, mx_cs: null, months: new Set() };
-    g.months.add(month);
-    g.n += (Number(m.n) || 0) / r;
-    g.avail += (Number(m.avail) || 0) / r;
-    g.sold += (Number(m.sold) || 0) / r;
-    g.res += (Number(m.res) || 0) / r;
-    g.s_cs += (Number(m.s_cs) || 0) / r;
-    g.n_cs += (Number(m.n_cs) || 0) / r;
-    g.s_pw += (Number(m.s_pw) || 0) / r;
-    g.s_lw += (Number(m.s_lw) || 0) / r;
+    const g = groups.get(key) || { markets: new Map(), mn_cs: null, mx_cs: null };
+    const mk = g.markets.get(country) || { months: new Set(), ...Object.fromEntries(SUMS.map((k) => [k, 0])) };
+    mk.months.add(month);
+    for (const k of SUMS) mk[k] += (Number(m[k]) || 0) / r;
     if (m.mn_cs != null) g.mn_cs = g.mn_cs == null ? Number(m.mn_cs) : Math.min(g.mn_cs, Number(m.mn_cs));
     if (m.mx_cs != null) g.mx_cs = g.mx_cs == null ? Number(m.mx_cs) : Math.max(g.mx_cs, Number(m.mx_cs));
+    g.markets.set(country, mk);
     groups.set(key, g);
   }
-  // A group's own months (one when grouped by month), so the same flats give the same
-  // number whether they are asked for as a group or as a filter.
+  // Each market over its own months among the group's rows (one when grouped by month),
+  // the markets added — so the same flats give the same number whether they are asked
+  // for as a group or as a filter.
   return [...groups.entries()].map(([group, g]) => {
-    const span = Math.max(1, g.months.size);
+    const t = Object.fromEntries(SUMS.map((k) => [k, 0]));
+    for (const mk of g.markets.values()) for (const k of SUMS) t[k] += mk[k] / mk.months.size;
     return {
       group,
-      units: Math.round(g.n / span),
-      available: Math.round(g.avail / span),
-      sold: Math.round(g.sold / span),
-      reserved: Math.round(g.res / span),
-      avg_price_eur: g.n_cs ? Math.round(g.s_cs / g.n_cs) : null,
-      avg_eur_per_m2: g.s_lw ? Math.round(g.s_pw / g.s_lw) : null,
+      units: Math.round(t.n),
+      available: Math.round(t.avail),
+      sold: Math.round(t.sold),
+      reserved: Math.round(t.res),
+      avg_price_eur: t.n_cs ? Math.round(t.s_cs / t.n_cs) : null,
+      avg_eur_per_m2: t.s_lw ? Math.round(t.s_pw / t.s_lw) : null,
       min_price: g.mn_cs == null ? null : Math.round(g.mn_cs),
       max_price: g.mx_cs == null ? null : Math.round(g.mx_cs),
     };

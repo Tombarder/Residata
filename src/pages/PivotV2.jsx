@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef, useLayoutEffect, Fragment } from 
 import { createPortal } from "react-dom";
 import { useSpecifics, SpecificsMark } from "../lib/projectSpecifics";
 import { useAnalyticsRegistry, useProjects, useFlatsArchive, useFlatsCurrent, useArchiveMonths, useArchiveDays, useArchiveReadingDays, usePivotGrain, usePivotDistinct, usePivotFieldStats, fetchFlatsForProjects } from "../lib/useData";
-import { archiveGrainDims, archiveReadingScope, normaliseArchiveGrain } from "../lib/archiveReadings";
+import { archiveGrainDims, archiveReadingScope, normaliseArchiveGrain, periodFactors, scaleComponents } from "../lib/archiveReadings";
 import { useCountry, isAllCountries, countryName } from "../lib/useCountry";
 import { useCapabilities } from "../lib/useCapabilities";
 import { useAuth } from "../lib/useAuth";
@@ -1096,6 +1096,18 @@ function addComp(acc, m) {
     if (mx != null) acc["mx_" + p] = acc["mx_" + p] == null ? +mx : Math.max(acc["mx_" + p], +mx);
   }
 }
+// A table node's components from its grain rows. An archive row carries its `cell` (its
+// market and month — or day — src/lib/archiveReadings.js), and the node is the AVERAGE
+// over the periods it spans: each market over its own months among the node's rows, the
+// markets added. Summed instead, a 100-flat project over 30 September and 1 October read
+// 200 (one month-average each) where the assistant says 100. Today's rows carry no cell
+// and are summed as before.
+function compOfGrain(rows) {
+  const c = emptyComp();
+  const f = periodFactors(rows, (g) => g.cell);
+  rows.forEach((g, i) => addComp(c, f[i] === 1 ? g.m : scaleComponents(g.m, f[i])));
+  return c;
+}
 // Counts are whole flats. An archive grain's components are flats at an average reading
 // (src/lib/archiveReadings.js), so a count can come out as 7 512.4 — rounded here, where
 // it becomes a number on the page, and never in the components, which averages share.
@@ -1127,7 +1139,7 @@ function computeFromComp(v, c) {
 /* Build the same tree buildTree produces, from grain rows [{d:[dimVals], m:{components}}].
    d holds the row dims then the (optional) col dim, in the order they were sent — and,
    in archive mode, the market and month of the row after them (archiveGrainDims), which
-   this sums over. */
+   each node averages over (compOfGrain). */
 function buildTreeFromGrain(grain, rowFields, colFields, valueDefs) {
   const safe = Array.isArray(grain) ? grain : [];
   const hasCol = colFields.length > 0;
@@ -1140,11 +1152,11 @@ function buildTreeFromGrain(grain, rowFields, colFields, valueDefs) {
     colKeys = orderCappedColKeys(counts.entries(), colFields[0]);
     colOverflow = Math.max(0, counts.size - colKeys.length);
   }
-  const rollupsFor = (rows) => { const c = emptyComp(); for (const g of rows) addComp(c, g.m); return valueDefs.map(v => computeFromComp(v, c)); };
+  const rollupsFor = (rows) => { const c = compOfGrain(rows); return valueDefs.map(v => computeFromComp(v, c)); };
   // Per-node stav components (grain rows carry no records) so the table can show
   // the on-offer / sold split on every row, not just the header total.
-  const compFor = (rows) => { const c = emptyComp(); for (const g of rows) addComp(c, g.m); return c; };
-  const countFor = (rows) => Math.round(rows.reduce((a, g) => a + (+g.m.n || 0), 0));
+  const compFor = (rows) => compOfGrain(rows);
+  const countFor = (rows) => Math.round(compOfGrain(rows).n);
   const colRollupsFor = (rows) => {
     if (!colKeys) return null;
     const byKey = {}; for (const ck of colKeys) byKey[ck] = [];
@@ -1913,8 +1925,8 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
     let included, total;
     if (useGrain) {
       if (!grain || !grainUnscoped) return null;
-      included = Math.round(grain.reduce((acc, g) => acc + (+g?.m?.n || 0), 0));
-      total    = Math.round(grainUnscoped.reduce((acc, g) => acc + (+g?.m?.n || 0), 0));
+      included = Math.round(compOfGrain(grain).n);
+      total    = Math.round(compOfGrain(grainUnscoped).n);
     } else {
       included = filteredRecords.length;
       total    = unscopedRecords.length;
@@ -1950,8 +1962,8 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
     let offer = 0, sold = 0;
     if (useGrain) {
       // grain rows are { d: [dimVals], m: {components} } — components are under .m
-      for (const g of (grain || [])) { const m = g.m || {}; offer += (+m.avail || 0) + (+m.res || 0) + (+m.prer || 0); sold += (+m.sold || 0); }
-      offer = Math.round(offer); sold = Math.round(sold);   // flats at an average reading in archive mode
+      const m = compOfGrain(grain || []);   // flats at an average reading in archive mode
+      offer = Math.round(m.avail + m.res + m.prer); sold = Math.round(m.sold);
     } else {
       for (const r of filteredRecords) {
         const s = (r.stav || "").trim().toUpperCase();
