@@ -1771,7 +1771,7 @@ function _loadArchiveReadings(key, force = false, within = 0) {
         if (factsRead.error) return kept;            // as it was; the cube's check says more
         const seen = archiveHolding(specs.from, [], factsRead.data, days);
         if (await daysBehind(seen)) continue;
-        const factsSig = holdingFactsSignature(seen);
+        const factsSig = holdingFactsSignature(seen, days);
         if (factsSig === kept.factsSig) {
           kept.factsAt = startedAt;
           return kept;
@@ -1810,7 +1810,7 @@ function _loadArchiveReadings(key, force = false, within = 0) {
         return entry;
       }
       const holdingSig = holdingSignature(holding);
-      const factsSig = holdingFactsSignature(holding);
+      const factsSig = holdingFactsSignature(holding, days);
       const cubeMoved = entry.holdingKnown && !failed && (entry.holdingSig !== holdingSig || entry.factsSig !== factsSig);
       const lagging = holdingLags(days, holding);
       // a forced read (the archive's records asking) is no step of a long lag's spacing

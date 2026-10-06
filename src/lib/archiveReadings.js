@@ -301,6 +301,7 @@ export function holdingSpecs(days) {
  *  cubeExtra: Map('SK|2026-11' → readings) — readings the cube still holds that the facts
  *  no longer do (a withdrawal whose cube refresh failed) —
  *  cubeTotals: Map('SK|2026-11' → the cube's rows),
+ *  factsRows: Map(market → Map(day → the facts' rows)),
  *  factsAhead: Map(market → days of its newest month the facts hold as a reading and
  *  `days` do not) }. `days` (readingDaysByCountry) says
  *  how many readings each day holds; a day not among them (a retry) is one.
@@ -386,7 +387,7 @@ export function archiveHolding(from, cubeRows, factRows, days) {
       }
     }
   }
-  return { from, facts, factsAhead, cubeThrough, cubePartial, cubeExtra, cubeTotals };
+  return { from, facts, factsRows: factsN, factsAhead, cubeThrough, cubePartial, cubeExtra, cubeTotals };
 }
 
 /** `days` (readingDaysByCountry) without the readings a grain's source does not hold yet:
@@ -443,20 +444,25 @@ export function holdingSignature(holding) {
 }
 
 /** The facts' side of a holding — which days of each market's newest month the facts
- *  hold — as a fingerprint: the archive's records (flats_archive, the facts) change with
- *  it, whatever the cube does. */
-export function holdingFactsSignature(holding) {
+ *  hold, and of a day that is no full reading in `days` (a not-due morning's retry) its
+ *  rows too — as a fingerprint: the archive's records (flats_archive, the facts) change
+ *  with it, whatever the cube does. A retry approved, a second one the same morning or
+ *  one withdrawn moves it; a few rows resynced into a reading do not. */
+export function holdingFactsSignature(holding, days = null) {
   if (!holding) return "-";
-  return [...holding.facts].sort().map(([c, s]) => `${c}:${[...s].sort().join(";")}`).join(",");
+  return [...holding.facts].sort().map(([c, s]) => `${c}:${[...s].sort().map((d) => (days && !days[c]?.has(d)
+    ? `${d}+${holding.factsRows?.get(c)?.get(d) ?? ""}` : d)).join(";")}`).join(",");
 }
 
-/** What divides the archive's records of one request, as a fingerprint: each market's
- *  full readings as the facts hold them (heldReadingDays, not via the cube) in the months
- *  the request covers. `country` is its market (null: every market); `months` the
- *  snapshot months it asks and `dates` the days (null: all) — by whole months, a month's
- *  records being divided by the readings of its days, which the Datum filter may take
- *  beyond the days fetched. A reading of another market or month, a not-due morning's
- *  retry (no full reading) and the cube leave it as it is. */
+/** What the archive's records of one request hold and are divided by, as a fingerprint:
+ *  each market's full readings as the facts hold them (heldReadingDays, not via the cube)
+ *  in the months the request covers, and in its newest month the days the facts hold that
+ *  are no full reading — a not-due morning's retry, whose rows are records of their month
+ *  — with their rows. `country` is its market (null: every market); `months` the snapshot
+ *  months it asks and `dates` the days (null: all) — by whole months, a month's records
+ *  being divided by the readings of its days, which the Datum filter may take beyond the
+ *  days fetched. A reading or a retry of another market or month, and the cube, leave it
+ *  as it is. */
 export function recordReadingsSignature(days, holding, { country = null, months = null, dates = null } = {}) {
   if (!days) return "";
   const held = heldReadingDays(days, holding, false);
@@ -465,13 +471,19 @@ export function recordReadingsSignature(days, holding, { country = null, months 
   const lo = ds ? ds[0].slice(0, 7) : null;
   const hi = ds ? ds[ds.length - 1].slice(0, 7) : null;
   const parts = [];
-  for (const c of Object.keys(held || {}).sort()) {
+  const inScope = (d) => {
+    const mo = d.slice(0, 7);
+    return (!inMonths || inMonths.has(mo)) && (!lo || (mo >= lo && mo <= hi));
+  };
+  const markets = new Set([...Object.keys(held || {}), ...(holding?.facts?.keys() || [])]);
+  for (const c of [...markets].sort()) {
     if (country && c !== country) continue;
-    const kept = [...held[c]].filter(([d]) => {
-      const mo = d.slice(0, 7);
-      return (!inMonths || inMonths.has(mo)) && (!lo || (mo >= lo && mo <= hi));
-    }).map(([d, n]) => `${d}=${n}`).sort();
-    if (kept.length) parts.push(`${c}:${kept.join(";")}`);
+    const kept = [...(held[c] || [])].filter(([d]) => inScope(d)).map(([d, n]) => `${d}=${n}`);
+    const from = holding?.from?.get(c);
+    for (const d of holding?.facts?.get(c) || []) {
+      if (from && d >= from && !days[c]?.has(d) && inScope(d)) kept.push(`${d}+${holding.factsRows?.get(c)?.get(d) ?? ""}`);
+    }
+    if (kept.length) parts.push(`${c}:${kept.sort().join(";")}`);
   }
   return parts.join(",");
 }

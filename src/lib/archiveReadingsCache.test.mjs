@@ -798,7 +798,7 @@ test("an SK user's September records stay for a CZ reading, a retry and a cube r
   const pages = db.pages;
   st.facts.push(["SK", "2026-10-07", 60]);                                  // a not-due morning's retry of 2 SK projects
   await show();
-  assert.equal(db.pages, pages, "a retry");
+  assert.equal(db.pages, pages, "a retry in another month");
   st.days.push({ day: "2026-10-06", country: "CZ", readings: 1 });          // a CZ reading
   st.facts.push(["CZ", "2026-10-06", 4000]);
   await show();
@@ -816,7 +816,7 @@ test("an SK user's September records stay for a CZ reading, a retry and a cube r
   assert.ok(!after.stamp.days.SK.has("2026-09-08"));
 });
 
-test("records of the newest month are asked again for its new reading and for its facts catching up, not for a retry", async () => {
+test("records of the newest month are asked again for its new reading, its facts catching up and a retry", async () => {
   const st = {
     days: [{ day: "2026-10-02", country: "SK", readings: 1 }, { day: "2026-10-05", country: "SK", readings: 1 }],
     facts: [["SK", "2026-10-02", 7500]],                                    // the 5th's sync failed
@@ -838,9 +838,10 @@ test("records of the newest month are asked again for its new reading and for it
   await show();
   assert.ok(db.pages > pages, "the facts caught up with the 5th");
   pages = db.pages;
-  st.facts.push(["SK", "2026-10-07", 60]);                                  // a retry
+  st.facts.push(["SK", "2026-10-07", 60]);                                  // a retry: its rows are records of October
   await show();
-  assert.equal(db.pages, pages, "a retry");
+  assert.ok(db.pages > pages, "a retry");
+  pages = db.pages;
   st.days.push({ day: "2026-10-09", country: "CZ", readings: 1 });          // every market on screen
   st.facts.push(["CZ", "2026-10-09", 4000]);
   st.cube.push(["CZ", "2026-10", 4000]);
@@ -860,9 +861,78 @@ test("the records' readings are those of their market and months, as the facts h
   assert.equal(sig(all, {}), "CZ:2026-10-02=1,SK:2026-09-04=1;2026-10-02=1;2026-10-05=2");
   assert.equal(sig(holding([["SK", "2026-10-02"], ["CZ", "2026-10-02"]]), { country: "SK", months: ["2026-10"] }), "SK:2026-10-02=1",
     "a day the facts do not hold");
-  assert.equal(sig(holding([["SK", "2026-10-02"], ["SK", "2026-10-05"], ["SK", "2026-10-07"], ["CZ", "2026-10-02"]]), { country: "SK", months: ["2026-10"] }),
-    sig(all, { country: "SK", months: ["2026-10"] }), "a retry");
+  const retry = holding([["SK", "2026-10-02"], ["SK", "2026-10-05"], ["SK", "2026-10-07"], ["CZ", "2026-10-02"]]);
+  assert.equal(sig(retry, { country: "SK", months: ["2026-10"] }), "SK:2026-10-02=1;2026-10-05=2;2026-10-07+100", "a retry, with its rows");
+  assert.equal(sig(retry, { country: "CZ" }), sig(all, { country: "CZ" }), "another market's retry");
+  assert.equal(sig(retry, { country: "SK", months: ["2026-09"] }), sig(all, { country: "SK", months: ["2026-09"] }), "another month's retry");
+  const more = archiveHolding(sp.from, [], [["SK", "2026-10-02", 100], ["SK", "2026-10-05", 200], ["SK", "2026-10-07", 160], ["CZ", "2026-10-02", 100]]
+    .map(([c, d, n]) => ({ d: [c, d], m: { n } })), days);
+  assert.notEqual(sig(more, { country: "SK" }), sig(retry, { country: "SK" }), "a second retry the same morning");
   assert.equal(recordReadingsSignature(null, null, {}), "");
+});
+
+// ── a retry's rows are records: its approval or withdrawal asks for them again ──
+// SK October read on the 2nd and the 6th; the 6th missed project P (100 flats), so the
+// record path shows P at 50. The 7th's retry of P approved: the grain shows 100, and the
+// records — never asked again — stayed at 50 for the session.
+const retryRows = (day, n, pfx, project) => Array.from({ length: n }, (_, i) => ({
+  id: `${pfx}${day}-${i}`, project_id: project, country: "SK", batch_timestamp: `${day}T05:00:00+00:00`, snapshot_month: "2026-10" }));
+const retryWorld = () => ({
+  days: [{ day: "2026-10-02", country: "SK", readings: 1 }, { day: "2026-10-06", country: "SK", readings: 1 }],
+  facts: [["SK", "2026-10-02", 7500], ["SK", "2026-10-06", 7400]],
+  cube: [["SK", "2026-10", 14900]],
+});
+const projectFlats = (got, project) => weightedCount(got.flats.filter((r) => r.project_id === project), archiveRecordCells(
+  heldReadingDays(got.stamp.days, got.stamp.holding, false), archiveReadingScope([{ key: "snapshot_month", mode: "in", values: ["2026-10"] }]), ["project_name"]));
+
+test("a retry approved while the Pivot's records are open asks for them again; withdrawn, again", async () => {
+  const st = retryWorld();
+  const w = readingsWorld(st);
+  const db = { rows: [...retryRows("2026-10-06", 7400, "", "A"), ...retryRows("2026-10-02", 7400, "", "A"), ...retryRows("2026-10-02", 100, "p", "P")] };
+  const render = flatsHarness(db, "SK");
+  const show = async () => {
+    w.advance(16 * MIN);
+    const e = await w.load();
+    render(["2026-10"], null, true, w.stampOf(e));
+    await settle();
+    return render(["2026-10"], null, true, w.stampOf(e));
+  };
+  const a = await show();
+  assert.equal(projectFlats(a, "P"), 50, "missed on the 6th");
+  st.facts.push(["SK", "2026-10-07", 100]);                                  // the 7th's retry of P approved
+  st.cube = [["SK", "2026-10", 15000]];
+  db.rows = [...retryRows("2026-10-07", 100, "r", "P"), ...db.rows];
+  const b = await show();
+  assert.equal(b.flats.length, 15000);
+  assert.equal(projectFlats(b, "P"), 100);
+  st.facts = st.facts.filter(([, d]) => d !== "2026-10-07");                // withdrawn
+  st.cube = [["SK", "2026-10", 14900]];
+  db.rows = db.rows.filter((r) => !r.id.startsWith("r"));
+  const c = await show();
+  assert.equal(c.flats.length, 14900);
+  assert.equal(projectFlats(c, "P"), 50);
+});
+
+test("a retry approved while the records are paged asks for them again, not kept with rows twice and rows missing", async () => {
+  const st = retryWorld();
+  const w = readingsWorld(st);
+  // newest first, as the records are paged: the retry's rows land at the top and shift every page after
+  const db = { rows: [...retryRows("2026-10-06", 7400, "", "A"), ...retryRows("2026-10-02", 7400, "", "A"), ...retryRows("2026-10-02", 100, "p", "P")] };
+  db.onPage = (n) => {
+    if (n === 1) { db.rows = [...retryRows("2026-10-07", 100, "r", "P"), ...db.rows]; st.facts.push(["SK", "2026-10-07", 100]); }
+  };
+  const render = flatsHarness(db, "SK");
+  await w.load();
+  let got = null;
+  for (let k = 0; k < 4; k += 1) {
+    render(["2026-10"], null, true, w.stampOf(w.latest()));
+    await settle();
+    got = render(["2026-10"], null, true, w.stampOf(w.latest()));
+  }
+  const ids = got.flats.map((r) => r.id);
+  assert.equal(ids.length - new Set(ids).size, 0, "no row twice");
+  assert.equal(got.flats.filter((r) => r.id.startsWith("r")).length, 100, "the retry's rows");
+  assert.equal(projectFlats(got, "P"), 100);
 });
 
 // ── W3: a records load costs one read of the days and the facts, not two of everything ──
