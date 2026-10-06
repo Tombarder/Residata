@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { supabaseData, supabasePublic, isSupabaseReady } from "./supabase";
 import { useAuth } from "./useAuth";
 import { useCountry, isAllCountries } from "./useCountry";
+import { readingDaysByCountry } from "./archiveReadings";
 
 /**
  * sbRead — the single settle-guarantee wrapper every RLS-gated read goes through.
@@ -1621,6 +1622,41 @@ export function useArchiveDays() {
     return () => { cancelled = true; };
   }, [key, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
   return { days, loading };
+}
+
+let _archiveReadingsCache = new Map();
+/** Full readings of every market ({ SK: Set(days), CZ: … }) from public.archive_days, for
+ *  turning the Pivot's archive grain — flat-READINGS — into flats (src/lib/archiveReadings.js).
+ *  All markets, whatever the country selector says: the "All" view divides each market by
+ *  its own readings. Every page of it — a day per market per reading outgrows PostgREST's
+ *  1 000-row cap within the year. Keyed and gated by identity like useArchiveDays.
+ *  `days` is null while loading, when not enabled, and when it could not be read. */
+export function useArchiveReadingDays({ enabled = false } = {}) {
+  const { loading: authLoading, user, profile } = useAuth();
+  const key = `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}`;
+  // The list lives in the cache and is read by THIS identity's key on every render, and
+  // "loading" is derived from it — so neither can be another identity's, or a stale
+  // "not loading" for the render in which the page switched to the archive. The state
+  // only re-renders once the list lands, or says it failed.
+  const [, setLanded] = useState(0);
+  const [failedKey, setFailedKey] = useState(null);
+  useEffect(() => {
+    if (!enabled || _archiveReadingsCache.has(key)) return;
+    if (!isSupabaseReady() || authLoading) return; // wait for the session so RLS returns the caller's real rows
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await sbReadAll((from, to) => supabaseData.from("archive_days")
+        .select("day,country").order("day", { ascending: false }).order("country").range(from, to));
+      if (cancelled) return;
+      if (error) { console.error("[useArchiveReadingDays]", error); setFailedKey(key); return; }
+      _archiveReadingsCache.set(key, readingDaysByCountry(data));
+      setFailedKey(null); setLanded((n) => n + 1);
+    })();
+    return () => { cancelled = true; };
+  }, [enabled, key, authLoading]);
+  const days = enabled ? (_archiveReadingsCache.get(key) || null) : null;
+  const error = !!enabled && !days && failedKey === key;
+  return { days, loading: !!enabled && !days && !error, error };
 }
 
 let _pivotGrainCache = new Map();

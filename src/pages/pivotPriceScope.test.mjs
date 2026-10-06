@@ -114,7 +114,7 @@ test("every consumer of the filter list uses the SCOPED filters", () => {
   // describing a different set of flats from the table around it.
   const mustContain = [
     ["client record path",   "records.filter(r => effectiveFilters.every(f => passesFilter(r, f)))"],
-    ["server pivot spec",    "buildPivotSpec({ dims: gDims, filters: effectiveFilters, country, isCurrent })"],
+    ["server pivot spec",    "buildPivotSpec({ dims: specDims, filters: effectiveFilters, country, isCurrent })"],
     ["serverability gate",   "isServerable(rows, cols, effectiveValues, effectiveFilters)"],
     ["drill-down unit list", "effectiveFilters.every((flt) => passesFilter(r, flt))"],
   ];
