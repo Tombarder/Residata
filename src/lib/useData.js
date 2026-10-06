@@ -1638,15 +1638,29 @@ export function useArchiveDays() {
 const ARCHIVE_READINGS_TTL_MS = 15 * 60 * 1000;
 const ARCHIVE_READINGS_LAG_TTL_MS = 60 * 1000;
 const ARCHIVE_READINGS_CHECK_MS = 60 * 1000;   // each check a no-op while the kept answer is current
-const _readingsTtl = (entry) => (entry.lagging ? ARCHIVE_READINGS_LAG_TTL_MS : ARCHIVE_READINGS_TTL_MS);
-let _archiveReadingsCache = new Map();     // identity → { days, holding, lagging, version, at }
+// A minute, too, after what the cube holds could not be read.
+const _readingsTtl = (entry) => (entry.lagging || entry.holdingFailed ? ARCHIVE_READINGS_LAG_TTL_MS : ARCHIVE_READINGS_TTL_MS);
+// identity → { days, daysSig, holding, holdingSig, holdingKnown, holdingFailed, lagging, cubeGen, version, at }
+let _archiveReadingsCache = new Map();
 const _archiveReadingsInflight = new Map();
+const _archiveReadingsListeners = new Map();   // identity → Set(callback): a new entry landed
+function _publishReadings(key) {
+  for (const fn of _archiveReadingsListeners.get(key) || []) fn();
+}
 function _dropArchiveGrains() {
   for (const k of [..._pivotGrainCache.keys()]) if (k.includes('"mode":"archive"')) _pivotGrainCache.delete(k);
 }
+/* Two steps, and the first is published at once: the days (public.archive_days), with
+   which a grain can already be asked, then what the cube and the facts hold of them —
+   asked in parallel with the grain rather than before it, so the first paint waits for
+   the slower of the two, not for both one after the other. The version — what an archive
+   grain's request carries — is the days' signature and the cube's generation: a new or
+   withdrawn reading changes the first; a refresh of the cube (what it holds moved while
+   the days did not) the second. A holding that could not be read keeps the last good one
+   and changes neither, so a passing error does not send every grain to be asked again. */
 function _loadArchiveReadings(key) {
   const kept = _archiveReadingsCache.get(key);
-  if (kept && Date.now() - kept.at < _readingsTtl(kept)) return Promise.resolve(kept);
+  if (kept && kept.holdingKnown && Date.now() - kept.at < _readingsTtl(kept)) return Promise.resolve(kept);
   if (_archiveReadingsInflight.has(key)) return _archiveReadingsInflight.get(key);
   const p = (async () => {
     const read = (cols) => sbReadAll((from, to) => supabaseData.from("archive_days")
@@ -1658,24 +1672,54 @@ function _loadArchiveReadings(key) {
       if (kept) return kept;                       // the last good answer stands
       throw error;
     }
-    const days = readingDaysByCountry(data);
+    const fresh = readingDaysByCountry(data);
+    const daysSig = readingsSignature(fresh);
+    const sameDays = !!kept && kept.daysSig === daysSig;
+    const days = sameDays ? kept.days : fresh;
+    let entry = sameDays ? kept : {
+      days, daysSig, holding: null, holdingSig: null, holdingKnown: false, holdingFailed: false,
+      lagging: false, cubeGen: kept ? kept.cubeGen : 0, version: `${daysSig}/${kept ? kept.cubeGen : 0}`, at: 0,
+    };
+    if (!sameDays) {
+      if (kept) _dropArchiveGrains();
+      _archiveReadingsCache.set(key, entry);
+      _publishReadings(key);
+    }
     // What the cube and the facts hold of each market's newest month (archiveReadings.js,
-    // THE CUBE LAGS). Unreadable, the readings are used as they are.
+    // THE CUBE LAGS). Unreadable: the last good holding for these days, else none — the
+    // readings as they are.
     const specs = holdingSpecs(days);
     let holding = null;
+    let failed = false;
     if (specs) {
       const [cube, facts] = await Promise.all([
         sbRead(supabaseData.rpc("analytics_pivot", { p_spec: specs.cube })),
         sbRead(supabaseData.rpc("analytics_pivot", { p_spec: specs.facts })),
       ]);
-      if (cube.error || facts.error) console.error("[archive readings] what the cube holds", cube.error || facts.error);
+      if (cube.error || facts.error) { console.error("[archive readings] what the cube holds", cube.error || facts.error); failed = true; }
       else holding = archiveHolding(specs.from, cube.data, facts.data);
     }
-    const version = `${readingsSignature(days)}/${holdingSignature(holding)}`;
-    if (kept && kept.version === version) { kept.at = Date.now(); return kept; }
-    if (kept) _dropArchiveGrains();
-    const entry = { days, holding, lagging: holdingLags(days, holding), version, at: Date.now() };
+    if (failed && entry.holdingKnown) {
+      entry.holdingFailed = true;
+      entry.at = Date.now();
+      return entry;
+    }
+    const holdingSig = holdingSignature(holding);
+    const cubeMoved = entry.holdingKnown && !failed && entry.holdingSig !== holdingSig;
+    if (entry.holdingKnown && !cubeMoved) {        // nothing moved: the same entry, kept longer
+      entry.holdingFailed = false;
+      entry.lagging = holdingLags(days, holding);
+      entry.at = Date.now();
+      return entry;
+    }
+    if (cubeMoved) _dropArchiveGrains();
+    const cubeGen = entry.cubeGen + (cubeMoved ? 1 : 0);
+    entry = {
+      ...entry, holding, holdingSig, holdingKnown: true, holdingFailed: failed,
+      lagging: holdingLags(days, holding), cubeGen, version: `${daysSig}/${cubeGen}`, at: Date.now(),
+    };
     _archiveReadingsCache.set(key, entry);
+    _publishReadings(key);
     return entry;
   })().finally(() => _archiveReadingsInflight.delete(key));
   _archiveReadingsInflight.set(key, p);
@@ -1687,8 +1731,9 @@ function _loadArchiveReadings(key) {
  *  its own readings. Every page of it — a day per market per reading outgrows PostgREST's
  *  1 000-row cap within the year. Keyed and gated by identity like useArchiveDays.
  *  `days` is null while loading, when not enabled, and when it could not be read;
- *  `holding` says which of them the cube and the facts hold yet (heldReadingDays);
- *  `version` changes whenever either does. */
+ *  `holding` says which of them the cube and the facts hold yet (heldReadingDays) once
+ *  `holdingKnown` — it follows the days, read in parallel with the grain; `version`
+ *  changes with a new reading and with a refresh of the cube. */
 export function useArchiveReadingDays({ enabled = false } = {}) {
   const { loading: authLoading, user, profile } = useAuth();
   const key = `${user?.id || "anon"}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}`;
@@ -1696,22 +1741,27 @@ export function useArchiveReadingDays({ enabled = false } = {}) {
   // "loading" is derived from it — so neither can be another identity's, or a stale
   // "not loading" for the render in which the page switched to the archive. The state
   // only re-renders when the list lands or changes, or says it failed.
-  const [, setLanded] = useState(null);
+  const [, setLanded] = useState(0);
   const [failedKey, setFailedKey] = useState(null);
   useEffect(() => {
     if (!enabled) return;
     if (!isSupabaseReady() || authLoading) return; // wait for the session so RLS returns the caller's real rows
     let cancelled = false;
+    const landed = () => { if (!cancelled) setLanded((n) => n + 1); };
+    if (!_archiveReadingsListeners.has(key)) _archiveReadingsListeners.set(key, new Set());
+    _archiveReadingsListeners.get(key).add(landed);
     const ask = () => _loadArchiveReadings(key).then(
-      (entry) => { if (!cancelled) { setFailedKey(null); setLanded(entry.version); } },
+      () => { if (!cancelled) { setFailedKey(null); landed(); } },
       (e) => { console.error("[useArchiveReadingDays]", e); if (!cancelled) setFailedKey(key); },
     );
     ask();
-    const onVisible = () => { if (typeof document === "undefined" || document.visibilityState === "visible") ask(); };
+    const hidden = () => typeof document !== "undefined" && document.visibilityState === "hidden";
+    const onVisible = () => { if (!hidden()) ask(); };
     if (typeof document !== "undefined") document.addEventListener("visibilitychange", onVisible);
-    const timer = setInterval(ask, ARCHIVE_READINGS_CHECK_MS);
+    const timer = setInterval(() => { if (!hidden()) ask(); }, ARCHIVE_READINGS_CHECK_MS);
     return () => {
       cancelled = true;
+      _archiveReadingsListeners.get(key)?.delete(landed);
       if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisible);
       clearInterval(timer);
     };
@@ -1719,7 +1769,10 @@ export function useArchiveReadingDays({ enabled = false } = {}) {
   const entry = enabled ? _archiveReadingsCache.get(key) : null;
   const days = entry ? entry.days : null;
   const error = !!enabled && !days && failedKey === key;
-  return { days, holding: entry ? entry.holding : null, version: entry ? entry.version : "", loading: !!enabled && !days && !error, error };
+  return {
+    days, holding: entry ? entry.holding : null, holdingKnown: !!entry?.holdingKnown,
+    version: entry ? entry.version : "", loading: !!enabled && !days && !error, error,
+  };
 }
 
 let _pivotGrainCache = new Map();
@@ -1778,7 +1831,7 @@ export function usePivotGrain({ enabled = false, spec = null, meta = null, versi
     };
     const onVisible = () => { if (typeof document === "undefined" || document.visibilityState === "visible") ask(); };
     if (typeof document !== "undefined") document.addEventListener("visibilitychange", onVisible);
-    const timer = setInterval(ask, PIVOT_GRAIN_CHECK_MS);
+    const timer = setInterval(() => { if (typeof document === "undefined" || document.visibilityState !== "hidden") ask(); }, PIVOT_GRAIN_CHECK_MS);
     return () => {
       if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisible);
       clearInterval(timer);
@@ -2620,7 +2673,7 @@ function useFreshnessMap() {
     ask();
     const onVisible = () => { if (typeof document === "undefined" || document.visibilityState === "visible") ask(); };
     if (typeof document !== "undefined") document.addEventListener("visibilitychange", onVisible);
-    const timer = setInterval(ask, FRESHNESS_CHECK_MS);
+    const timer = setInterval(() => { if (typeof document === "undefined" || document.visibilityState !== "hidden") ask(); }, FRESHNESS_CHECK_MS);
     return () => {
       cancelled = true;
       if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisible);

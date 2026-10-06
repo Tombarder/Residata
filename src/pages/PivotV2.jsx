@@ -1136,11 +1136,14 @@ function compOfGrain(rows) {
 // scope IT was asked with, so a grain still on screen while the next loads shows its own
 // question's numbers, not the new filters applied to old rows. An answer for another
 // layout (other dims) has nothing to show until its own arrives.
-function grainView(raw, meta, specDims) {
+function grainView(raw, meta, specDims, holding) {
   if (raw == null || !meta) return null;
   if (meta.dims.join("\u0001") !== specDims.join("\u0001")) return null;
   if (!meta.archive) return raw;
-  return meta.days ? normaliseArchiveGrain(raw, meta.dims, meta.days, meta.scope) : null;
+  // divided by the readings of its request that its source holds (heldReadingDays) — once
+  // what the cube and the facts hold is known (`holding` undefined until then)
+  if (!meta.days || holding === undefined) return null;
+  return normaliseArchiveGrain(raw, meta.dims, heldReadingDays(meta.days, holding, meta.viaCube), meta.scope);
 }
 // Counts are whole flats. An archive grain's components are flats at an average reading
 // (src/lib/archiveReadings.js), so a count can come out as 7 512.4 — rounded here, where
@@ -1869,7 +1872,10 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // flat-reading count is the number this replaces.
   const archiveGrain = configServerable && !isCurrent;
   // The record path (median, distinct counts) counts its flats by the same readings.
-  const { days: readingDays, holding: readingHolding, version: readingsVersion, loading: readingsLoading, error: readingsError } = useArchiveReadingDays({ enabled: canViewAnalytics && !isCurrent });
+  const { days: readingDays, holding: readingHolding, holdingKnown: readingHoldingKnown, version: readingsVersion, loading: readingsLoading, error: readingsError } = useArchiveReadingDays({ enabled: canViewAnalytics && !isCurrent });
+  // What the cube and the facts hold is read in parallel with the grain; until it is in,
+  // an archive grain or record set cannot be divided and reads as loading.
+  const holdingNow = readingHoldingKnown ? readingHolding : undefined;
   // A grain is divided only by the readings its source holds yet: the cube lags the
   // approvals until its refresh (heldReadingDays, src/lib/archiveReadings.js).
   const cubeDims = useMemo(
@@ -1880,9 +1886,9 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // What a grain answers, handed back with it: a grain still on screen while the next
   // loads is read as the question IT answers (grainView), not the one now being asked.
   const grainMeta = useMemo(
-    () => ({ archive: !isCurrent, dims: specDims, scope: readingScope,
-      days: readingDays && heldReadingDays(readingDays, readingHolding, specUsesCube(pivotSpec, cubeDims)) }),
-    [isCurrent, specDims, readingScope, readingDays, readingHolding, pivotSpec, cubeDims]
+    () => ({ archive: !isCurrent, dims: specDims, scope: readingScope, days: readingDays,
+      viaCube: specUsesCube(pivotSpec, cubeDims) }),
+    [isCurrent, specDims, readingScope, readingDays, pivotSpec, cubeDims]
   );
   const grainEnabled = configServerable && (isCurrent || !!readingDays);
   const { grain: grainRaw, meta: grainRawMeta, loading: grainRawLoading, error: grainRawError } = usePivotGrain({ enabled: grainEnabled, spec: pivotSpec, meta: grainMeta, version: grainVersion });
@@ -1895,14 +1901,13 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
     [priceScope, specDims, filters, country, isCurrent]
   );
   const grainUnscopedMetaNow = useMemo(
-    () => ({ ...grainMeta,
-      days: readingDays && heldReadingDays(readingDays, readingHolding, specUsesCube(pivotSpecUnscoped, cubeDims)) }),
-    [grainMeta, readingDays, readingHolding, pivotSpecUnscoped, cubeDims]
+    () => ({ ...grainMeta, viaCube: specUsesCube(pivotSpecUnscoped, cubeDims) }),
+    [grainMeta, pivotSpecUnscoped, cubeDims]
   );
   const { grain: grainUnscopedRaw, meta: grainUnscopedMeta } = usePivotGrain({ enabled: grainEnabled && priceScope, spec: pivotSpecUnscoped, meta: grainUnscopedMetaNow, version: grainVersion });
-  const grain = useMemo(() => grainView(grainRaw, grainRawMeta, specDims), [grainRaw, grainRawMeta, specDims]);
-  const grainUnscoped = useMemo(() => grainView(grainUnscopedRaw, grainUnscopedMeta, specDims), [grainUnscopedRaw, grainUnscopedMeta, specDims]);
-  const grainLoading = grainRawLoading || (archiveGrain && readingsLoading);
+  const grain = useMemo(() => grainView(grainRaw, grainRawMeta, specDims, holdingNow), [grainRaw, grainRawMeta, specDims, holdingNow]);
+  const grainUnscoped = useMemo(() => grainView(grainUnscopedRaw, grainUnscopedMeta, specDims, holdingNow), [grainUnscopedRaw, grainUnscopedMeta, specDims, holdingNow]);
+  const grainLoading = grainRawLoading || (archiveGrain && (readingsLoading || holdingNow === undefined));
   const grainError = grainRawError || (archiveGrain && readingsError);
   // A non-server-able config needs records — pull them (sticky once needed).
   useEffect(() => {
@@ -1959,9 +1964,9 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   const useGrain = configServerable;
   // In the archive a record is a flat at one reading; this weighs it (recordCount).
   const recordCell = useMemo(
-    () => (canViewAnalytics && !isCurrent && readingDays
-      ? archiveRecordCells(heldReadingDays(readingDays, readingHolding, false), readingScope, gDims) : null),
-    [canViewAnalytics, isCurrent, readingDays, readingHolding, readingScope, gDims]
+    () => (canViewAnalytics && !isCurrent && readingDays && holdingNow !== undefined
+      ? archiveRecordCells(heldReadingDays(readingDays, holdingNow, false), readingScope, gDims) : null),
+    [canViewAnalytics, isCurrent, readingDays, holdingNow, readingScope, gDims]
   );
   const rawTree = useMemo(
     () => useGrain
@@ -2038,12 +2043,15 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
       ? (grainLoading && (grain == null || grain.length === 0))
       : (((forceRaw || !configServerable) && loadingFlats && (realFlats?.length || 0) === 0)
         // archive records are counted by the readings: wait for them (recordCount)
-        || (!configServerable && !isCurrent && readingsLoading))
+        || (!configServerable && !isCurrent && (readingsLoading || (!readingsError && holdingNow === undefined))))
   );
   // The server pivot (analytics_pivot RPC) can fail (cold statement_timeout, RLS,
   // bad spec). Without this the empty grain rendered as a benign "0 units" — a
   // silent failure indistinguishable from "filters matched nothing". Surface it.
-  const grainErrored = useGrain && !!grainError && !grainLoading && (grain == null || grain.length === 0);
+  const grainErrored = (useGrain && !!grainError && !grainLoading && (grain == null || grain.length === 0))
+    // the record path in the archive cannot count flats without the readings either: the
+    // same error, never the flat-readings in silence
+    || (!useGrain && canViewAnalytics && !isCurrent && !!readingsError);
 
   // Records for the open drill-down. In grain mode the clicked node carries no
   // records, so resolve them from filteredRecords by matching the row-dim path

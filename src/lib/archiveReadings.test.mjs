@@ -284,9 +284,9 @@ test("the Pivot asks the archive for the market and month of every row", () => {
 });
 
 test("everything the Pivot reads from the archive grain is in flats", () => {
-  assert.match(PIVOT, /const grain = useMemo\(\(\) => grainView\(grainRaw, grainRawMeta, specDims\)/);
-  assert.match(PIVOT, /const grainUnscoped = useMemo\(\(\) => grainView\(grainUnscopedRaw, grainUnscopedMeta, specDims\)/);
-  assert.match(PIVOT, /return meta\.days \? normaliseArchiveGrain\(raw, meta\.dims, meta\.days, meta\.scope\) : null;/);
+  assert.match(PIVOT, /const grain = useMemo\(\(\) => grainView\(grainRaw, grainRawMeta, specDims, holdingNow\)/);
+  assert.match(PIVOT, /const grainUnscoped = useMemo\(\(\) => grainView\(grainUnscopedRaw, grainUnscopedMeta, specDims, holdingNow\)/);
+  assert.match(PIVOT, /if \(!meta\.days \|\| holding === undefined\) return null;/);
   // past the point where the flats are made, nothing reads the flat-readings
   const after = PIVOT.slice(PIVOT.indexOf("const grainLoading = "));
   assert.doesNotMatch(after, /\bgrainRaw\b|\bgrainUnscopedRaw\b/);
@@ -312,8 +312,9 @@ test("the readings come from archive_days for every market, every page of it", (
 // ── a grain still on screen while the next loads is read as its own question ──
 const DATA_SRC = readFileSync(new URL("./useData.js", import.meta.url), "utf8");
 const grainViewOfHook = new Function(`${DATA_SRC.match(/function _grainView\([\s\S]*?\n\}/)[0]}\nreturn _grainView;`)();
-const grainViewOfPage = new Function("normaliseArchiveGrain",
-  `${PIVOT.match(/function grainView\(raw, meta, specDims\)[\s\S]*?\n\}/)[0]}\nreturn grainView;`)(normaliseArchiveGrain);
+const grainViewOfPage = new Function("normaliseArchiveGrain", "heldReadingDays",
+  `${PIVOT.match(/function grainView\(raw, meta, specDims, holding\)[\s\S]*?\n\}/)[0]}\nreturn grainView;`)(
+  normaliseArchiveGrain, (await import("./archiveReadings.js")).heldReadingDays);
 
 test("the hook hands back the held grain with the request it answers, as loading", () => {
   const held = { key: "k1", grain: [{ d: [], m: { n: 1 } }], meta: { tag: "old" }, error: false };
@@ -335,7 +336,7 @@ test("narrowing Datum from 1–5 October to 5 October shows 100 while the new gr
   const dimsOld = archiveGrainDims(["project_name"], oldScope);
   const dimsNew = archiveGrainDims(["project_name"], newScope);
   const held = [{ d: ["Projekt X", "SK"], m: { n: 500 } }];
-  const shown = grainViewOfPage(held, { archive: true, dims: dimsOld, scope: oldScope, days }, dimsNew);
+  const shown = grainViewOfPage(held, { archive: true, dims: dimsOld, scope: oldScope, days, viaCube: true }, dimsNew, null);
   assert.equal(Math.round(nodeOf(shown).n), 100);
 });
 
@@ -344,21 +345,21 @@ test("an archive grain held while Aktuálne loads is still divided by its readin
   const scope = archiveReadingScope([{ key: "snapshot_month", mode: "in", values: ["2026-10"] }]);
   const dims = archiveGrainDims(["country"], scope);            // [country]: the same as Aktuálne's
   const held = [{ d: ["SK"], m: { n: 7500 * 8 } }];
-  const shown = grainViewOfPage(held, { archive: true, dims, scope, days }, ["country"]);
+  const shown = grainViewOfPage(held, { archive: true, dims, scope, days, viaCube: true }, ["country"], null);
   assert.equal(Math.round(nodeOf(shown).n), 7500, "it showed the flat-readings, ×8");
 });
 
 test("a grain for another layout is not shown under this one", () => {
-  assert.equal(grainViewOfPage([{ d: ["A", "SK"], m: { n: 1 } }], { archive: false, dims: ["cast"], scope: {}, days: null }, ["developer"]), null);
+  assert.equal(grainViewOfPage([{ d: ["A", "SK"], m: { n: 1 } }], { archive: false, dims: ["cast"], scope: {}, days: null }, ["developer"], undefined), null);
   const today = [{ d: ["A"], m: { n: 1 } }];
-  assert.equal(grainViewOfPage(today, { archive: false, dims: ["cast"], scope: {}, days: null }, ["cast"]), today);
+  assert.equal(grainViewOfPage(today, { archive: false, dims: ["cast"], scope: {}, days: null }, ["cast"], undefined), today);
 });
 
 test("the page asks for the archive grain once the readings are known, and passes what it asks", () => {
   assert.match(PIVOT, /const grainEnabled = configServerable && \(isCurrent \|\| !!readingDays\);/);
   assert.match(PIVOT, /usePivotGrain\(\{ enabled: grainEnabled, spec: pivotSpec, meta: grainMeta,/);
   assert.match(PIVOT, /usePivotGrain\(\{ enabled: grainEnabled && priceScope, spec: pivotSpecUnscoped, meta: grainUnscopedMetaNow,/);
-  assert.match(PIVOT, /\(\{ archive: !isCurrent, dims: specDims, scope: readingScope,\s*days: readingDays && heldReadingDays\(readingDays, readingHolding, specUsesCube\(pivotSpec, cubeDims\)\) \}\)/);
+  assert.match(PIVOT, /\(\{ archive: !isCurrent, dims: specDims, scope: readingScope, days: readingDays,\s*viaCube: specUsesCube\(pivotSpec, cubeDims\) \}\)/);
 });
 
 // ── the record path (median, distinct counts) and the drill-down count flats too ──
@@ -408,7 +409,7 @@ test("the record path's tree, header and the drill-down all count this way", () 
   assert.equal((tree.match(/count: recordCount\((records|items), recordCell\)/g) || []).length, 3);
   assert.match(tree, /compute\(FIELDS\[v\.field\], v\.agg, recs, recordCell\)/);
   assert.match(PIVOT, /buildTree\(filteredRecords, rows, cols, effectiveValues, recordCell\)/);
-  assert.match(PIVOT, /archiveRecordCells\(heldReadingDays\(readingDays, readingHolding, false\), readingScope, gDims\)/);
+  assert.match(PIVOT, /archiveRecordCells\(heldReadingDays\(readingDays, holdingNow, false\), readingScope, gDims\)/);
   assert.match(PIVOT, /const displayCount = useGrain \? \(rawTree\?\.count \|\| 0\) : recordsCount;/);
   assert.match(PIVOT, /configServerable \? displayCount : \(rawTree\?\.count \|\| 0\)/);
   assert.match(PIVOT, /configServerable \? displayCount : recordsCount/);
@@ -443,7 +444,7 @@ test("a reading in archive_days that the cube does not hold yet is not counted f
   const scope = archiveReadingScope([{ key: "snapshot_month", mode: "in", values: ["2026-11"] }]);
   const dims = archiveGrainDims(["country"], scope);
   const shown = grainViewOfPage([{ d: ["SK"], m: { n: 7500 } }],
-    { archive: true, dims, scope, days: heldReadingDays(NOV_DAYS, holding, true) }, dims);
+    { archive: true, dims, scope, days: NOV_DAYS, viaCube: true }, dims, holding);
   assert.equal(Math.round(nodeOf(shown).n), 7500);
   // refreshed, it holds both (and the retry's rows)
   const later = archiveHolding(specs.from, [{ d: ["SK", "2026-11"], m: { n: 15040 } }], NOV_FACTS);
@@ -467,10 +468,11 @@ test("which grains read the cube follows the engine's routing", () => {
 });
 
 test("the Pivot divides each grain and the records by the readings their source holds", () => {
-  assert.match(PIVOT, /heldReadingDays\(readingDays, readingHolding, specUsesCube\(pivotSpecUnscoped, cubeDims\)\)/);
-  assert.match(PIVOT, /archiveRecordCells\(heldReadingDays\(readingDays, readingHolding, false\), readingScope, gDims\)/);
+  assert.match(PIVOT, /\(\{ \.\.\.grainMeta, viaCube: specUsesCube\(pivotSpecUnscoped, cubeDims\) \}\)/);
+  assert.match(PIVOT, /return normaliseArchiveGrain\(raw, meta\.dims, heldReadingDays\(meta\.days, holding, meta\.viaCube\), meta\.scope\);/);
+  assert.match(PIVOT, /archiveRecordCells\(heldReadingDays\(readingDays, holdingNow, false\), readingScope, gDims\)/);
   assert.match(DATA, /holding = archiveHolding\(specs\.from, cube\.data, facts\.data\);/);
-  assert.match(DATA, /const version = `\$\{readingsSignature\(days\)\}\/\$\{holdingSignature\(holding\)\}`;/);
+  assert.match(DATA, /version: `\$\{daysSig\}\/\$\{cubeGen\}`/);
 });
 
 // ── what the cube holds survives a few rows of drift ──

@@ -22,7 +22,7 @@ function harness(answers) {
   const sbReadAll = async (make) => make(0, 999);
   const sbRead = (b) => b;
   const supabaseData = {
-    rpc: () => Promise.resolve({ data: null, error: { message: "what the cube holds is another test's" } }),
+    rpc: () => Promise.resolve({ data: [], error: null }),   // what the cube holds is another test's
     from: () => {
       let cols = "";
       const b = {
@@ -97,7 +97,7 @@ test("a view without readings yet is read without them", async () => {
 
 test("the hook asks again while the page is open, and the Pivot's grain key follows the version", () => {
   const hook = SRC.match(/export function useArchiveReadingDays[\s\S]*?\n\}\n/)[0];
-  assert.match(hook, /setInterval\(ask, ARCHIVE_READINGS_CHECK_MS\)/);
+  assert.match(hook, /setInterval\(\(\) => \{ if \(!hidden\(\)\) ask\(\); \}, ARCHIVE_READINGS_CHECK_MS\)/);
   assert.match(hook, /addEventListener\("visibilitychange"/);
   assert.match(hook, /version: entry \? entry\.version : ""/);
   const grainHook = SRC.match(/export function usePivotGrain[\s\S]*?\n\}\n/)[0];
@@ -135,7 +135,7 @@ test("a latest grain is served for 15 minutes, then asked again; an archive grai
 
 test("the grain hook asks again while the page is open, and keeps the kept grain on screen meanwhile", () => {
   const hook = SRC.match(/export function usePivotGrain[\s\S]*?\n\}\n/)[0];
-  assert.match(hook, /setInterval\(ask, PIVOT_GRAIN_CHECK_MS\)/);
+  assert.match(hook, /document\.visibilityState !== "hidden"\) ask\(\); \}, PIVOT_GRAIN_CHECK_MS\)/);
   assert.match(hook, /addEventListener\("visibilitychange"/);
   assert.match(hook, /_pivotGrainCache\.set\(key, \{ grain: arr, at: Date\.now\(\) \}\)/);
   assert.match(hook, /if \(kept\) setState\(\{ key, grain: kept\.grain, meta, error: false \}\);\s*\n\s*if \(_grainCurrent\(key, kept, Date\.now\(\)\)\) return;/);
@@ -175,7 +175,86 @@ test("a holding read during the cube's lag is kept a minute, then 15 minutes onc
 
 test("the hook checks every minute, and the assistant keeps lagging readings a minute", () => {
   assert.match(SRC, /const ARCHIVE_READINGS_CHECK_MS = 60 \* 1000;/);
-  assert.match(SRC, /const _readingsTtl = \(entry\) => \(entry\.lagging \? ARCHIVE_READINGS_LAG_TTL_MS : ARCHIVE_READINGS_TTL_MS\);/);
+  assert.match(SRC, /const _readingsTtl = \(entry\) => \(entry\.lagging \|\| entry\.holdingFailed \? ARCHIVE_READINGS_LAG_TTL_MS : ARCHIVE_READINGS_TTL_MS\);/);
   const CHAT = readFileSync(new URL("../../api/ai/chat.js", import.meta.url), "utf8");
   assert.match(CHAT, /const keep = _readings\?\.lagging \? 60 \* 1000 : 10 \* 60 \* 1000;/);
+});
+
+// ── what the cube holds is read in parallel with the grain, and a passing error keeps it ──
+function stagedHarness() {
+  let now = Date.UTC(2026, 10, 6, 9, 0);
+  const days = [{ day: "2026-11-02", country: "SK", readings: 1 }, { day: "2026-11-06", country: "SK", readings: 1 }];
+  const facts = [{ d: ["SK", "2026-11-02"], m: { n: 7500 } }, { d: ["SK", "2026-11-06"], m: { n: 7500 } }];
+  const st = { cube: [{ d: ["SK", "2026-11"], m: { n: 15000 } }], rpcFails: false, gate: null };
+  const supabaseData = {
+    rpc: async (_n, { p_spec }) => {
+      if (st.gate) await st.gate;
+      if (st.rpcFails) return { data: null, error: { message: "timeout" } };
+      return { data: p_spec.dims[1] === "snapshot_month" ? st.cube : facts, error: null };
+    },
+    from: () => { const b = { select() { return b; }, order() { return b; }, range() { return Promise.resolve({ data: days, error: null }); } }; return b; },
+  };
+  const grains = new Map([['u::{"mode":"archive"}::x', { grain: [] }], ['u::{"mode":"latest"}::', { grain: [] }]]);
+  const api = new Function(
+    "sbReadAll", "sbRead", "supabaseData", "readingDaysByCountry", "readingsSignature",
+    "holdingSpecs", "archiveHolding", "holdingSignature", "holdingLags", "_pivotGrainCache", "Date", "console",
+    `${BLOCK}\nreturn { _loadArchiveReadings, _archiveReadingsCache, _archiveReadingsListeners };`,
+  )(async (make) => make(0, 999), (b) => b, supabaseData, readingDaysByCountry, readingsSignature,
+    holdingSpecs, archiveHolding, holdingSignature, holdingLags, grains, { now: () => now }, { error() {} });
+  return { ...api, st, grains, advance: (ms) => { now += ms; } };
+}
+
+test("the days are published before what the cube holds is in, so a grain can be asked meanwhile", async () => {
+  const h = stagedHarness();
+  let release;
+  h.st.gate = new Promise((r) => { release = r; });
+  const heard = [];
+  h._archiveReadingsListeners.set("u", new Set([() => heard.push(h._archiveReadingsCache.get("u").holdingKnown)]));
+  const p = h._loadArchiveReadings("u");
+  await new Promise((r) => setTimeout(r, 0));
+  const early = h._archiveReadingsCache.get("u");
+  assert.ok(early && early.days.SK.get("2026-11-06") === 1, "the days are there before the holding");
+  assert.equal(early.holdingKnown, false);
+  release();
+  const done = await p;
+  assert.equal(done.holdingKnown, true);
+  assert.equal(done.version, early.version, "the holding arriving is no new question for the grain");
+  assert.deepEqual(heard, [false, true]);
+});
+
+test("a holding that cannot be read keeps the last good one, the version and the grains", async () => {
+  const h = stagedHarness();
+  const a = await h._loadArchiveReadings("u");
+  h.st.rpcFails = true;
+  h.advance(20 * MIN);
+  const b = await h._loadArchiveReadings("u");
+  assert.equal(b.version, a.version);
+  assert.equal(b.holding, a.holding);
+  assert.equal(b.holdingFailed, true);
+  assert.equal(h.grains.size, 2, "no grain sent to be asked again");
+  h.st.rpcFails = false;
+  h.advance(2 * MIN);                                   // asked again within the minute
+  const c = await h._loadArchiveReadings("u");
+  assert.equal(c.holdingFailed, false);
+  assert.equal(c.version, a.version);
+});
+
+test("a cube refresh with the same days is a new version, and the archive grains go", async () => {
+  const h = stagedHarness();
+  h.st.cube = [{ d: ["SK", "2026-11"], m: { n: 7500 } }];   // lagging the 6th
+  const a = await h._loadArchiveReadings("u");
+  h.st.cube = [{ d: ["SK", "2026-11"], m: { n: 15000 } }];
+  h.advance(2 * MIN);
+  const b = await h._loadArchiveReadings("u");
+  assert.notEqual(b.version, a.version);
+  assert.deepEqual([...h.grains.keys()], ['u::{"mode":"latest"}::']);
+});
+
+test("the Pivot waits for what the cube holds before dividing, and the record path errors with the grain path", () => {
+  const PIVOT = readFileSync(new URL("../pages/PivotV2.jsx", import.meta.url), "utf8");
+  assert.match(PIVOT, /const holdingNow = readingHoldingKnown \? readingHolding : undefined;/);
+  assert.match(PIVOT, /const grainEnabled = configServerable && \(isCurrent \|\| !!readingDays\);/);
+  assert.match(PIVOT, /const grainLoading = grainRawLoading \|\| \(archiveGrain && \(readingsLoading \|\| holdingNow === undefined\)\);/);
+  assert.match(PIVOT, /\|\| \(!useGrain && canViewAnalytics && !isCurrent && !!readingsError\);/);
+  assert.match(SRC, /holdingKnown: !!entry\?\.holdingKnown/);
 });

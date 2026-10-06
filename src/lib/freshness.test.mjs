@@ -85,7 +85,7 @@ test("asks at the same moment share one read", async () => {
 test("a page left open asks again on its own", () => {
   const m = SRC.match(/function useFreshnessMap\(\)[\s\S]*?\n\}\n/);
   assert.ok(m, "useFreshnessMap not found");
-  assert.match(m[0], /setInterval\(ask, FRESHNESS_CHECK_MS\)/);
+  assert.match(m[0], /document\.visibilityState !== "hidden"\) ask\(\); \}, FRESHNESS_CHECK_MS\)/);
   assert.match(m[0], /addEventListener\("visibilitychange"/);
   for (const hook of ["useFreshness", "useFreshnessByCountry", "useFreshnessStatus"]) {
     const h = SRC.match(new RegExp(`export function ${hook}\\(\\)[\\s\\S]*?\\n\\}\\n`));
