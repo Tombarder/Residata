@@ -2436,19 +2436,38 @@ export function useAnalyticsRegistry() {
 // market — the visible "this batch needs fixing" signal, never silently mixing
 // fresh + stale data. The "All" view shows the OLDEST market date (the combined
 // view is only as fresh as its stalest market).
-let _freshness = null;            // { SK: 'YYYY-MM-DD', CZ: '…' }
+// The answer is kept for FRESHNESS_TTL_MS and only when it is one. It used to be kept
+// for the whole session whatever it was: a failed or empty read cached {} — the
+// dashboard's month-ago arrows vanished and Sales fell back to today until a reload —
+// and a tab left open overnight kept yesterday's date after the morning's reading.
+// A failed or empty read now keeps the last good answer (or none) and is tried again on
+// the next ask; a good one is asked again after a few hours. The hooks ask on mount, when
+// the tab comes back into view, and every FRESHNESS_CHECK_MS — each a no-op while the
+// kept answer is current.
+const FRESHNESS_TTL_MS = 3 * 60 * 60 * 1000;
+const FRESHNESS_CHECK_MS = 15 * 60 * 1000;
+let _freshness = null;            // { SK: 'YYYY-MM-DD', CZ: '…' } — the last good answer
+let _freshnessAt = 0;             // when it was read
 let _freshnessPromise = null;
+function _freshnessCurrent() {
+  return _freshness && Date.now() - _freshnessAt < FRESHNESS_TTL_MS ? _freshness : null;
+}
 function _loadFreshness() {
-  if (_freshness) return Promise.resolve(_freshness);
+  const current = _freshnessCurrent();
+  if (current) return Promise.resolve(current);
   if (_freshnessPromise) return _freshnessPromise;
-  _freshnessPromise = supabasePublic.from("market_freshness").select("country,last_data_date")
-    .then(({ data }) => {
+  _freshnessPromise = Promise.resolve()
+    .then(() => supabasePublic.from("market_freshness").select("country,last_data_date"))
+    .then(({ data, error }) => {
       const m = {};
       (data || []).forEach((r) => { if (r.country) m[r.country] = r.last_data_date; });
+      if (error || !Object.keys(m).length) return _freshness || {};
       _freshness = m;
+      _freshnessAt = Date.now();
       return m;
     })
-    .catch(() => ({}));
+    .catch(() => _freshness || {})
+    .finally(() => { _freshnessPromise = null; });
   return _freshnessPromise;
 }
 function _freshnessForView(country, m) {
@@ -2460,30 +2479,53 @@ function _freshnessForView(country, m) {
   return m[country] || null;
 }
 
+/* The per-market map behind every freshness hook, kept current (see FRESHNESS_TTL_MS).
+   `settled` is true once this mount has an answer to go on — a current one from the
+   cache, or the outcome of its own read, good or not — so a page can wait for the date
+   rather than start from today and be corrected. */
+function useFreshnessMap() {
+  const [state, setState] = useState(() => ({ map: _freshness, settled: !!_freshnessCurrent() }));
+  useEffect(() => {
+    if (!isSupabaseReady()) return;
+    let cancelled = false;
+    const ask = () => _loadFreshness().then((m) => {
+      if (cancelled) return;
+      const map = m && Object.keys(m).length ? m : null;
+      setState((s) => (s.map === map && s.settled ? s : { map, settled: true }));
+    });
+    ask();
+    const onVisible = () => { if (typeof document === "undefined" || document.visibilityState === "visible") ask(); };
+    if (typeof document !== "undefined") document.addEventListener("visibilitychange", onVisible);
+    const timer = setInterval(ask, FRESHNESS_CHECK_MS);
+    return () => {
+      cancelled = true;
+      if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisible);
+      clearInterval(timer);
+    };
+  }, []);
+  // Without a database there is nothing to wait for.
+  return isSupabaseReady() || state.settled ? state : { ...state, settled: true };
+}
+
 /** Latest data date per market ({ SK: 'YYYY-MM-DD', CZ: … }), or null while loading
  *  or when it could not be read — for figures that must be anchored on EACH market's
  *  own last reading, which the "All" view's single (oldest) date is not. */
 export function useFreshnessByCountry() {
-  const [map, setMap] = useState(() => (_freshness && Object.keys(_freshness).length ? _freshness : null));
-  useEffect(() => {
-    let cancelled = false;
-    if (!isSupabaseReady()) return;
-    _loadFreshness().then((m) => { if (!cancelled) setMap(m && Object.keys(m).length ? m : null); });
-    return () => { cancelled = true; };
-  }, []);
-  return map;
+  const { map } = useFreshnessMap();
+  return map && Object.keys(map).length ? map : null;
+}
+
+/** Latest data date ('YYYY-MM-DD') for the selected country (the oldest market for the
+ *  "All" view) and whether it is settled: { date: null, settled: false } while it is
+ *  being read, { date: null, settled: true } when it could not be. */
+export function useFreshnessStatus() {
+  const { country } = useCountry();
+  const { map, settled } = useFreshnessMap();
+  return { date: _freshnessForView(country, map), settled };
 }
 
 /** Latest data date ('YYYY-MM-DD') for the selected country (the oldest market
  *  for the "All" view), or null while loading. Drives the freshness indicator. */
 export function useFreshness() {
-  const { country } = useCountry();
-  const [date, setDate] = useState(() => _freshnessForView(country, _freshness));
-  useEffect(() => {
-    let cancelled = false;
-    if (!isSupabaseReady()) return;
-    _loadFreshness().then((m) => { if (!cancelled) setDate(_freshnessForView(country, m)); });
-    return () => { cancelled = true; };
-  }, [country]);
-  return date;
+  return useFreshnessStatus().date;
 }
