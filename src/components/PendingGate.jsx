@@ -1,34 +1,29 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { getLiveT } from "../lib/liveLang";
 import { useAuth } from "../lib/useAuth";
 
 /**
- * Zobrazené namiesto Live/ProjectDetail/Analytics ak user je prihlásený
- * ale tier je stále 'pending' (čaká na admin approval).
+ * Shown instead of Live / ProjectDetail / the platform to a signed-in account
+ * whose tier is 'pending' — since sign-ups are approved automatically the moment
+ * the profile form is saved, that now means one thing: an admin set the account
+ * to "Bez prístupu" (no access). It used to say "Application received … we
+ * approve manually, you'll get an e-mail" — a promise nobody would keep.
  *
- * AUTO-REFRESH: každé 4 sekundy ticho pingneme Supabase cez reloadProfile.
- * Keď admin klikne "Approve" → DB sa zmení → náš nasledujúci poll to zachytí
- * → App.jsx re-renderuje → PendingGate unmount-uje, user vidí dashboard.
- * Bez tohto by user sedel navždy kým sám manuálne refreshne.
+ * AUTO-REFRESH: every 30 s we quietly re-read the profile, so the moment an admin
+ * gives access the page unlocks by itself (App re-renders, this unmounts).
  */
 export default function PendingGate({ setCurrent, lang = "en" }) {
   const t = getLiveT(lang);
   const { reloadProfile } = useAuth();
-  const [pollCount, setPollCount] = useState(0);
 
   useEffect(() => {
-    // Neagresívne: 4-sekundový interval. Query je tiny (single row by id),
-    // DB voľná. Keď user zavrie tab, interval sa vyčistí.
-    const iv = setInterval(() => {
-      reloadProfile();
-      setPollCount(c => c + 1);
-    }, 4000);
+    const iv = setInterval(() => { reloadProfile(); }, 30000);
     return () => clearInterval(iv);
   }, [reloadProfile]);
 
   return (
     <main style={{ padding: "6rem 2rem 4rem", maxWidth: 560, margin: "0 auto", textAlign: "center" }}>
-      <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>⏳</div>
+      <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>🔒</div>
       <h1 style={{ fontSize: "1.8rem", fontWeight: 700, marginBottom: "0.75rem", letterSpacing: "-0.02em" }}>
         {t.pending_title}
       </h1>
@@ -55,8 +50,7 @@ export default function PendingGate({ setCurrent, lang = "en" }) {
           width: 6, height: 6, borderRadius: "50%", background: "var(--accent)",
           animation: "pg-pulse 1.4s ease-in-out infinite",
         }} />
-        {lang === "sk" ? "Sledujeme schválenie · live" : "Watching for approval · live"}
-        {pollCount > 0 && <span style={{ color: "var(--text-dim)", fontWeight: 400 }}>· checked {pollCount}×</span>}
+        {lang === "sk" ? "Čakáme na prístup · live" : "Waiting for access · live"}
       </div>
 
       <div>

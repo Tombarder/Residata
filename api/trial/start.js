@@ -20,7 +20,8 @@
 // Response:
 //   200 { trial_until, trial_started_at }
 //   401 — unauthenticated
-//   403 — untrusted origin / trial already consumed
+//   403 — untrusted origin / sign-up not finished (profile_incomplete)
+//   409 — trial already used, or already on a paid / admin tier
 
 import { createClient } from "@supabase/supabase-js";
 import { isTrustedRequest as isTrustedOrigin } from "../_lib/origin.js";
@@ -51,10 +52,19 @@ export default async function handler(req, res) {
     // Check current state — trial is one-shot per user (self-service).
     const { data: prof } = await admin
       .from("user_profiles")
-      .select("tier, trial_until, trial_started_at")
+      .select("tier, profile_completed, trial_until, trial_started_at")
       .eq("id", user.id)
       .maybeSingle();
     if (!prof) return res.status(404).json({ error: "profile not found" });
+    // Not before the sign-up is finished. A pending account has no access at all
+    // (resolveAccess), so a week started now would tick away unused — and the
+    // database gate (current_user_is_paid) WOULD count it, giving data to an
+    // account the app itself still shows as locked. 403, not 409: the trial
+    // intent kept from the marketing page must survive this and be redeemed
+    // once the profile is complete (settleTrialIntent drops it only on 2xx/409).
+    if (prof.tier === "pending" || !prof.profile_completed) {
+      return res.status(403).json({ error: "profile_incomplete" });
+    }
     if (prof.tier === "paid" || prof.tier === "admin") {
       return res.status(409).json({ error: "already on a paid tier", tier: prof.tier });
     }

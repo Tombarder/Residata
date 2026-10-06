@@ -557,7 +557,9 @@ function UserForm({ mode, user, isSelf, lang, now, onClose, onSaved }) {
       from: isPaid ? (dayKey(u.paid_started_at) || "") : today,
       to: isPaid ? (dayKey(u.paid_until) || "") : "",
       note: u.subscription_note || "",
-      send_invite: true,
+      // New account: announce it by default. Existing one: only when asked —
+      // e.g. the dates changed after the first e-mail, or it never arrived.
+      send_invite: creating,
       invite_lang: lang === "en" ? "en" : "sk",
     };
   }, [user, creating, today, lang]);
@@ -606,8 +608,11 @@ function UserForm({ mode, user, isSelf, lang, now, onClose, onSaved }) {
         if (f.from !== init.from) p.paid_started_at = f.from || null;
         if (f.to !== init.to) p.paid_until = f.to || null;
       }
-      if (Object.keys(p).length === 0) { onClose(); return; }
-      r = await callAdmin("/api/admin/set-subscription", { user_id: user.id, ...p }, lang);
+      const announce = f.send_invite && f.tier !== "pending";
+      if (Object.keys(p).length === 0 && !announce) { onClose(); return; }
+      r = await callAdmin("/api/admin/set-subscription", {
+        user_id: user.id, ...p, ...(announce ? { send_invite: true, invite_lang: f.invite_lang } : {}),
+      }, lang);
     }
     setSaving(false);
     if (!r.ok) {
@@ -617,9 +622,11 @@ function UserForm({ mode, user, isSelf, lang, now, onClose, onSaved }) {
     }
     const row = r.j.user;
     let message = { kind: "ok", text: creating ? t(`Účet vytvorený: ${row.email}`, `Account created: ${row.email}`) : t(`Uložené: ${row.email}`, `Saved: ${row.email}`) };
-    if (creating) {
-      if (r.j.invite === "sent") message.text += t(" · e-mail s prístupom odoslaný", " · access e-mail sent");
-      if (r.j.invite === "failed") message = { kind: "warn", text: t(`Účet ${row.email} je vytvorený, ale e-mail sa nepodarilo odoslať (${r.j.invite_error || "?"}). Daj mu vedieť sám: prihlási sa na residata.eu svojím e-mailom a jednorazovým kódom.`, `Account ${row.email} is created, but the e-mail failed (${r.j.invite_error || "?"}). Tell them yourself: they sign in at residata.eu with their e-mail and a one-time code.`) };
+    if (r.j.invite === "sent") message.text += t(" · e-mail s prístupom odoslaný", " · access e-mail sent");
+    if (r.j.invite === "failed") {
+      message = { kind: "warn", text: creating
+        ? t(`Účet ${row.email} je vytvorený, ale e-mail sa nepodarilo odoslať (${r.j.invite_error || "?"}). Daj mu vedieť sám: prihlási sa na residata.eu svojím e-mailom a jednorazovým kódom.`, `Account ${row.email} is created, but the e-mail failed (${r.j.invite_error || "?"}). Tell them yourself: they sign in at residata.eu with their e-mail and a one-time code.`)
+        : t(`Uložené: ${row.email}, ale e-mail sa nepodarilo odoslať (${r.j.invite_error || "?"}). Skús to znova alebo mu daj vedieť sám.`, `Saved: ${row.email}, but the e-mail failed (${r.j.invite_error || "?"}). Try again or tell them yourself.`) };
     }
     onSaved(row, message, r.j.now);
   };
@@ -729,11 +736,13 @@ function UserForm({ mode, user, isSelf, lang, now, onClose, onSaved }) {
             placeholder={t("Napr. novinár — prístup výmenou za uvedenie zdroja. Vidí len admin.", "E.g. journalist — access in exchange for credit. Admins only.")} />
         </label>
 
-        {creating && (
+        {(creating || f.tier !== "pending") && (
           <div className="rd-form__full" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.6rem 1rem" }}>
             <label className="rd-check">
               <input type="checkbox" checked={f.send_invite} onChange={set("send_invite")} />
-              {t("Poslať mu e-mail, že má účet pripravený", "E-mail them that the account is ready")}
+              {creating
+                ? t("Poslať mu e-mail, že má účet pripravený", "E-mail them that the account is ready")
+                : t("Poslať mu e-mail s jeho prístupom", "E-mail them their access")}
             </label>
             {f.send_invite && (
               <div className="rd-seg" role="group" aria-label={t("Jazyk e-mailu", "E-mail language")}>
@@ -743,7 +752,10 @@ function UserForm({ mode, user, isSelf, lang, now, onClose, onSaved }) {
               </div>
             )}
             <span className="rd-form__hint" style={{ flexBasis: "100%" }}>
-              {f.send_invite
+              {!creating
+                ? t("Príde mu „Váš účet na Residata je pripravený“ s tým, čo bude mať po uložení, a ako sa prihlási. Napr. keď si zmenil dátumy alebo prvý e-mail nedošiel.",
+                    "They get “Your Residata account is ready” with what they will have after saving, and how to sign in. E.g. when you changed the dates or the first e-mail never arrived.")
+                : f.send_invite
                 ? t("Príde mu „Váš účet na Residata je pripravený“: čo má k dispozícii a že sa prihlási svojím e-mailom a jednorazovým kódom (bez hesla).",
                     "They get “Your Residata account is ready”: what they have, and that they sign in with their e-mail and a one-time code (no password).")
                 : t("Účet sa vytvorí potichu — daj mu vedieť sám: prihlási sa na residata.eu svojím e-mailom a jednorazovým kódom.",

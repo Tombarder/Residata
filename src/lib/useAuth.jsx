@@ -154,15 +154,22 @@ function useAuthInternal() {
     return () => window.removeEventListener("focus", onFocus);
   }, [loadProfile]);
 
-  const signIn = async (email) => {
+  const signIn = async (email, { lang } = {}) => {
     if (!isSupabaseReady()) return { error: "Supabase offline" };
     return supabase.auth.signInWithOtp({
       email,
-      // Where the email's link lands, for any template that carries one. The
-      // platform, not the marketing homepage — someone who has just signed up
-      // wants the product, not the sales page. (The code-entry path in
-      // LoginModal routes there too, so both ways in agree.)
-      options: { emailRedirectTo: window.location.origin + "/app" },
+      options: {
+        // Where the email's link lands, for any template that carries one. The
+        // platform, not the marketing homepage — someone who has just signed up
+        // wants the product, not the sales page. (The code-entry path in
+        // LoginModal routes there too, so both ways in agree.)
+        emailRedirectTo: window.location.origin + "/app",
+        // The site's language at sign-up. Supabase stores `data` as the new
+        // user's metadata ONLY when this request creates the account (an
+        // existing user's sign-in ignores it), and the welcome e-mail reads it
+        // to greet them in their language (api/webhooks/welcome-user.js).
+        ...(lang ? { data: { lang } } : {}),
+      },
     });
   };
 

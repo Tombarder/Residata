@@ -35,7 +35,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { isTrustedRequest as isTrustedOrigin } from "../_lib/origin.js";
-import { accountCreatedHtml, sendEmail } from "../_lib/emails.js";
+import { accountCreatedHtml, inviteSubject, sendEmail } from "../_lib/emails.js";
 import { planNewUser } from "../../src/lib/adminUsers.js";
 
 export const maxDuration = 20;
@@ -152,7 +152,7 @@ export default async function handler(req, res) {
       try {
         await sendEmail({
           to: email,
-          subject: inviteLang === "sk" ? "Váš účet na Residata je pripravený" : "Your Residata account is ready",
+          subject: inviteSubject(inviteLang),
           html: accountCreatedHtml(newUser, process.env.WEB_URL || "https://residata.eu", inviteLang),
           gmailUser: process.env.GMAIL_FROM || "tkamhal@gmail.com",
           gmailPassword: process.env.GMAIL_APP_PASSWORD,

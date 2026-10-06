@@ -43,19 +43,26 @@ export default function LoginModal({ open, onClose, onSignedIn, lang = "en" }) {
   // syntactically valid address we ask the server whether this one is exempt.
   // Without this the submit button stays disabled for an exempt address and the
   // person simply cannot sign up, however permissive the server is.
-  const [exempt, setExempt] = useState(false);
+  // `verdict` is the server's answer and the address it was for; an answer for
+  // another address counts for nothing. Until the one on screen is answered the
+  // field says nothing alarming: a person the admin let in on a gmail address
+  // used to see "personal providers are not accepted" in red for the moment the
+  // check took — exactly when they are least sure they are in the right place.
+  const [verdict, setVerdict] = useState({ email: null, ok: false });
   useEffect(() => {
-    setExempt(false);
     if (!email || !email.includes("@") || !localEmailError) return;
     let cancelled = false;
     const t = setTimeout(async () => {
       const ok = await signupEmailAllowed(email);
-      if (!cancelled) setExempt(ok);
+      if (!cancelled) setVerdict({ email, ok });
     }, 400);
     return () => { cancelled = true; clearTimeout(t); };
   }, [email, localEmailError]);
 
-  const emailError = exempt ? null : localEmailError;
+  const asked = !!localEmailError && email.includes("@");
+  const exempt = asked && verdict.email === email && verdict.ok;
+  const pending = asked && verdict.email !== email;
+  const emailError = exempt || pending ? null : localEmailError;
 
   if (!open) return null;
 
@@ -70,7 +77,7 @@ export default function LoginModal({ open, onClose, onSignedIn, lang = "en" }) {
     }
     setError(null); setBusy(true);
     track("login_code_requested", { domain: email.split("@")[1] });
-    const { error } = await signIn(email);
+    const { error } = await signIn(email, { lang });
     setBusy(false);
     if (error) {
       setError(loginErrorMessage(error, lang));
@@ -116,7 +123,7 @@ export default function LoginModal({ open, onClose, onSignedIn, lang = "en" }) {
   const resend = async () => {
     setVerifyError(null); setResent(false); setBusyResend(true);
     setCode("");
-    const { error } = await signIn(email);
+    const { error } = await signIn(email, { lang });
     setBusyResend(false);
     if (error) {
       setVerifyError(loginErrorMessage(error, lang));
@@ -184,14 +191,18 @@ export default function LoginModal({ open, onClose, onSignedIn, lang = "en" }) {
                 }}
               />
               <div style={{ fontSize: "0.7rem", color: emailError ? dangerInk : "var(--text-faint)", marginBottom: "0.75rem", minHeight: "1rem" }}>
-                {emailError || t.login_biz_email_hint}
+                {emailError || (pending ? (lang === "sk" ? "Overujem adresu…" : "Checking the address…")
+                  // A personal address that IS let in (an admin made the account)
+                  // must not read "work email required" under it.
+                  : exempt ? (lang === "sk" ? "Na túto adresu ti pošleme kód." : "We'll send the code to this address.")
+                  : t.login_biz_email_hint)}
               </div>
               {error && <div style={{ color: dangerInk, fontSize: "0.8rem", marginBottom: "0.75rem" }}>{error}</div>}
-              <button type="submit" disabled={busy || !email || !!emailError} style={{
+              <button type="submit" disabled={busy || !email || !!emailError || pending} style={{
                 width: "100%", padding: "0.75rem", background: "var(--accent)", color: "var(--bg)",
                 fontWeight: 600, borderRadius: 8, border: "none",
-                cursor: (busy || emailError) ? "not-allowed" : "pointer",
-                fontSize: "0.9rem", opacity: (busy || emailError) ? 0.4 : 1,
+                cursor: (busy || emailError || pending) ? "not-allowed" : "pointer",
+                fontSize: "0.9rem", opacity: (busy || emailError || pending) ? 0.4 : 1,
               }}>{busy ? t.login_sending : t.login_send}</button>
             </form>
             <p style={{ fontSize: "0.7rem", color: "var(--text-faint)", marginTop: "1rem", textAlign: "center", lineHeight: 1.55 }}>

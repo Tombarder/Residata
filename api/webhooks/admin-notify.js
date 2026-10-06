@@ -40,13 +40,12 @@ export default async function handler(req, res) {
   // ─── Env ───
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY;
-  const APPROVAL_HMAC_SECRET = process.env.APPROVAL_HMAC_SECRET;
   const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
   const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "tkamhal@gmail.com";
   const GMAIL_FROM = process.env.GMAIL_FROM || "tkamhal@gmail.com";
   const WEB_URL = process.env.WEB_URL || "https://residata.eu";
 
-  if (!SUPABASE_URL || !SUPABASE_SECRET_KEY || !APPROVAL_HMAC_SECRET || (!process.env.SMTP_PASS && !GMAIL_APP_PASSWORD)) {
+  if (!SUPABASE_URL || !SUPABASE_SECRET_KEY || (!process.env.SMTP_PASS && !GMAIL_APP_PASSWORD)) {
     return res.status(500).json({ error: "server misconfigured: missing required env" });
   }
 
@@ -76,8 +75,8 @@ export default async function handler(req, res) {
   try {
     await sendEmail({
       to: ADMIN_EMAIL,
-      subject: `[Residata] New free signup: ${user.email}`,
-      html: adminDigestHtml(user, WEB_URL, SUPABASE_URL, APPROVAL_HMAC_SECRET),
+      subject: `[Residata] New sign-up: ${user.email}`,
+      html: adminDigestHtml(user, WEB_URL),
       gmailUser: GMAIL_FROM,
       gmailPassword: GMAIL_APP_PASSWORD,
     });

@@ -46,6 +46,7 @@ import InfoTip from "../components/InfoTip";
 import { applyFilters, describe, isComplete, pruneStale } from "../lib/mapFilters";
 import { SoldShareNote } from "../lib/soldShareNote";
 import { soldSharePct } from "../lib/soldShare.js";
+import { daysLeftText } from "../lib/dates";
 
 const L = (lang, sk, en) => (lang === "sk" ? sk : en);
 
@@ -980,7 +981,7 @@ function TrialRunningBanner({ lang, daysLeft, onOpenBilling }) {
     <div style={{ background: ending ? "rgba(245,166,35,0.12)" : "color-mix(in srgb, var(--accent) 12%, transparent)", border: `1px solid color-mix(in srgb, var(--accent) 38%, transparent)`, borderRadius: 12, padding: "0.8rem 1.1rem", marginBottom: "1.4rem", display: "flex", alignItems: "center", gap: "0.8rem", flexWrap: "wrap", fontSize: "0.85rem" }}>
       <span style={{ fontSize: "1.05rem" }}>🎁</span>
       <span style={{ color: textLight, fontWeight: 600 }}>
-        {lang === "sk" ? <>Paid trial aktívny — <span style={{ color: accent }}>{daysLeft <= 0 ? "posledný deň" : `${daysLeft} dní zostáva`}</span></> : <>Paid trial active — <span style={{ color: accent }}>{daysLeft <= 0 ? "last day" : `${daysLeft} day${daysLeft === 1 ? "" : "s"} left`}</span></>}
+        {lang === "sk" ? "Trial Premium beží" : "Premium trial active"} — <span style={{ color: accent }}>{daysLeftText(daysLeft, lang)}</span>
       </span>
       <button onClick={onOpenBilling} style={{ marginLeft: "auto", background: "transparent", color: accent, border: `1px solid ${accent}`, borderRadius: 6, padding: "0.35rem 0.8rem", fontSize: "0.75rem", fontFamily: mono, fontWeight: 700, cursor: "pointer" }}>{L(lang, "Detail / upgrade", "Details / upgrade")}</button>
     </div>
