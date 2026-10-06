@@ -19,30 +19,30 @@ novostavby Slovensko, ceny novostavieb Slovensko, nové byty Slovensko, predaj b
 - **Počet bytov v ponuke v projektoch, ktoré predávali aj v predchádzajúcom štvrťroku, klesol o 4,3 %** — zo 6 305 na 6 035.
 - Dopyt: za 3. štvrťrok 2026 sa predalo 1 231 bytov.
 - Priemerná cena v projektoch sa pohybuje na úrovni 4 710 €/m² s DPH.
-- Cena dokončených bytov je o 3,2 % nižšia než cena rozostavaných.
+- Cena dokončených bytov je o 2,5 % nižšia než cena rozostavaných.
 
 ## Ponuka
 
 - Ku koncu obdobia bolo v ponuke 9 564 bytov v 248 projektoch.
 - 40 % projektov obsahuje 80 % ponuky (99 projektov s 7 672 bytmi).
 - 117 projektov má v ponuke menej ako 20 bytov (11 % ponuky).
-- Ponuka dokončených bytov tvorí 12,4 % všetkých nepredaných bytov (1 187 bytov).
-- Najviac dokončených voľných bytov je v Bratislavskom kraji a v Banskobystrickom kraji.
+- Ponuka dokončených bytov tvorí 10,4 % všetkých nepredaných bytov (991 bytov).
+- Najviac dokončených voľných bytov je v Bratislavskom kraji a v Trnavskom kraji.
 - Najväčšiu časť ponuky tvorí kategória 2-izb — 44,9 % bytov s uvedeným počtom izieb.
 
 **Podiel voľných bytov v 3. štvrťroku 2026 podľa kraja**
 
 | Kraj | Voľné | z toho dokončené |
 |---|---:|---:|
-| Bratislavský | 4 574 | 586 |
+| Bratislavský | 4 574 | 493 |
 | Trnavský | 878 | 140 |
 | Trenčiansky | 437 | 0 |
 | Nitriansky | 673 | 82 |
 | Žilinský | 625 | 117 |
-| Banskobystrický | 760 | 192 |
+| Banskobystrický | 760 | 123 |
 | Prešovský | 894 | 23 |
-| Košický | 723 | 47 |
-| **celkom** | **9 564** | **1 187** |
+| Košický | 723 | 13 |
+| **celkom** | **9 564** | **991** |
 
 ![Podiel voľných bytov podľa kategórie](/analyzy/sk-prehlad-2026-q3-podiel-ponuka.svg)
 *Podiel voľných bytov v 3. štvrťroku 2026 podľa kategórie.*
@@ -79,7 +79,7 @@ novostavby Slovensko, ceny novostavieb Slovensko, nové byty Slovensko, predaj b
 
 - Celková priemerná cena projektov na Slovensku je 4 710 €/m² s DPH.
 - Na tých istých 3 844 bytoch priemerná cena medzikvartálne stúpla o 0,6 %.
-- Cena dokončených bytov je o 3,2 % nižšia než cena rozostavaných.
+- Cena dokončených bytov je o 2,5 % nižšia než cena rozostavaných.
 - Predané byty mali priemernú cenníkovú cenu 5 025 €/m² s DPH, o 1,5 % nižšiu než byty, ktoré v tých istých projektoch zostali v ponuke (5 100 €/m² s DPH).
 
 ![Vývoj cien nových bytov](/analyzy/sk-prehlad-2026-q3-ceny-vyvoj.svg)
@@ -103,4 +103,4 @@ novostavby Slovensko, ceny novostavieb Slovensko, nové byty Slovensko, predaj b
 
 ## Výhľad
 
-Pri tempe predaja za 3. štvrťrok 2026 — 407 bytov mesačne — by sa súčasná ponuka 9 564 bytov vypredala za 23,5 mesiaca. Dokončené voľné byty (1 187) tvoria 12,4 % tejto ponuky; kategória 2-izb tvorí 44,9 % ponuky a 48,8 % predaja.
+Pri tempe predaja za 3. štvrťrok 2026 — 407 bytov mesačne — by sa súčasná ponuka 9 564 bytov vypredala za 23,5 mesiaca. Dokončené voľné byty (991) tvoria 10,4 % tejto ponuky; kategória 2-izb tvorí 44,9 % ponuky a 48,8 % predaja.

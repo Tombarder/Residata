@@ -19,14 +19,14 @@ novostavby Bratislavský kraj, ceny novostavieb Bratislavský kraj, nové byty B
 - **Počet bytov v ponuke v projektoch, ktoré predávali aj v predchádzajúcom štvrťroku, klesol o 4,3 %** — z 3 428 na 3 281.
 - Dopyt: za 3. štvrťrok 2026 sa predalo 626 bytov.
 - Priemerná cena v projektoch sa pohybuje na úrovni 5 564 €/m² s DPH.
-- Cena dokončených bytov je o 1,7 % vyššia než cena rozostavaných.
+- Cena dokončených bytov je o 4,7 % vyššia než cena rozostavaných.
 
 ## Ponuka
 
 - Ku koncu obdobia bolo v ponuke 4 574 bytov v 107 projektoch.
 - 36 % projektov obsahuje 80 % ponuky (39 projektov s 3 667 bytmi).
 - 52 projektov má v ponuke menej ako 20 bytov (11 % ponuky).
-- Ponuka dokončených bytov tvorí 12,8 % všetkých nepredaných bytov (586 bytov).
+- Ponuka dokončených bytov tvorí 10,8 % všetkých nepredaných bytov (493 bytov).
 - Najviac dokončených voľných bytov je v lokalitách Bratislava a Rovinka.
 - Najväčšiu časť ponuky tvorí kategória 2-izb — 42,8 % bytov s uvedeným počtom izieb.
 
@@ -34,7 +34,7 @@ novostavby Bratislavský kraj, ceny novostavieb Bratislavský kraj, nové byty B
 
 | Obec | Voľné | z toho dokončené |
 |---|---:|---:|
-| Bratislava | 4 250 | 579 |
+| Bratislava | 4 250 | 486 |
 | Slovenský Grob | 91 | 0 |
 | Bernolákovo | 59 | 0 |
 | Senec | 43 | 0 |
@@ -45,7 +45,7 @@ novostavby Bratislavský kraj, ceny novostavieb Bratislavský kraj, nové byty B
 | Svätý Jur | 19 | 0 |
 | Rovinka | 7 | 7 |
 | Pezinok | 2 | 0 |
-| **celkom** | **4 574** | **586** |
+| **celkom** | **4 574** | **493** |
 
 ![Podiel voľných bytov podľa kategórie](/analyzy/kraj-ba-prehlad-2026-q3-podiel-ponuka.svg)
 *Podiel voľných bytov v 3. štvrťroku 2026 podľa kategórie.*
@@ -82,7 +82,7 @@ novostavby Bratislavský kraj, ceny novostavieb Bratislavský kraj, nové byty B
 
 - Celková priemerná cena projektov v Bratislavskom kraji je 5 564 €/m² s DPH.
 - Na tých istých 2 150 bytoch priemerná cena medzikvartálne stúpla o 0,7 %.
-- Cena dokončených bytov je o 1,7 % vyššia než cena rozostavaných.
+- Cena dokončených bytov je o 4,7 % vyššia než cena rozostavaných.
 - Predané byty mali priemernú cenníkovú cenu 5 778 €/m² s DPH, o 2,0 % nižšiu než byty, ktoré v tých istých projektoch zostali v ponuke (5 895 €/m² s DPH).
 
 ![Vývoj cien nových bytov](/analyzy/kraj-ba-prehlad-2026-q3-ceny-vyvoj.svg)
@@ -101,4 +101,4 @@ novostavby Bratislavský kraj, ceny novostavieb Bratislavský kraj, nové byty B
 
 ## Výhľad
 
-Pri tempe predaja za 3. štvrťrok 2026 — 207 bytov mesačne — by sa súčasná ponuka 4 574 bytov vypredala za 22,1 mesiaca. Dokončené voľné byty (586) tvoria 12,8 % tejto ponuky; kategória 2-izb tvorí 42,8 % ponuky a 49,4 % predaja.
+Pri tempe predaja za 3. štvrťrok 2026 — 207 bytov mesačne — by sa súčasná ponuka 4 574 bytov vypredala za 22,1 mesiaca. Dokončené voľné byty (493) tvoria 10,8 % tejto ponuky; kategória 2-izb tvorí 42,8 % ponuky a 49,4 % predaja.

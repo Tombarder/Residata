@@ -19,15 +19,15 @@ novostavby Bratislava, ceny novostavieb Bratislava, nové byty Bratislava, preda
 - **Počet bytov v ponuke v projektoch, ktoré predávali aj v predchádzajúcom štvrťroku, klesol o 4,2 %** — z 3 398 na 3 256.
 - Dopyt: za 3. štvrťrok 2026 sa predalo 592 bytov.
 - Priemerná cena v projektoch sa pohybuje na úrovni 5 699 €/m² s DPH.
-- Cena dokončených bytov je o 1,8 % vyššia než cena rozostavaných.
+- Cena dokončených bytov je o 4,9 % vyššia než cena rozostavaných.
 
 ## Ponuka
 
 - Ku koncu obdobia bolo v ponuke 4 250 bytov v 95 projektoch.
 - 36 % projektov obsahuje 80 % ponuky (34 projektov s 3 424 bytmi).
 - 47 projektov má v ponuke menej ako 20 bytov (10 % ponuky).
-- Ponuka dokončených bytov tvorí 13,6 % všetkých nepredaných bytov (579 bytov).
-- Najviac dokončených voľných bytov je v okresoch Bratislava II a Bratislava I.
+- Ponuka dokončených bytov tvorí 11,4 % všetkých nepredaných bytov (486 bytov).
+- Najviac dokončených voľných bytov je v okresoch Bratislava I a Bratislava II.
 - Najväčšiu časť ponuky tvorí kategória 2-izb — 43,1 % bytov s uvedeným počtom izieb.
 
 **Podiel voľných bytov v 3. štvrťroku 2026 podľa obvodu**
@@ -35,11 +35,11 @@ novostavby Bratislava, ceny novostavieb Bratislava, nové byty Bratislava, preda
 | Okres | Voľné | z toho dokončené |
 |---|---:|---:|
 | Bratislava I | 751 | 139 |
-| Bratislava II | 1 182 | 223 |
+| Bratislava II | 1 182 | 130 |
 | Bratislava III | 566 | 83 |
 | Bratislava IV | 900 | 117 |
 | Bratislava V | 851 | 17 |
-| **celkom** | **4 250** | **579** |
+| **celkom** | **4 250** | **486** |
 
 ![Podiel voľných bytov podľa kategórie](/analyzy/ba-prehlad-2026-q3-podiel-ponuka.svg)
 *Podiel voľných bytov v 3. štvrťroku 2026 podľa kategórie.*
@@ -73,7 +73,7 @@ novostavby Bratislava, ceny novostavieb Bratislava, nové byty Bratislava, preda
 
 - Celková priemerná cena projektov v Bratislave je 5 699 €/m² s DPH.
 - Na tých istých 2 138 bytoch priemerná cena medzikvartálne stúpla o 0,7 %.
-- Cena dokončených bytov je o 1,8 % vyššia než cena rozostavaných.
+- Cena dokončených bytov je o 4,9 % vyššia než cena rozostavaných.
 - Predané byty mali priemernú cenníkovú cenu 5 800 €/m² s DPH, o 2,0 % nižšiu než byty, ktoré v tých istých projektoch zostali v ponuke (5 916 €/m² s DPH).
 
 ![Ceny nových bytov v Bratislave](/analyzy/ba-prehlad-2026-q3-ceny-dlhodobo.svg)
@@ -94,4 +94,4 @@ novostavby Bratislava, ceny novostavieb Bratislava, nové byty Bratislava, preda
 
 ## Výhľad
 
-Pri tempe predaja za 3. štvrťrok 2026 — 196 bytov mesačne — by sa súčasná ponuka 4 250 bytov vypredala za 21,7 mesiaca. Dokončené voľné byty (579) tvoria 13,6 % tejto ponuky; kategória 2-izb tvorí 43,1 % ponuky a 49,8 % predaja.
+Pri tempe predaja za 3. štvrťrok 2026 — 196 bytov mesačne — by sa súčasná ponuka 4 250 bytov vypredala za 21,7 mesiaca. Dokončené voľné byty (486) tvoria 11,4 % tejto ponuky; kategória 2-izb tvorí 43,1 % ponuky a 49,8 % predaja.

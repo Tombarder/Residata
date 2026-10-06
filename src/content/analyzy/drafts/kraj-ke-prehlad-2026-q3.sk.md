@@ -19,14 +19,13 @@ novostavby Košický kraj, ceny novostavieb Košický kraj, nové byty Košický
 - **Počet bytov v ponuke v projektoch, ktoré predávali aj v predchádzajúcom štvrťroku, zostal prakticky rovnaký** — z 347 na 347.
 - Dopyt: za 3. štvrťrok 2026 sa predalo 131 bytov.
 - Priemerná cena v projektoch sa pohybuje na úrovni 4 349 €/m² s DPH.
-- Cena dokončených bytov je o 27,5 % vyššia než cena rozostavaných.
 
 ## Ponuka
 
 - Ku koncu obdobia bolo v ponuke 723 bytov v 28 projektoch.
 - 50 % projektov obsahuje 80 % ponuky (14 projektov s 597 bytmi).
 - 13 projektov má v ponuke menej ako 20 bytov (15 % ponuky).
-- Ponuka dokončených bytov tvorí 6,5 % všetkých nepredaných bytov (47 bytov).
+- Ponuka dokončených bytov tvorí 1,8 % všetkých nepredaných bytov (13 bytov).
 - Najviac dokončených voľných bytov je v lokalitách Košice a Michalovce.
 - Najväčšiu časť ponuky tvorí kategória 2-izb — 43,8 % bytov s uvedeným počtom izieb.
 
@@ -34,10 +33,10 @@ novostavby Košický kraj, ceny novostavieb Košický kraj, nové byty Košický
 
 | Obec | Voľné | z toho dokončené |
 |---|---:|---:|
-| Košice | 651 | 43 |
+| Košice | 651 | 9 |
 | Spišská Nová Ves | 69 | 1 |
 | Michalovce | 3 | 3 |
-| **celkom** | **723** | **47** |
+| **celkom** | **723** | **13** |
 
 ![Podiel voľných bytov podľa kategórie](/analyzy/kraj-ke-prehlad-2026-q3-podiel-ponuka.svg)
 *Podiel voľných bytov v 3. štvrťroku 2026 podľa kategórie.*
@@ -69,7 +68,6 @@ novostavby Košický kraj, ceny novostavieb Košický kraj, nové byty Košický
 
 - Celková priemerná cena projektov v Košickom kraji je 4 349 €/m² s DPH.
 - Na tých istých 176 bytoch priemerná cena medzikvartálne klesla o 0,2 %.
-- Cena dokončených bytov je o 27,5 % vyššia než cena rozostavaných.
 - Predané byty mali priemernú cenníkovú cenu 4 997 €/m² s DPH, prakticky rovnakú ako byty, ktoré v tých istých projektoch zostali v ponuke (4 979 €/m² s DPH).
 
 ![Vývoj cien nových bytov](/analyzy/kraj-ke-prehlad-2026-q3-ceny-vyvoj.svg)
@@ -88,4 +86,4 @@ novostavby Košický kraj, ceny novostavieb Košický kraj, nové byty Košický
 
 ## Výhľad
 
-Pri tempe predaja za 3. štvrťrok 2026 — 43 bytov mesačne — by sa súčasná ponuka 723 bytov vypredala za 16,7 mesiaca. Dokončené voľné byty (47) tvoria 6,5 % tejto ponuky; kategória 2-izb tvorí 43,8 % ponuky a 34,6 % predaja.
+Pri tempe predaja za 3. štvrťrok 2026 — 43 bytov mesačne — by sa súčasná ponuka 723 bytov vypredala za 16,7 mesiaca. Dokončené voľné byty (13) tvoria 1,8 % tejto ponuky; kategória 2-izb tvorí 43,8 % ponuky a 34,6 % predaja.

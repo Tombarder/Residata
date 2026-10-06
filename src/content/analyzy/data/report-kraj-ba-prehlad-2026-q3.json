@@ -1,6 +1,6 @@
 {
  "asOf": "2026-09-30",
- "generatedAt": "2026-10-06T00:46:53",
+ "generatedAt": "2026-10-06T09:37:00",
  "slug": "kraj-ba-prehlad-2026-q3",
  "overview": {
   "scope": {
@@ -37,8 +37,8 @@
   "okres_supply": {
    "Bratislava": {
     "n": 4250,
-    "done": 579,
-    "building": 2957,
+    "done": 486,
+    "building": 3050,
     "unknown": 714,
     "projects": 95,
     "m2": 5699,
@@ -1072,12 +1072,12 @@
    "projects": 73
   },
   "completion_m2": {
-   "m2_done": 5669,
-   "m2_building": 5575,
-   "n_done": 462,
-   "n_building": 2592,
+   "m2_done": 5819,
+   "m2_building": 5558,
+   "n_done": 370,
+   "n_building": 2685,
    "p_done": 29,
-   "p_building": 49
+   "p_building": 50
   },
   "figures": {
    "podiel-ponuka": true,

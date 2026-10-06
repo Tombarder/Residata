@@ -25,7 +25,7 @@ novostavby Banskobystrický kraj, ceny novostavieb Banskobystrický kraj, nové 
 - Ku koncu obdobia bolo v ponuke 760 bytov v 19 projektoch.
 - 32 % projektov obsahuje 80 % ponuky (6 projektov s 623 bytmi).
 - 12 projektov má v ponuke menej ako 20 bytov (14 % ponuky).
-- Ponuka dokončených bytov tvorí 25,3 % všetkých nepredaných bytov (192 bytov).
+- Ponuka dokončených bytov tvorí 16,2 % všetkých nepredaných bytov (123 bytov).
 - Najviac dokončených voľných bytov je v lokalitách Zvolen a Banská Bystrica.
 - Najväčšiu časť ponuky tvorí kategória 2-izb — 52,0 % bytov s uvedeným počtom izieb.
 
@@ -33,13 +33,13 @@ novostavby Banskobystrický kraj, ceny novostavieb Banskobystrický kraj, nové 
 
 | Obec | Voľné | z toho dokončené |
 |---|---:|---:|
-| Zvolen | 398 | 175 |
+| Zvolen | 398 | 106 |
 | Banská Bystrica | 232 | 15 |
 | Lučenec | 57 | 0 |
 | Banská Štiavnica | 56 | 0 |
 | Brezno | 15 | 0 |
 | Rimavská Sobota | 2 | 2 |
-| **celkom** | **760** | **192** |
+| **celkom** | **760** | **123** |
 
 ![Podiel voľných bytov podľa kategórie](/analyzy/kraj-bb-prehlad-2026-q3-podiel-ponuka.svg)
 *Podiel voľných bytov v 3. štvrťroku 2026 podľa kategórie.*
@@ -91,4 +91,4 @@ novostavby Banskobystrický kraj, ceny novostavieb Banskobystrický kraj, nové 
 
 ## Výhľad
 
-Pri tempe predaja za 3. štvrťrok 2026 — 8 bytov mesačne — by sa súčasná ponuka 760 bytov vypredala za 91,9 mesiaca. Dokončené voľné byty (192) tvoria 25,3 % tejto ponuky; kategória 2-izb tvorí 52,0 % ponuky a 28,0 % predaja.
+Pri tempe predaja za 3. štvrťrok 2026 — 8 bytov mesačne — by sa súčasná ponuka 760 bytov vypredala za 91,9 mesiaca. Dokončené voľné byty (123) tvoria 16,2 % tejto ponuky; kategória 2-izb tvorí 52,0 % ponuky a 28,0 % predaja.

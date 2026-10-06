@@ -25,20 +25,19 @@ novostavby Košice, ceny novostavieb Košice, nové byty Košice, predaj bytov K
 - Ku koncu obdobia bolo v ponuke 651 bytov v 24 projektoch.
 - 54 % projektov obsahuje 80 % ponuky (13 projektov s 538 bytmi).
 - 10 projektov má v ponuke menej ako 20 bytov (14 % ponuky).
-- Ponuka dokončených bytov tvorí 6,6 % všetkých nepredaných bytov (43 bytov).
-- Najviac dokončených voľných bytov je v kategóriách 1-izb a 3-izb.
+- Ponuka dokončených bytov tvorí 1,4 % všetkých nepredaných bytov (9 bytov).
 - Najväčšiu časť ponuky tvorí kategória 2-izb — 43,2 % bytov s uvedeným počtom izieb.
 
 **Podiel voľných bytov v 3. štvrťroku 2026 podľa kategórie**
 
 | Kategória | Voľné | z toho dokončené |
 |---|---:|---:|
-| 1-izb | 67 | 33 |
+| 1-izb | 67 | 1 |
 | 2-izb | 281 | 3 |
-| 3-izb | 241 | 7 |
+| 3-izb | 241 | 5 |
 | 4-izb | 54 | 0 |
 | 5 a viac | 8 | 0 |
-| **celkom** | **651** | **43** |
+| **celkom** | **651** | **9** |
 
 ![Podiel voľných bytov podľa kategórie](/analyzy/ke-prehlad-2026-q3-podiel-ponuka.svg)
 *Podiel voľných bytov v 3. štvrťroku 2026 podľa kategórie.*
@@ -93,4 +92,4 @@ novostavby Košice, ceny novostavieb Košice, nové byty Košice, predaj bytov K
 
 ## Výhľad
 
-Pri tempe predaja za 3. štvrťrok 2026 — 42 bytov mesačne — by sa súčasná ponuka 651 bytov vypredala za 15,5 mesiaca. Dokončené voľné byty (43) tvoria 6,6 % tejto ponuky; kategória 2-izb tvorí 43,2 % ponuky a 35,0 % predaja.
+Pri tempe predaja za 3. štvrťrok 2026 — 42 bytov mesačne — by sa súčasná ponuka 651 bytov vypredala za 15,5 mesiaca. Dokončené voľné byty (9) tvoria 1,4 % tejto ponuky; kategória 2-izb tvorí 43,2 % ponuky a 35,0 % predaja.
