@@ -54,6 +54,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { isTrustedRequest as isTrustedOrigin } from "../_lib/origin.js";
+import { archiveGroups, readingsPerMonth } from "../_lib/archiveCounts.js";
 
 export const maxDuration = 60; // tool loop = a few model round-trips
 
@@ -285,10 +286,36 @@ async function toolMarketOverview(admin) {
   return { markets, top_sellers_30d, top_developers };
 }
 
+// Full readings per market-month (public.archive_days), for turning the archive's
+// flat-reading counts into flats — see api/_lib/archiveCounts.js. Ten minutes is far
+// shorter than the time between two readings.
+let _readings = null;
+let _readingsAt = 0;
+async function marketReadings(admin) {
+  if (_readings && Date.now() - _readingsAt < 10 * 60 * 1000) return _readings;
+  const { data, error } = await admin.from("archive_days").select("day,country").limit(10000);
+  if (error) throw new Error(error.message);
+  _readings = readingsPerMonth(data);
+  _readingsAt = Date.now();
+  return _readings;
+}
+
 async function toolMarketStats(admin, a, allowHistorical) {
   const [mode, gated] = pageMode(a.mode, allowHistorical);
   if (gated) return { gated: true, message: "Month-by-month history is a paid feature. On the current-month data I can answer fully." };
   const gkey = GROUP_KEY[a.group_by || "none"];
+  if (mode === "archive") {
+    // History: one row per flat per reading — counted per market-month and turned into
+    // flats, so a month read less often does not read as a market that shrank.
+    const dims = [...new Set([gkey, "country", "snapshot_month"].filter(Boolean))];
+    const spec = { dims, filters: buildFilters(a), ranges: buildRanges(a), mode };
+    const [{ data, error }, readings] = await Promise.all([
+      admin.rpc("analytics_pivot", { p_spec: spec }), marketReadings(admin)]);
+    if (error) throw new Error(error.message);
+    const groups = archiveGroups(data, dims, gkey, readings);
+    groups.sort((x, y) => y.units - x.units);
+    return { mode, group_by: a.group_by || "none", groups: groups.slice(0, 60) };
+  }
   const spec = { dims: gkey ? [gkey] : [], filters: buildFilters(a), ranges: buildRanges(a), mode };
   const { data, error } = await admin.rpc("analytics_pivot", { p_spec: spec });
   if (error) throw new Error(error.message);
