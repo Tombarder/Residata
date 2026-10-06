@@ -869,6 +869,10 @@ test("the records' readings are those of their market and months, as the facts h
   const more = archiveHolding(sp.from, [], [["SK", "2026-10-02", 100], ["SK", "2026-10-05", 200], ["SK", "2026-10-07", 160], ["CZ", "2026-10-02", 100]]
     .map(([c, d, n]) => ({ d: [c, d], m: { n } })), days);
   assert.notEqual(sig(more, { country: "SK" }), sig(retry, { country: "SK" }), "a second retry the same morning");
+  assert.equal(sig(retry, { country: "SK", dates: ["2026-10-05"] }), sig(all, { country: "SK", dates: ["2026-10-05"] }),
+    "a retry outside the days fetched");
+  assert.equal(sig(retry, { country: "SK", dates: ["2026-10-05", "2026-10-07"] }), "SK:2026-10-02=1;2026-10-05=2;2026-10-07+100",
+    "a retry within them");
   assert.equal(recordReadingsSignature(null, null, {}), "");
 });
 
@@ -934,6 +938,38 @@ test("a retry approved while the records are paged asks for them again, not kept
   assert.equal(ids.length - new Set(ids).size, 0, "no row twice");
   assert.equal(got.flats.filter((r) => r.id.startsWith("r")).length, 100, "the retry's rows");
   assert.equal(projectFlats(got, "P"), 100);
+});
+
+// The Pivot's default records: the Datum filter on the newest reading's day (the 6th),
+// fetched as batch_timestamp in [the 6th, the 7th). A retry on the 7th is none of them.
+test("records of a day are not asked again for a retry on another day, and are for one on theirs", async () => {
+  const st = retryWorld();
+  const w = readingsWorld(st);
+  const db = { rows: retryRows("2026-10-06", 7400, "", "A") };
+  const render = flatsHarness(db, "SK");
+  const show = async (dates) => {
+    w.advance(16 * MIN);
+    const e = await w.load();
+    render(null, dates, true, w.stampOf(e));
+    await settle();
+    return render(null, dates, true, w.stampOf(e));
+  };
+  await show(["2026-10-06"]);
+  let pages = db.pages;
+  st.facts.push(["SK", "2026-10-07", 100]);                                  // a retry on the 7th
+  st.cube = [["SK", "2026-10", 15000]];
+  await show(["2026-10-06"]);
+  assert.equal(db.pages, pages, "a retry on the 7th");
+  st.facts = st.facts.map(([c, d, n]) => (d === "2026-10-07" ? [c, d, 130] : [c, d, n]));   // a second one
+  st.cube = [["SK", "2026-10", 15030]];
+  await show(["2026-10-06"]);
+  assert.equal(db.pages, pages, "a second retry on the 7th");
+  // records of the 6th to the 7th hold it
+  await show(["2026-10-06", "2026-10-07"]);
+  pages = db.pages;
+  st.facts = st.facts.map(([c, d, n]) => (d === "2026-10-07" ? [c, d, 160] : [c, d, n]));
+  await show(["2026-10-06", "2026-10-07"]);
+  assert.ok(db.pages > pages, "a retry on a day fetched");
 });
 
 // ── the facts catch up with a reading while the cube cannot be read ──

@@ -459,10 +459,11 @@ export function holdingFactsSignature(holding, days = null) {
  *  in the months the request covers, and in its newest month the days the facts hold that
  *  are no full reading — a not-due morning's retry, whose rows are records of their month
  *  — with their rows. `country` is its market (null: every market); `months` the snapshot
- *  months it asks and `dates` the days (null: all) — by whole months, a month's records
- *  being divided by the readings of its days, which the Datum filter may take beyond the
- *  days fetched. A reading or a retry of another market or month, and the cube, leave it
- *  as it is. */
+ *  months it asks and `dates` the days (null: all) — the readings by whole months, a
+ *  month's records being divided by the readings of its days, which the Datum filter may
+ *  take beyond the days fetched; a retry only within the days fetched (dates[0] to the
+ *  last), its rows being records and no divisor. A reading or a retry of another market
+ *  or month, a retry outside the days fetched, and the cube leave it as it is. */
 export function recordReadingsSignature(days, holding, { country = null, months = null, dates = null } = {}) {
   if (!days) return "";
   const held = heldReadingDays(days, holding, false);
@@ -481,6 +482,8 @@ export function recordReadingsSignature(days, holding, { country = null, months 
     const kept = [...(held[c] || [])].filter(([d]) => inScope(d)).map(([d, n]) => `${d}=${n}`);
     const from = holding?.from?.get(c);
     for (const d of holding?.facts?.get(c) || []) {
+      // a retry's rows are records only of the days fetched (no divisor of a month's)
+      if (ds && (d < ds[0] || d > ds[ds.length - 1])) continue;
       if (from && d >= from && !days[c]?.has(d) && inScope(d)) kept.push(`${d}+${holding.factsRows?.get(c)?.get(d) ?? ""}`);
     }
     if (kept.length) parts.push(`${c}:${kept.sort().join(";")}`);
