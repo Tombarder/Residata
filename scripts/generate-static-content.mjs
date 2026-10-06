@@ -42,6 +42,7 @@ import { COMPANY, addressOneLine, registrationLine } from '../src/lib/company.js
 import { PUBLIC_LANGS } from '../src/lib/locale.js';
 import { SK_PATHS, pathToPage } from '../src/lib/routing.js';
 import { FALLBACK_MONTHLY_CENTS, FALLBACK_MONTHLY_DISPLAY, FALLBACK_ANCHOR_DISPLAY } from '../src/lib/pricingDefaults.js';
+import { everyPhrase } from '../src/lib/refreshCadence.js';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -141,6 +142,19 @@ try {
   process.exit(0);
 }
 
+// How often the market is read — public.data_collection, the interval an admin
+// sets in Kontrola dát → Zber dát. Every public sentence about freshness is
+// written from it (src/lib/refreshCadence.js); unreadable → null, and the copy
+// says "regularly" rather than an interval this build could not see.
+let scrapeEveryDays = null;
+try {
+  const [row] = await fetchView('data_collection', { select: 'every_days' });
+  scrapeEveryDays = Number.isInteger(row?.every_days) ? row.every_days : null;
+} catch (e) {
+  console.warn('[gen-static] could not read the collection interval:', e.message);
+}
+const EVERY_EN = everyPhrase('en', { scrape_every_days: scrapeEveryDays });
+
 // Live subscription price — single source of truth is public.pricing_config
 // (id=1), edited from the in-app admin Pricing editor. Read here at build time
 // so the static/SEO surfaces (llms.txt, index.html JSON-LD) follow the editor on
@@ -196,7 +210,7 @@ function articlesSection() {
 const llms = `# Residata
 
 > New-build residential market intelligence for Slovakia and Czechia.
-> Every active development, structured and refreshed daily. Pricing,
+> Every active development, structured and refreshed ${EVERY_EN}. Pricing,
 > availability, absorption rate, and trends — delivered to developers,
 > banks, valuers, and investors.
 
@@ -206,7 +220,7 @@ capitals. It normalizes
 data from developer websites into a single consistent schema, refreshes
 it daily, and delivers it as CSV and XLSX.
 
-## Scope (updated daily; snapshot ${monthLabel})
+## Scope (updated ${EVERY_EN}; snapshot ${monthLabel})
 
 - Markets: ${coverageLine}
 - Total projects in dataset: ${fmtN(market?.total_projects_tracked ?? market?.total_projects_active)} new-build residential projects (current + sold-out under tracking)
@@ -285,7 +299,7 @@ Operated by ${COMPANY.legalName} (IČO ${COMPANY.icoPlain}), a Slovak limited
 liability company at ${addressOneLine('en')}.
 ${registrationLine('en')}. Contact ${COMPANY.email} · https://residata.eu/imprint
 
-## Market coverage (updated daily; snapshot ${monthLabel})
+## Market coverage (updated ${EVERY_EN}; snapshot ${monthLabel})
 
 - ${fmtN(market?.total_projects_tracked ?? market?.total_projects_active)} total projects in dataset (currently active + projects that sold out under our tracking — both groups have full historical price/availability snapshots)
 - ${fmtN(market?.total_projects_active)} of them are currently active in the market
@@ -308,7 +322,7 @@ ${topProjList}
 
 ## Data delivery
 
-- CSV / XLSX exports (any daily snapshot)
+- CSV / XLSX exports (any snapshot)
 - Live dashboard, analytics/pivot, and unit-level explorer
 - AI assistant that answers questions over the dataset
 
@@ -508,6 +522,8 @@ const buildData = {
   // instead of counting months: a count cannot be checked by the build and
   // decays in both directions, a start date only gets stronger.
   history_since: historySince,
+  // How often the market is read (src/lib/refreshCadence.js reads it).
+  scrape_every_days: scrapeEveryDays ?? undefined,
   total_available: market?.total_available,
   // PERF Step 2: reserved + sold included so the build-time snapshot is a
   // complete seed for the hero/headline (useMarketTotals) — see vite.config.js

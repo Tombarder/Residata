@@ -637,6 +637,24 @@ def _finish_overview_vars(rep: dict, out: dict) -> dict:
                            f"{_a.strftime('%-d %B %Y')}")
         out["periodClosed"] = "false"
 
+    # 🔴 HOW OFTEN WE READ IS A FIGURE TOO. The method note said the price
+    # lists are read "denne" — true for all of Q3 2026, false from 5 October,
+    # when the market began to be read every four days. The generator records
+    # the interval(s) the period was actually read at (ba_overview.
+    # reading_intervals), and the sentence is in the past tense because it
+    # describes how THIS issue's figures were gathered, not what we do today.
+    every = ov.get("reading_every_days")
+    if every:
+        def _sk(n):
+            return "denne" if n == 1 else (f"každé {n} dni" if 2 <= n <= 4 else f"každých {n} dní")
+
+        def _en(n):
+            return "daily" if n == 1 else f"every {n} days"
+        out["readingSk"] = (_sk(every[0]) if len(every) == 1
+                            else "najprv " + ", potom ".join(_sk(n) for n in every))
+        out["readingEn"] = (_en(every[0]) if len(every) == 1
+                            else "first " + ", then ".join(_en(n) for n in every))
+
     lp = ov.get("last_published", "")
     if lp:
         out["lastPublishedSk"] = f"{lp[5]}Q {lp[:4]}"

@@ -42,6 +42,7 @@ import useDismiss from "../lib/useDismiss";
 
 const mono    = "'JetBrains Mono', ui-monospace, Menlo, monospace";
 import { accent as green, accentInk, orange, dim, border, bg, surfacePanel as panelHi, text , orangeInk, dangerInk } from "../lib/theme";
+import { SoldShareNote } from "../lib/soldShareNote";
 const panel   = "var(--surface-2)";
 
 /* ─── Field registry ─────────────────────────────────────────────
@@ -597,6 +598,9 @@ function isFilterActive(f) {
    zero rows carrying one without the other) because dph_normalizer always
    derives one from the other. */
 const PRICE_VALUE_FIELDS = new Set(["cena_s_dph", "cena_bez_dph", "cena_na_m2_obytnej", "wavg_m2_price"]);
+// The aggregations that make a price value an AVERAGE of a project's remaining
+// offer — the ones a sold-share note qualifies (lib/soldShare.js).
+const PRICE_AVERAGE_AGGS = new Set(["avg", "median", "measure"]);
 const PRICE_SCOPE_FILTER = Object.freeze({ key: "cena_s_dph", mode: "not_empty" });
 
 /* 🔴 THE SAME SCOPE, WRITTEN SO THE ENGINE CAN STAY ON THE CUBE.
@@ -2536,6 +2540,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
         valueMode={valueMode}
         dataBars={dataBars}
         expanded={expanded}
+        soldShareProjects={isCurrent ? projects : null}
         onToggleExpand={() => setExpanded((v) => !v)}
         onDrillDown={async (node) => {
           const title = node.path.length ? node.path.join(" › ") : (lang === "sk" ? "Všetky záznamy" : "All records");
@@ -3602,8 +3607,19 @@ function copyPivotTable(flatRows, grandTotal, rowFields, colFields, effectiveVal
 
 
 /* ─── RESULT TABLE ────────────────────────────────────────────── */
-function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, collapsed: _collapsed, onToggle, sort, setSort, grandTotal, lang, valueMode = "raw", dataBars = false, onDrillDown, onProjectOpen, expanded = false, onToggleExpand }) {
+function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, collapsed: _collapsed, onToggle, sort, setSort, grandTotal, lang, valueMode = "raw", dataBars = false, onDrillDown, onProjectOpen, expanded = false, onToggleExpand, soldShareProjects = null }) {
   const spec = useSpecifics(lang);
+  // 🔴 A PROJECT'S AVERAGE PRICE IS THE AVERAGE OF WHAT IS LEFT (lib/soldShare.js,
+  // board decision 186771 — found by Boss on Dostupné bývanie Nitra in this very
+  // table). Beside a project row's average price the table says how much of the
+  // project is already sold. Passed only for "Aktuálne": in a history layout a
+  // row is one period, and today's sold share would describe the wrong moment.
+  const soldShareByName = useMemo(() => {
+    if (!soldShareProjects) return null;
+    const m = new Map();
+    for (const pr of soldShareProjects) if (pr?.name) m.set(pr.name, pr);
+    return m;
+  }, [soldShareProjects]);
   // Project-name column support:
   // When the deepest row field is project_name, rows ARE individual
   // projects — we offer a click-to-navigate on the name cell.
@@ -4125,6 +4141,12 @@ function ResultTable({ rowFields, colFields = [], effectiveValues, flatRows, col
                         )}
                         {isSubtotal && <span style={{ opacity: 0.5, marginRight: "0.3rem" }}>Σ</span>}
                         {renderCellValue(raw, i, parentRaw)}
+                        {soldShareByName && isProjectLabel && valueMode === "raw"
+                          && PRICE_VALUE_FIELDS.has(v.field) && PRICE_AVERAGE_AGGS.has(v.agg)
+                          && soldShareByName.get(n.label)
+                          ? <SoldShareNote project={soldShareByName.get(n.label)} lang={lang} block
+                                           style={{ fontWeight: 400, fontFamily: "inherit" }} />
+                          : null}
                       </td>
                     );
                   })

@@ -36,6 +36,7 @@
  *   8. CSV export — one row per (unit, month) for valuers/banks
  *      who paste comparables into their own reports
  */
+import { everyPhrase, EveryPhrase } from "../lib/refreshCadence";
 import { useState, useMemo, useEffect, useRef, useCallback, Fragment } from "react";
 import { statusLabel, listingStatus, OFF_LIST } from "../lib/unitStatus";
 import Picker from "../components/Picker";
@@ -1709,8 +1710,8 @@ function EmptyState({ lang, canFull, archiveMonths }) {
       {months <= 1 && (
         <div style={{ marginTop: "1rem", fontSize: "0.78rem", color: orangeInk, fontStyle: "italic", maxWidth: 540, margin: "1rem auto 0" }}>
           {lang === "sk"
-            ? "Každý deň pribudne nový dátový bod a krivka sa rozšíri."
-            : "A new data point lands every day and the curve grows."}
+            ? `${EveryPhrase("sk")} pribudne nový dátový bod a krivka sa rozšíri.`
+            : `A new data point lands ${everyPhrase("en")} and the curve grows.`}
         </div>
       )}
     </div>

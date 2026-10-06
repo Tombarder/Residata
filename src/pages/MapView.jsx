@@ -48,6 +48,7 @@ import { fieldBlock } from "../lib/controls";
 import { checkWebGL } from "../lib/webgl";
 import MapUnavailable from "../components/MapUnavailable";
 import { watchMapHealth } from "../lib/mapHealth";
+import { soldSharePct, soldShareText, soldShareTitle } from "../lib/soldShare.js";
 const greyPt = "#6b6b76";
 const panel = "var(--surface)";
 
@@ -173,6 +174,13 @@ function showProjectPopup(map, lngLat, props, lang, onOpen, popupRef, specProjec
   el.style.minWidth = "180px";
   const loc = [props.city, props.district].filter(Boolean).join(" · ");
   const price = Number(props.ppm2) > 0 ? formatPerM2(Number(props.ppm2)) : "—";
+  // The average is over the flats still on offer — say how much is already sold
+  // (soldShare.js). Nothing to say when nothing is sold or there is no average.
+  const soldPct = soldSharePct({ total_units: props.total, sold_units: props.sold });
+  const soldNote = Number(props.ppm2) > 0 && soldShareText(soldPct, lang)
+    ? `<div title="${escapeHtml(soldShareTitle(soldPct, lang))}" style="color:${dim};font-size:0.68rem;cursor:help">` +
+      `${escapeHtml(soldShareText(soldPct, lang))}</div>`
+    : "";
   // Everything unusual about this project, from the one place that decides it.
   // The map is where most people meet a project first, so an unlabelled 90/10
   // or bare-shell price here reads as an ordinary one.
@@ -203,7 +211,8 @@ function showProjectPopup(map, lngLat, props, lang, onOpen, popupRef, specProjec
     approxNote +
     `<div style="font-family:${mono};font-size:0.72rem;color:${textLight};line-height:1.5">` +
     `<div><span style="color:${dim}">${lang === "sk" ? "Voľné" : "Available"}</span> &nbsp;${props.available} / ${props.total}</div>` +
-    `<div><span style="color:${dim}">${lang === "sk" ? "Priem." : "Avg"}</span> &nbsp;${price}${schedMark}${levelMark}</div></div>` +
+    `<div><span style="color:${dim}">${lang === "sk" ? "Priem." : "Avg"}</span> &nbsp;${price}${schedMark}${levelMark}</div>` +
+    soldNote + `</div>` +
     specBlock +
     `<button id="mv-open" style="margin-top:10px;width:100%;padding:7px 10px;background:${green};color:#0a0a0b;` +
     `border:none;border-radius:6px;font-weight:600;font-size:0.78rem;cursor:pointer">` +

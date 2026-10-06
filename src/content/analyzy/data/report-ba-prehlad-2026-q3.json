@@ -1,6 +1,6 @@
 {
   "asOf": "2026-09-30",
-  "generatedAt": "2026-10-05T22:35:26+00:00",
+  "generatedAt": "2026-10-06T08:30:26+00:00",
   "bratislavaReport": {
     "thenDate": "2026-07-27",
     "nowDate": "2026-09-30",
@@ -1568,19 +1568,19 @@
   },
   "priceStepByScope": {
     "bratislava": {
-      "moves": 1305,
+      "moves": 1299,
       "projects": 38,
       "up": 1156,
-      "down": 149,
-      "pctUp": 88.6,
+      "down": 143,
+      "pctUp": 89.0,
       "medianPct": 1.6
     },
     "rest": {
-      "moves": 444,
-      "projects": 40,
-      "up": 355,
+      "moves": 443,
+      "projects": 39,
+      "up": 354,
       "down": 89,
-      "pctUp": 80.0,
+      "pctUp": 79.9,
       "medianPct": 5.0
     },
     "days": 90
@@ -1832,7 +1832,10 @@
     "sk": {
       "from": "2026-05-16",
       "to": "2026-10-05",
-      "days": 142
+      "days": 142,
+      "readingEveryDays": [
+        1
+      ]
     },
     "cz": {
       "from": "2026-06-09",
@@ -2110,11 +2113,11 @@
     "pctOfChangesUp": 84.2
   },
   "priceMoves90d": {
-    "moves": 1753,
-    "projects": 79,
-    "up": 1512,
-    "down": 241,
-    "pctUp": 86.3,
+    "moves": 1746,
+    "projects": 78,
+    "up": 1511,
+    "down": 235,
+    "pctUp": 86.5,
     "medianPct": 2.3
   },
   "caveats": {
@@ -2169,10 +2172,10 @@
       }
     ],
     "completion_m2": {
-      "m2_done": 5678,
-      "m2_building": 5578,
-      "n_done": 460,
-      "n_building": 2583
+      "m2_done": 5832,
+      "m2_building": 5561,
+      "n_done": 367,
+      "n_building": 2676
     },
     "project_supply": [
       {
@@ -2611,6 +2614,9 @@
     "sale_settling_days": 7,
     "prev_period_sales": 166,
     "period_days": 92,
+    "reading_every_days": [
+      1
+    ],
     "last_published": "2026Q2",
     "first_published": "2018Q1",
     "published_rebased": {
@@ -2659,8 +2665,8 @@
       },
       "Bratislava II": {
         "n": 1182,
-        "done": 223,
-        "building": 741,
+        "done": 130,
+        "building": 834,
         "unknown": 218,
         "projects": 28,
         "m2": 5905,

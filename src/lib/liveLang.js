@@ -12,7 +12,7 @@ export const liveT = {
     // Dashboard
     live_label: "Live dashboard",
     live_title: "Current market snapshot",
-    live_desc_base: "Data refreshed daily. Filter, explore, compare.",
+    live_desc_base: "Data refreshed __EVERY__. Filter, explore, compare.",
     live_desc_anon: "Sign in for full detail on any single project (free).",
     live_desc_free: "Upgrade to paid for access to all {n} projects.",
     upgrade_to_paid: "Upgrade to paid",
@@ -168,7 +168,7 @@ export const liveT = {
 
     live_label: "Live dashboard",
     live_title: "Aktuálny stav trhu",
-    live_desc_base: "Dáta aktualizované každý deň. Filtruj, preklikni, porovnaj.",
+    live_desc_base: "Dáta aktualizované __EVERY__. Filtruj, preklikni, porovnaj.",
     live_desc_anon: "Registrácia odomkne plný detail 1 projektu (zadarmo).",
     live_desc_free: "Upgrade na paid pre prístup ku všetkým {n} projektom.",
     upgrade_to_paid: "Upgrade na paid",
@@ -318,6 +318,7 @@ export function ll(str, params = {}) {
 }
 
 import { applyOverrides } from "./copyOverrides";
+import { fillEvery } from "./refreshCadence.js";
 
 /**
  * Resolve the live/admin-page dictionary for `lang`, with the Boss's DB
@@ -330,5 +331,6 @@ import { applyOverrides } from "./copyOverrides";
  */
 export function getLiveT(lang) {
   const base = liveT[lang] || liveT.en;
-  return applyOverrides(lang, base, "lv");
+  // __EVERY__ = how often the market is read (lib/refreshCadence), filled last.
+  return fillEvery(applyOverrides(lang, base, "lv"), liveT[lang] ? lang : "en");
 }

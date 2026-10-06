@@ -167,8 +167,8 @@ export async function createArticle({ slug, date }) {
                 "A short summary shown in the list."),
     blocks: [{ type: "lead", text: stub("", "") }],
     method: stub(
-      "Dáta pochádzajú z verejne publikovaných cenníkov developerov, ktoré Residata zaznamenáva denne.",
-      "Data come from developers' publicly published price lists, recorded daily by Residata."),
+      "Dáta pochádzajú z verejne publikovaných cenníkov developerov, ktoré Residata pravidelne zaznamenáva.",
+      "Data come from developers' publicly published price lists, recorded regularly by Residata."),
   }).select("slug").maybeSingle();
   if (error) {
     if (String(error.message).includes("articles_slug_shape")) {

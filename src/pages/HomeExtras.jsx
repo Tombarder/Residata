@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { everyPhrase, EveryPhrase } from "../lib/refreshCadence";
 import { useSpecifics, SpecificsMark } from "../lib/projectSpecifics";
 import { useMarketTotals, useHomeProjects, useTotalsList, useVelocityMature } from "../lib/useData";
 import { useCountry, countryName } from "../lib/useCountry";
@@ -6,6 +7,8 @@ import { moneyFromEur, moneySymbol } from "../lib/money";
 import { localeTag } from "../lib/locale";
 import { useCurrency } from "../lib/useCurrency";
 import { marketInventoryDisplay, fmtMonthsToSellout } from "../lib/absorption";
+import { SoldShareNote } from "../lib/soldShareNote";
+import { soldSharePct, soldShareTitle } from "../lib/soldShare.js";
 // (imports already include useMarketTotals — we rely on its live view
 // instead of summing projects.total_units, which inflates the count for
 // projects like Bory/Slnečnice whose total_units is a manual registry
@@ -255,7 +258,7 @@ function DashboardPanel({ captionRow1, captionRow2, chipLabels, avgLabel, rows, 
                 a wider number (13 076 €/m²) grows leftwards instead of out of the panel. */}
             <text x="10" y="18" fill="var(--text)" fontFamily="'Outfit', sans-serif" fontSize="10" fontWeight="600">{clip(r.name, 24)}</text>
             <text x="150" y="18" fill="var(--text-dim)" fontFamily={mono} fontSize="9">{clip(r.district, 11)}</text>
-            <text x="270" y="18" textAnchor="end" fill="var(--accent)" fontFamily={mono} fontSize="9" fontWeight="700">{r.price}</text>
+            <text x="270" y="18" textAnchor="end" fill="var(--accent)" fontFamily={mono} fontSize="9" fontWeight="700">{r.price}{r.priceTitle ? <title>{r.priceTitle}</title> : null}</text>
           </g>
         ))}
       </g>
@@ -346,6 +349,9 @@ export function PipelineFlow({ lang = "en" }) {
       name: p.name,
       district: p.district,
       price: `${Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString("en-US").replace(/,/g, " ")} ${moneySymbol()}/m²`,
+      // a 9px illustration has no room for a second line: the sold share rides
+      // on the price's hover title instead (soldShare.js)
+      priceTitle: soldShareTitle(soldSharePct(p), lang),
     }));
   const panelAvg = marketTotals.avgPriceM2
     ? `${Math.round(moneyFromEur(marketTotals.avgPriceM2)).toLocaleString("en-US").replace(/,/g, " ")} ${moneySymbol()}/m²`
@@ -575,7 +581,7 @@ export function PipelineFlow({ lang = "en" }) {
           { n: fmt(projTrackedCount, localeTag(lang)), label: T.statsLabel[1] },
           // 3. karta = cadence, slovný stat. "Mesačne" / "Monthly" hovorí
           // čo kupujúcemu zaujíma: ako často dostane fresh dáta.
-          { n: lang === "sk" ? "Denne" : "Daily",                       label: T.statsLabel[2] },
+          { n: EveryPhrase(lang),                                         label: T.statsLabel[2] },
         ].map((s, i) => (
           <div key={i} style={{
             textAlign: "center",
@@ -810,6 +816,7 @@ function ProjectMini({ project, setCurrent, lang }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
         <span style={{ fontFamily: mono, fontSize: "0.95rem", fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap" }}>
           {project.avg_price_eur_m2 ? `${nf(Math.round(moneyFromEur(project.avg_price_eur_m2)))} ${moneySymbol()}/m²` : "—"}
+          {project.avg_price_eur_m2 && !soldDataUnavailable ? <SoldShareNote project={project} lang={lang} style={{ fontFamily: "inherit" }} /> : null}
         </span>
         {soldLastMonth > 0 && (
           <span
@@ -1093,8 +1100,8 @@ export function DistrictPulse({ lang = "en", setCurrent }) {  // eslint-disable-
       : (lang === "sk" ? "mestských častí" : "districts");
   const title = lang === "sk" ? `Priemerná cena ${moneySymbol()}/m² ${levelWord}` : `Average ${moneySymbol()}/m² ${levelWord}`;
   const desc = lang === "sk"
-    ? "Skutočné dáta z aktívnych projektov. Klikni na riadok pre rozpad nižšie. Updatuje sa každý deň."
-    : "Real data from active projects. Click a row to drill down. Refreshes daily.";
+    ? "Skutočné dáta z aktívnych projektov. Klikni na riadok pre rozpad nižšie. Aktualizuje sa " + everyPhrase("sk") + "."
+    : "Real data from active projects. Click a row to drill down. Refreshes " + everyPhrase("en") + ".";
 
   // Breadcrumb trail (clickable parents).
   const crumbs = [{ label: cName, go: () => setDrill(_emptyDrill) }];
