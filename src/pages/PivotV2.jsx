@@ -1155,10 +1155,14 @@ function grainView(raw, meta, specDims, holding) {
   if (raw == null || !meta) return null;
   if (meta.dims.join("\u0001") !== specDims.join("\u0001")) return null;
   if (!meta.archive) return raw;
-  // divided by the readings of its request that its source holds (heldReadingDays) — once
-  // what the cube and the facts hold is known (`holding` undefined until then)
-  if (!meta.days || holding === undefined) return null;
-  return normaliseArchiveGrain(raw, meta.dims, heldReadingDays(meta.days, holding, meta.viaCube), meta.scope);
+  // divided by the readings of its request that its source held then (heldReadingDays):
+  // the request's own holding — during a cube refresh the grain on screen was asked
+  // before it, and the new holding showed November's 7 500 as 3 750 until the new grain
+  // came — or, for a request that went out before the holding was in, the current one
+  // (`holding`, undefined until it is known)
+  const held = meta.holding !== undefined ? meta.holding : holding;
+  if (!meta.days || held === undefined) return null;
+  return normaliseArchiveGrain(raw, meta.dims, heldReadingDays(meta.days, held, meta.viaCube), meta.scope);
 }
 // Counts are whole flats. An archive grain's components are flats at an average reading
 // (src/lib/archiveReadings.js), so a count can come out as 7 512.4 — rounded here, where
@@ -1900,10 +1904,14 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   const grainVersion = isCurrent ? "" : readingsVersion;
   // What a grain answers, handed back with it: a grain still on screen while the next
   // loads is read as the question IT answers (grainView), not the one now being asked.
+  // Its days AND what the cube and the facts held of them when it was asked: a grain
+  // still on screen across a cube refresh is divided by the holding of its own request,
+  // not the new one (holdingNow is undefined when the request went out before the holding
+  // was in; grainView then takes the current one).
   const grainMeta = useMemo(
     () => ({ archive: !isCurrent, dims: specDims, scope: readingScope, days: readingDays,
-      viaCube: specUsesCube(pivotSpec, cubeDims) }),
-    [isCurrent, specDims, readingScope, readingDays, pivotSpec, cubeDims]
+      holding: holdingNow, viaCube: specUsesCube(pivotSpec, cubeDims) }),
+    [isCurrent, specDims, readingScope, readingDays, holdingNow, pivotSpec, cubeDims]
   );
   const grainEnabled = configServerable && (isCurrent || !!readingDays);
   const { grain: grainRaw, meta: grainRawMeta, loading: grainRawLoading, error: grainRawError } = usePivotGrain({ enabled: grainEnabled, spec: pivotSpec, meta: grainMeta, version: grainVersion });
