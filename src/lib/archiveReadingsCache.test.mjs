@@ -522,9 +522,9 @@ test("records loads during a holding outage do not push the next check out", asy
     for (let sec = 1; sec <= 20 * 60; sec += 1) {
       h.advance(1000);
       if (sec === 3 * 60) { h.st.rpcFails = false; h.st.cube = [{ d: ["SK", "2026-11"], m: { n: 15000 } }]; }
-      if (forcedLoads && [70, 100, 130].includes(sec)) {
-        await h._loadArchiveReadings("u", true, 10 * 1000);
-        await h._loadArchiveReadings("u", true);
+      if (forcedLoads && [70, 100, 130].includes(sec)) {                  // they say they could not read
+        await assert.rejects(h._loadArchiveReadings("u", true, 10 * 1000));
+        await assert.rejects(h._loadArchiveReadings("u", true));
       }
       if (sec % 60 === 0) {                                                  // the hook's minute tick
         const before = h.st.cubeAsks;
@@ -699,6 +699,7 @@ function readingsWorld(st) {
         return { data: st.cube.map(([c, m, n]) => ({ d: [c, m], m: { n } })), error: null };
       }
       st.factsAsks += 1;
+      if (st.factsFails) return { data: null, error: { message: "timeout" } };
       return { data: st.facts.map(([c, d, n]) => ({ d: [c, d], m: { n } })), error: null };
     },
     from: () => {
@@ -1002,6 +1003,45 @@ test("a retry approved while the records are paged asks for them again, not kept
   assert.equal(projectFlats(got, "P"), 100);
 });
 
+// The same, with the check after the pages unable to read the facts (or the cube): the
+// pages read across the retry's approval were kept, and cached, with 100 rows twice and
+// 100 missing — P at 50 for 100 — for as long as the readings stood.
+for (const down of ["facts", "cube"]) {
+  test(`a retry approved while the records are paged, the ${down} unreadable after them: read again, not kept with rows twice`, async () => {
+    const st = retryWorld();
+    const w = readingsWorld(st);
+    const db = { rows: [...retryRows("2026-10-06", 7400, "", "A"), ...retryRows("2026-10-02", 7400, "", "A"), ...retryRows("2026-10-02", 100, "p", "P")] };
+    db.onPage = (n) => {
+      if (n !== 1) return;
+      db.rows = [...retryRows("2026-10-07", 100, "r", "P"), ...db.rows];
+      st.facts.push(["SK", "2026-10-07", 100]);
+      if (down === "facts") st.factsFails = true; else st.cubeFails = true;
+    };
+    const render = flatsHarness(db, "SK");
+    await w.load();
+    let got = null;
+    for (let k = 0; k < 4; k += 1) {
+      render(["2026-10"], null, true, w.stampOf(w.latest()));
+      await settle();
+      got = render(["2026-10"], null, true, w.stampOf(w.latest()));
+    }
+    const ids = got.flats.map((r) => r.id);
+    assert.equal(got.loading, false);
+    assert.equal(ids.length - new Set(ids).size, 0, "no row twice");
+    assert.equal(got.flats.filter((r) => r.id.startsWith("r")).length, 100, "the retry's rows");
+    assert.equal(projectFlats(got, "P"), 100);
+    if (down === "facts") {
+      // shown, not cached: away and back, they are read again
+      const pages = db.pages;
+      render(["2026-09"], null, true, w.stampOf(w.latest()));
+      await settle();
+      render(["2026-10"], null, true, w.stampOf(w.latest()));
+      await settle();
+      assert.ok(db.pages > pages, "not cached");
+    }
+  });
+}
+
 // The Pivot's default records: the Datum filter on the newest reading's day (the 6th),
 // fetched as batch_timestamp in [the 6th, the 7th). A retry on the 7th is none of them.
 test("records of a day are not asked again for a retry on another day, and are for one on theirs", async () => {
@@ -1139,6 +1179,15 @@ test("a records load after a fresh check reads the days and the facts once, and 
   await settle();
   render(null, ["2026-10-01"], true, w.stampOf(e));
   assert.deepEqual([st.dayReads - at2.dayReads, st.factsAsks - at2.factsAsks, st.cubeAsks - at2.cubeAsks], [2, 2, 0]);
+});
+
+test("a forced read that cannot read the days or the facts says so", async () => {
+  const h = stagedHarness();
+  await h._loadArchiveReadings("u");
+  h.st.rpcFails = true;
+  await assert.rejects(h._loadArchiveReadings("u", true), "the facts");
+  h.st.rpcFails = false;
+  assert.ok(await h._loadArchiveReadings("u", true));
 });
 
 test("the Pivot hands the records its readings and a fresh read; the hook only when enabled", () => {

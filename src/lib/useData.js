@@ -1365,19 +1365,21 @@ export function useFlatsArchive(months, dates, enabled = true, stamp = null) {
     setLoading(true);
     setProgress(0);
     setError(null); setTruncated(false); setTooLarge(null);
-    // Whether the readings, read now (or `within` ms ago), no longer divide these records
-    // as those they are kept with do (or this request was dropped meanwhile). A read that
-    // fails leaves them as they were.
-    const readingsMoved = async (within = 0) => {
-      if (!stamp?.refresh) return cancelled;
+    // What the readings, read now (or `within` ms ago), say of these records: "moved" —
+    // they no longer divide them as those they are kept with do (or this request was
+    // dropped meanwhile); "unread" — they could not be read; "same".
+    const readingsNow = async (within = 0) => {
+      if (!stamp?.refresh) return cancelled ? "moved" : "same";
       let now = null;
-      try { now = await stamp.refresh(within); } catch { /* the readings' own state says so */ }
-      return cancelled || (!!now && readingsOf(now) !== readingsKey);
+      try { now = await stamp.refresh(within); } catch { /* unread */ }
+      if (cancelled) return "moved";
+      if (!now) return "unread";
+      return readingsOf(now) !== readingsKey ? "moved" : "same";
     };
     (async () => {
       // The readings first, fresh: if they moved on, the caller asks again under the new
       // ones and this request is dropped (see `stamp`).
-      if (await readingsMoved(ARCHIVE_RECORDS_READINGS_FRESH_MS)) return;
+      if (await readingsNow(ARCHIVE_RECORDS_READINGS_FRESH_MS) === "moved") return;
       const all = [];
       let hadError = false;
       let lastError = null;
@@ -1470,56 +1472,73 @@ export function useFlatsArchive(months, dates, enabled = true, stamp = null) {
         return;
       }
 
-      while (offset < MAX_TOTAL) {
-        let q = _eqCountry(supabaseData.from("flats_archive").select("*"), country)
-          .range(offset, offset + REQUESTED_PAGE - 1)
-          .order("batch_timestamp", { ascending: false, nullsFirst: false })
-          .order("id", { ascending: true });
-        if (Array.isArray(months) && months.length > 0) {
-          q = q.in("snapshot_month", months);
+      // The pages are read twice at most: see the check after them.
+      let readingsAfter = "same";
+      for (let pass = 0; ; pass += 1) {
+        if (pass > 0) {
+          all.length = 0;
+          hadError = false;
+          lastError = null;
+          offset = 0;
+          lastPageSize = REQUESTED_PAGE;
+          setProgress(0);
         }
-        if (datesArr) {
-          // Day-scope: batch_timestamp range [min, max+1) — index-friendly; the
-          // exact datum filter refines in filteredRecords. Cuts the default
-          // fetch from the whole month (~152k) to the shown day (~19k).
-          const hi = new Date(datesArr[datesArr.length - 1] + "T00:00:00Z");
-          hi.setUTCDate(hi.getUTCDate() + 1);
-          q = q.gte("batch_timestamp", datesArr[0]).lt("batch_timestamp", hi.toISOString().slice(0, 10));
+        while (offset < MAX_TOTAL) {
+          let q = _eqCountry(supabaseData.from("flats_archive").select("*"), country)
+            .range(offset, offset + REQUESTED_PAGE - 1)
+            .order("batch_timestamp", { ascending: false, nullsFirst: false })
+            .order("id", { ascending: true });
+          if (Array.isArray(months) && months.length > 0) {
+            q = q.in("snapshot_month", months);
+          }
+          if (datesArr) {
+            // Day-scope: batch_timestamp range [min, max+1) — index-friendly; the
+            // exact datum filter refines in filteredRecords. Cuts the default
+            // fetch from the whole month (~152k) to the shown day (~19k).
+            const hi = new Date(datesArr[datesArr.length - 1] + "T00:00:00Z");
+            hi.setUTCDate(hi.getUTCDate() + 1);
+            q = q.gte("batch_timestamp", datesArr[0]).lt("batch_timestamp", hi.toISOString().slice(0, 10));
+          }
+          const { data, error } = await sbRead(q);
+          if (cancelled) return;
+          if (error) {
+            console.error("[useFlatsArchive]", error);
+            hadError = true;
+            lastError = error;
+            break;
+          }
+          const got = data?.length || 0;
+          if (got === 0) break;                       // truly out of rows
+          all.push(...data);
+          setProgress(all.length);
+          offset += got;                              // advance by ACTUAL rows
+          // If we got fewer rows than the previous page's size, we've likely
+          // hit the dataset end. We track lastPageSize so we don't break
+          // prematurely on a server-imposed page cap (which would otherwise
+          // happen on EVERY page).
+          if (lastPageSize !== REQUESTED_PAGE && got < lastPageSize) break;
+          if (got < REQUESTED_PAGE && lastPageSize === REQUESTED_PAGE) {
+            // First time getting less than REQUESTED — could be server cap
+            // OR end of data. Adjust expected page size to what we got and
+            // keep paginating. The next iteration's same/larger page size
+            // means more data; smaller means done.
+            lastPageSize = got;
+          }
         }
-        const { data, error } = await sbRead(q);
         if (cancelled) return;
-        if (error) {
-          console.error("[useFlatsArchive]", error);
-          hadError = true;
-          lastError = error;
-          break;
-        }
-        const got = data?.length || 0;
-        if (got === 0) break;                       // truly out of rows
-        all.push(...data);
-        setProgress(all.length);
-        offset += got;                              // advance by ACTUAL rows
-        // If we got fewer rows than the previous page's size, we've likely
-        // hit the dataset end. We track lastPageSize so we don't break
-        // prematurely on a server-imposed page cap (which would otherwise
-        // happen on EVERY page).
-        if (lastPageSize !== REQUESTED_PAGE && got < lastPageSize) break;
-        if (got < REQUESTED_PAGE && lastPageSize === REQUESTED_PAGE) {
-          // First time getting less than REQUESTED — could be server cap
-          // OR end of data. Adjust expected page size to what we got and
-          // keep paginating. The next iteration's same/larger page size
-          // means more data; smaller means done.
-          lastPageSize = got;
-        }
+        // And again after: a reading or a retry approved while the pages were read is in
+        // some of them, and the pages after it shifted — asked again under the new readings.
+        readingsAfter = await readingsNow();
+        if (readingsAfter === "moved") return;
+        // The readings could not be read: such an approval cannot be ruled out, so the pages
+        // are read once more; still unread, they are shown but not cached.
+        if (readingsAfter === "unread" && pass === 0 && !hadError) continue;
+        break;
       }
       const hitCap = offset >= MAX_TOTAL;
       if (hitCap) {
         console.warn("[useFlatsArchive] reached safety cap of", MAX_TOTAL, "rows");
       }
-      if (cancelled) return;
-      // And again after: a reading approved while the pages were read is in some of them
-      // and not in the readings they would be kept with — asked again under the new version.
-      if (await readingsMoved()) return;
       // F-313 (DP-096): don't poison the module cache with a partial/empty
       // result when the fetch errored. A transient Supabase hiccup during
       // the analytics Pivot's heavy archive read would otherwise leave the
@@ -1531,7 +1550,7 @@ export function useFlatsArchive(months, dates, enabled = true, stamp = null) {
       // of the session, and re-reading it would at least have had a chance of
       // being right.
       const all_eur = _toEurDisplay(all);
-      if (!hadError && !hitCap) {
+      if (!hadError && !hitCap && readingsAfter !== "unread") {
         _archiveCache = all_eur;
         _archiveCacheKey = identityKey;
         _archiveCacheStamp = stamp;
@@ -1751,7 +1770,7 @@ function _loadArchiveReadings(key, force = false, within = 0) {
     };
     let { data, error } = await readDays();
     if (error) {
-      if (kept) return kept;                       // the last good answer stands
+      if (kept && !force) return kept;             // the last good answer stands (forced: says so)
       throw error;
     }
     for (let attempt = 0; ; attempt += 1) {
@@ -1784,7 +1803,7 @@ function _loadArchiveReadings(key, force = false, within = 0) {
       let factsRead = null;
       if (force && sameDays && kept.holdingKnown && kept.holding && specs) {
         factsRead = await sbRead(supabaseData.rpc("analytics_pivot", { p_spec: specs.facts }));
-        if (factsRead.error) return kept;            // as it was; the cube's check says more
+        if (factsRead.error) throw factsRead.error;  // the entry as it was; the caller is told
         const seen = archiveHolding(specs.from, [], factsRead.data, days);
         if (await daysBehind(seen)) continue;
         const factsSig = holdingFactsSignature(seen, days);
