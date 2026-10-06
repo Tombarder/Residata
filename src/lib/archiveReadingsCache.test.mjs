@@ -1076,6 +1076,44 @@ test("records read while the cube cannot be read are divided by the facts as rea
   assert.equal(after.holding.cubeTotals.get("SK|2026-10"), 15000);
 });
 
+// The same on the grain path, where only the scheduled checks run: they threw away the
+// facts they had read, and a grain from the facts read October at 15 000 for 7 500 for
+// as long as the cube could not be read.
+test("scheduled checks while the cube cannot be read divide by the facts they read", async () => {
+  const st = { days: [{ day: "2026-10-02", country: "SK", readings: 1 }, { day: "2026-10-05", country: "SK", readings: 1 }],
+    facts: [["SK", "2026-10-02", 7500]], cube: [["SK", "2026-10", 7500]] };      // the 5th's sync failed
+  const w = readingsWorld(st);
+  await w.load();
+  w.advance(5 * MIN);
+  st.facts.push(["SK", "2026-10-05", 7500]);                                // drained; the cube cannot be read
+  st.cubeFails = true;
+  const octoberReadings = (viaCube) => [...(heldReadingDays(w.latest().days, w.latest().holding, viaCube).SK || [])]
+    .filter(([d]) => d.startsWith("2026-10")).reduce((a, [, n]) => a + n, 0);
+  let checked = false;
+  for (let m = 0; m < 25; m += 1) {
+    w.advance(MIN);
+    const asked = st.cubeAsks;
+    await w.load();
+    checked = checked || st.cubeAsks > asked;
+    if (!checked) continue;                                                // from the first check on
+    assert.equal(octoberReadings(false), 2, `+${m + 1} min: a grain from the facts divided by both readings`);
+    assert.equal(octoberReadings(true), 1, "one from the cube by the one it holds");
+  }
+  assert.ok(checked);
+  const e = w.latest();
+  assert.equal(e.holdingFailed, true);
+  assert.equal(e.holding.cubeTotals.get("SK|2026-10"), 7500, "the cube as last held");
+  assert.ok(e.failures > 1, "the backoff steps as before");
+  // a new reading while the cube is still down: the facts as read, the cube as last held
+  st.days.push({ day: "2026-10-09", country: "SK", readings: 1 });
+  st.facts.push(["SK", "2026-10-09", 7500]);
+  w.advance(16 * MIN);
+  await w.load();
+  assert.ok(w.latest().days.SK.has("2026-10-09"));
+  assert.equal(octoberReadings(false), 3);
+  assert.equal(octoberReadings(true), 1);
+});
+
 // ── W3: a records load costs one read of the days and the facts, not two of everything ──
 test("a records load after a fresh check reads the days and the facts once, and never the cube", async () => {
   const st = {

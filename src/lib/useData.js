@@ -1815,11 +1815,12 @@ function _loadArchiveReadings(key, force = false, within = 0) {
         if (cube.error || facts.error) {
           console.error("[archive readings] what the cube holds", cube.error || facts.error);
           failed = true;
-          // A forced read that found the facts moved, the cube unreadable: the facts as read,
-          // the cube as last held. The records are the facts; kept with a holding that lacks
-          // a day they hold, they counted it against a reading too few until the cube was back.
-          if (factsRead && !facts.error && entry.holdingKnown && entry.holding) {
-            const cubeRows = [...(entry.holding.cubeTotals || [])].map(([k, n]) => ({ d: k.split("|"), m: { n } }));
+          // The facts read, the cube not: the facts as read, the cube as last held. A grain
+          // from the facts, and the records (the facts), divided by a holding that lacks a
+          // day the facts hold counted it against a reading too few until the cube was back.
+          const lastHeld = entry.holding || kept?.holding;
+          if (!facts.error && lastHeld) {
+            const cubeRows = [...(lastHeld.cubeTotals || [])].map(([k, n]) => ({ d: k.split("|"), m: { n } }));
             holding = archiveHolding(specs.from, cubeRows, facts.data, days);
           }
         } else holding = archiveHolding(specs.from, cube.data, facts.data, days);
