@@ -8,6 +8,7 @@ import path from 'node:path'
 import { COMPANY, addressOneLine } from './src/lib/company.js'
 import { FALLBACK_MONTHLY_CENTS } from './src/lib/pricingDefaults.js'
 import { firstPaintScript } from './src/lib/trialBannerState.js'
+import { everyPhrase } from './src/lib/refreshCadence.js'
 
 /**
  * residataIndexHtmlContent
@@ -59,6 +60,10 @@ function residataIndexHtmlContent() {
         // headline paints real numbers on first render (no "loading…" flash, no
         // DB round-trip on the critical path). 'null' when build data absent
         // (graceful fallback → current live-fetch behaviour). Must be valid JS.
+        // How often the market is read (public.data_collection via the snapshot):
+        // the head and structured data say it instead of a typed "daily".
+        // No snapshot → "regularly", never an interval the build could not see.
+        __REFRESH_EVERY_EN__:              everyPhrase('en', data),
         __BUILD_SNAPSHOT_JSON__:           (data && Object.keys(data).length) ? JSON.stringify(data) : 'null',
         // Legal identity — one source (src/lib/company.js), same as the Imprint.
         // The deploy's own identity. Vercel exposes the commit SHA; locally the

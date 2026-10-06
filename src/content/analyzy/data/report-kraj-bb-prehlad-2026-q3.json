@@ -1,6 +1,6 @@
 {
  "asOf": "2026-09-30",
- "generatedAt": "2026-10-06T00:50:17",
+ "generatedAt": "2026-10-06T10:49:07",
  "slug": "kraj-bb-prehlad-2026-q3",
  "overview": {
   "scope": {
@@ -34,12 +34,15 @@
   "rolling_days": 28,
   "prev_period_sales": 0,
   "period_days": 92,
+  "reading_every_days": [
+   1
+  ],
   "okres_supply": {
    "Zvolen": {
     "n": 398,
-    "done": 175,
-    "building": 27,
-    "unknown": 196,
+    "done": 106,
+    "building": 64,
+    "unknown": 228,
     "projects": 3,
     "m2": 3583,
     "area": 65.5,
@@ -252,195 +255,195 @@
   "price_series": [
    {
     "wk": "2026-06-15",
-    "m2_done": "3880",
-    "m2_building": "3980",
+    "m2_done": "4057",
+    "m2_building": "3946",
     "m2_all": "3846",
     "n_all": 256,
-    "u_done": 95,
-    "u_building": 146,
+    "u_done": 26,
+    "u_building": 183,
     "p_all": 6,
     "p_done": 3,
-    "p_building": 3
+    "p_building": 4
    },
    {
     "wk": "2026-06-22",
-    "m2_done": "3880",
-    "m2_building": "3980",
+    "m2_done": "4057",
+    "m2_building": "3945",
     "m2_all": "3845",
     "n_all": 254,
-    "u_done": 95,
-    "u_building": 144,
+    "u_done": 26,
+    "u_building": 181,
     "p_all": 6,
     "p_done": 3,
-    "p_building": 3
+    "p_building": 4
    },
    {
     "wk": "2026-06-29",
-    "m2_done": "3880",
-    "m2_building": "3980",
+    "m2_done": "4057",
+    "m2_building": "3945",
     "m2_all": "3845",
     "n_all": 254,
-    "u_done": 95,
-    "u_building": 144,
+    "u_done": 26,
+    "u_building": 181,
     "p_all": 6,
     "p_done": 3,
-    "p_building": 3
+    "p_building": 4
    },
    {
     "wk": "2026-07-06",
-    "m2_done": "3880",
-    "m2_building": "3981",
+    "m2_done": "4057",
+    "m2_building": "3946",
     "m2_all": "3846",
     "n_all": 255,
-    "u_done": 95,
-    "u_building": 145,
+    "u_done": 26,
+    "u_building": 182,
     "p_all": 6,
     "p_done": 3,
-    "p_building": 3
+    "p_building": 4
    },
    {
     "wk": "2026-07-13",
-    "m2_done": "3880",
-    "m2_building": "3974",
+    "m2_done": "4057",
+    "m2_building": "3941",
     "m2_all": "3841",
     "n_all": 253,
-    "u_done": 95,
-    "u_building": 143,
+    "u_done": 26,
+    "u_building": 180,
     "p_all": 6,
     "p_done": 3,
-    "p_building": 3
+    "p_building": 4
    },
    {
     "wk": "2026-07-20",
-    "m2_done": "3880",
-    "m2_building": "3983",
+    "m2_done": "4057",
+    "m2_building": "3948",
     "m2_all": "3848",
     "n_all": 258,
-    "u_done": 95,
-    "u_building": 148,
+    "u_done": 26,
+    "u_building": 185,
     "p_all": 6,
     "p_done": 3,
-    "p_building": 3
+    "p_building": 4
    },
    {
     "wk": "2026-07-27",
-    "m2_done": "3880",
-    "m2_building": "3978",
+    "m2_done": "4057",
+    "m2_building": "3944",
     "m2_all": "3845",
     "n_all": 257,
-    "u_done": 95,
-    "u_building": 147,
+    "u_done": 26,
+    "u_building": 184,
     "p_all": 6,
     "p_done": 3,
-    "p_building": 3
+    "p_building": 4
    },
    {
     "wk": "2026-08-03",
-    "m2_done": "3880",
-    "m2_building": "3978",
+    "m2_done": "4057",
+    "m2_building": "3944",
     "m2_all": "3845",
     "n_all": 257,
-    "u_done": 95,
-    "u_building": 147,
+    "u_done": 26,
+    "u_building": 184,
     "p_all": 6,
     "p_done": 3,
-    "p_building": 3
+    "p_building": 4
    },
    {
     "wk": "2026-08-10",
-    "m2_done": "3880",
-    "m2_building": "3978",
+    "m2_done": "4057",
+    "m2_building": "3944",
     "m2_all": "3843",
     "n_all": 253,
-    "u_done": 95,
-    "u_building": 143,
+    "u_done": 26,
+    "u_building": 180,
     "p_all": 6,
     "p_done": 3,
-    "p_building": 3
+    "p_building": 4
    },
    {
     "wk": "2026-08-17",
-    "m2_done": "3880",
-    "m2_building": "3978",
+    "m2_done": "4057",
+    "m2_building": "3944",
     "m2_all": "3843",
     "n_all": 253,
-    "u_done": 95,
-    "u_building": 143,
+    "u_done": 26,
+    "u_building": 180,
     "p_all": 6,
     "p_done": 3,
-    "p_building": 3
+    "p_building": 4
    },
    {
     "wk": "2026-08-24",
-    "m2_done": "3880",
-    "m2_building": "3978",
+    "m2_done": "4057",
+    "m2_building": "3944",
     "m2_all": "3843",
     "n_all": 253,
-    "u_done": 95,
-    "u_building": 143,
+    "u_done": 26,
+    "u_building": 180,
     "p_all": 6,
     "p_done": 3,
-    "p_building": 3
+    "p_building": 4
    },
    {
     "wk": "2026-08-31",
-    "m2_done": "3880",
-    "m2_building": "4035",
+    "m2_done": "4057",
+    "m2_building": "3988",
     "m2_all": "3873",
     "n_all": 249,
-    "u_done": 95,
-    "u_building": 139,
+    "u_done": 26,
+    "u_building": 176,
     "p_all": 6,
     "p_done": 3,
-    "p_building": 3
+    "p_building": 4
    },
    {
     "wk": "2026-09-07",
-    "m2_done": "3880",
-    "m2_building": "4034",
+    "m2_done": "4057",
+    "m2_building": "3987",
     "m2_all": "3872",
     "n_all": 248,
-    "u_done": 95,
-    "u_building": 138,
+    "u_done": 26,
+    "u_building": 175,
     "p_all": 6,
     "p_done": 3,
-    "p_building": 3
+    "p_building": 4
    },
    {
     "wk": "2026-09-14",
-    "m2_done": "3880",
-    "m2_building": "4034",
+    "m2_done": "4057",
+    "m2_building": "3987",
     "m2_all": "3872",
     "n_all": 248,
-    "u_done": 95,
-    "u_building": 138,
+    "u_done": 26,
+    "u_building": 175,
     "p_all": 6,
     "p_done": 3,
-    "p_building": 3
+    "p_building": 4
    },
    {
     "wk": "2026-09-21",
-    "m2_done": "3880",
-    "m2_building": "4030",
+    "m2_done": "4057",
+    "m2_building": "3983",
     "m2_all": "3868",
     "n_all": 246,
-    "u_done": 95,
-    "u_building": 136,
+    "u_done": 26,
+    "u_building": 173,
     "p_all": 6,
     "p_done": 3,
-    "p_building": 3
+    "p_building": 4
    },
    {
     "wk": "2026-09-28",
-    "m2_done": "3880",
-    "m2_building": "4012",
+    "m2_done": "4057",
+    "m2_building": "3969",
     "m2_all": "3858",
     "n_all": 246,
-    "u_done": 95,
-    "u_building": 136,
+    "u_done": 26,
+    "u_building": 173,
     "p_all": 6,
     "p_done": 3,
-    "p_building": 3
+    "p_building": 4
    }
   ],
   "project_supply": [
@@ -599,10 +602,10 @@
    "projects": 10
   },
   "completion_m2": {
-   "m2_done": 3919,
-   "m2_building": 4035,
-   "n_done": 89,
-   "n_building": 140,
+   "m2_done": 4083,
+   "m2_building": 3991,
+   "n_done": 25,
+   "n_building": 174,
    "p_done": 2,
    "p_building": 3
   },

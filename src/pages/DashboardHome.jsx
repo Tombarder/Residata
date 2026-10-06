@@ -22,6 +22,7 @@
  * render in the user's selected display currency; velocity/analytics widgets
  * are capability-gated (blurred + upgrade nudge for free users).
  */
+import { everyPhrase } from "../lib/refreshCadence";
 import { useState, useMemo, useRef, useEffect, useId } from "react";
 import { useSpecifics, SpecificsMark } from "../lib/projectSpecifics";
 import { createPortal } from "react-dom";
@@ -43,6 +44,8 @@ import MapFilterBuilder from "../components/MapFilterBuilder";
 import Picker from "../components/Picker";
 import InfoTip from "../components/InfoTip";
 import { applyFilters, describe, isComplete, pruneStale } from "../lib/mapFilters";
+import { SoldShareNote } from "../lib/soldShareNote";
+import { soldSharePct } from "../lib/soldShare.js";
 
 const L = (lang, sk, en) => (lang === "sk" ? sk : en);
 
@@ -553,7 +556,7 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
   const velocityMature = useVelocityMature();
   const { districts } = useDistrictTotals();
   const snapshots = useProjectHistory();
-  const freshness = useFreshness(); // last data date (YYYY-MM-DD) — data refreshes daily
+  const freshness = useFreshness(); // last data date (YYYY-MM-DD) — data refreshes at the collection interval
   const fmtDate = (d) => { try { return new Date(d).toLocaleDateString(localeTag(lang), { day: "numeric", month: "short", year: "numeric" }); } catch { return d; } };
 
   const { config, loading: cfgLoading, saveState, setConfig, resetToDefault } = useDashboardConfig();
@@ -729,8 +732,8 @@ export default function DashboardHome({ lang = "en", setCurrent }) {
       <h2 style={{ fontSize: "1.5rem", fontWeight: 600, color: textLight, margin: "0 0 0.2rem" }}>{greeting}</h2>
       <p style={{ color: dim, fontSize: "0.9rem", lineHeight: 1.55, margin: "0 0 1.4rem" }}>
         {lang === "sk"
-          ? <>Tvoj osobný prehľad trhu novostavieb. Dáta sa obnovujú <strong style={{ color: textLight }}>každý deň</strong>{freshness ? <> — naposledy aktualizované <strong style={{ color: textLight }}>{fmtDate(freshness)}</strong></> : null}.</>
-          : <>Your personal new-build market overview. Data refreshes <strong style={{ color: textLight }}>daily</strong>{freshness ? <> — last updated <strong style={{ color: textLight }}>{fmtDate(freshness)}</strong></> : null}.</>}
+          ? <>Tvoj osobný prehľad trhu novostavieb. Dáta sa obnovujú <strong style={{ color: textLight }}>{everyPhrase("sk")}</strong>{freshness ? <> — naposledy aktualizované <strong style={{ color: textLight }}>{fmtDate(freshness)}</strong></> : null}.</>
+          : <>Your personal new-build market overview. Data refreshes <strong style={{ color: textLight }}>{everyPhrase("en")}</strong>{freshness ? <> — last updated <strong style={{ color: textLight }}>{fmtDate(freshness)}</strong></> : null}.</>}
       </p>
 
       {showTrialOffer && <TrialOfferBanner lang={lang} onActivate={trialOffer.start} busy={trialOffer.busy} msg={trialOffer.msg} />}
@@ -1191,7 +1194,10 @@ function ProjectBody({ cfg, ctx, lang }) {
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(70px, 1fr))", gap: "0.5rem", marginTop: "0.85rem" }}>
         <MiniStat label={L(lang, "Voľné", "Avail")} value={fmtCount(p.available_units, lang)} accent={green} />
-        <MiniStat label={L(lang, "Predané", "Sold")} value={p.sold_percentage != null ? `${Math.round(p.sold_percentage)}%` : "—"} />
+        {/* "Predané" is the ledger's sold share — the flats the €/m² beside it cannot
+            see (soldShare.js). It used to print sold_percentage, which counts
+            reservations as sold. */}
+        <MiniStat label={L(lang, "Predané", "Sold")} value={soldSharePct(p) != null ? `${soldSharePct(p)}%` : "—"} />
         <MiniStat label={`${moneySymbol()}/m²`} value={p.avg_price_eur_m2 ? Math.round(moneyFromEur(p.avg_price_eur_m2)).toLocaleString(localeTag(lang)) : "—"} />
         <MiniStat label={L(lang, "30d", "30d")} value={soldLocked ? "🔒" : (p.sold_last_month == null ? "—" : p.sold_last_month > 0 ? `+${p.sold_last_month}` : "0")} accent={orange} />
       </div>
@@ -1213,7 +1219,9 @@ const RANK_METRICS = {
     available:  { label: { sk: "Voľné byty", en: "Available" }, get: p => p.available_units, fmt: "count" },
     sold30:     { label: { sk: "Predaj 30d", en: "Sold 30d" }, get: p => p.sold_last_month, fmt: "count", requires: "view_sold_velocity" },
     avg_m2:     { label: { sk: "Cena /m²", en: "Price /m²" }, get: p => p.avg_price_eur_m2, fmt: "m2" },
-    sold_pct:   { label: { sk: "% predané", en: "% sold" }, get: p => p.sold_percentage, fmt: "pct" },
+    // sold + reserved + pre-reserved over total — TAKEN, not sold (the key stays,
+    // saved dashboards keep working; only the words were wrong)
+    sold_pct:   { label: { sk: "% obsadené", en: "% taken" }, get: p => p.sold_percentage, fmt: "pct" },
   },
   districts: {
     available:   { label: { sk: "Voľné byty", en: "Available" }, get: d => d.available_units, fmt: "count" },
@@ -1287,7 +1295,11 @@ function RankingBody({ cfg, ctx, lang }) {
               <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${Math.max(4, (Math.abs(r.val) / max) * 100)}%`, background: green, borderRadius: 2, opacity: 0.7 }} />
             </div>
           </div>
-          <span style={{ fontFamily: mono, fontSize: "0.78rem", fontWeight: 700, color: textLight, flexShrink: 0 }}>{fmtRankVal(mdef.fmt, r.val, lang)}</span>
+          <span style={{ fontFamily: mono, fontSize: "0.78rem", fontWeight: 700, color: textLight, flexShrink: 0, textAlign: "right" }}>
+            {fmtRankVal(mdef.fmt, r.val, lang)}
+            {/* a project ranked by its average price: say what the average leaves out */}
+            {r.project && !locked && mdef.fmt === "m2" ? <SoldShareNote project={r.project} lang={lang} block style={{ fontSize: "0.82em" }} /> : null}
+          </span>
         </div>
       ))}
     </div>
@@ -1421,6 +1433,7 @@ function TrendBody({ cfg, ctx, lang }) {
         </div>
         <div style={{ textAlign: "right", flexShrink: 0 }}>
           <div style={{ fontFamily: mono, fontSize: "1.1rem", fontWeight: 700, color: textLight, lineHeight: 1.1 }}>{fmtRankVal(sdef.fmt, last, lang)}</div>
+          {sdef === TREND_SERIES.avg_m2 && !locked ? <SoldShareNote project={p} lang={lang} block style={{ fontSize: "0.68rem" }} /> : null}
           {delta != null && delta !== 0 && (
             <div style={{ fontFamily: mono, fontSize: "0.68rem", color: delta > 0 ? green : dangerInk }}>{delta > 0 ? "▲" : "▼"} {fmtRankVal(sdef.fmt, Math.abs(delta), lang)}</div>
           )}
