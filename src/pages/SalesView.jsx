@@ -269,11 +269,15 @@ export default function SalesView({ lang = "sk" }) {
      sale on one of the days its reading covers, and nothing after the latest reading is
      known yet — so a window ending today held fewer days of sales than it said whenever
      today was not a reading day. The market's last data day (the oldest market's in the
-     "All" view, like the freshness line) makes "45 days" 45 days of sales. Today only
-     until that date is known. */
+     "All" view, like the freshness line) is the window's end. Today only until that date
+     is known. */
+  /* The engine counts BOTH ends (sale_day >= date_from AND sale_day <= date_to), so a
+     preset of N days starts N − 1 days before its end. It started N days before, and "30
+     dní" held 31 days of sales and "45 dní" 46, beside a dashboard card whose 30 days
+     are 30. */
   const freshness = useFreshness();
   const date_to = customTo || (freshness && freshness < isoToday() ? freshness : isoToday());
-  const date_from = customFrom || isoDaysBefore(date_to, days);
+  const date_from = customFrom || isoDaysBefore(date_to, days - 1);
   // An explicitly inverted pair (both typed, from after to) is still possible and is the
   // user's own doing — but it is said out loud rather than answered with an empty table.
   const rangeInverted = date_from > date_to;
