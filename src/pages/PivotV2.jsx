@@ -1449,7 +1449,7 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // The record path (median, distinct counts) counts its flats by the same readings.
   const { days: readingDays, holding: readingHolding, holdingKnown: readingHoldingKnown, version: readingsVersion,
     prevVersion: readingsPrevVersion, prevHolding: readingsPrevHolding,
-    recordsVersion: readingsRecordsVersion, refresh: refreshReadings,
+    refresh: refreshReadings,
     loading: readingsLoading, error: readingsError } = useArchiveReadingDays({ enabled: canViewAnalytics && !isCurrent });
   // What the cube and the facts hold is read in parallel with the grain; until it is in,
   // an archive grain or record set cannot be divided and reads as loading.
@@ -1458,8 +1458,8 @@ export default function PivotV2({ lang = "sk", setCurrent }) {
   // kept with them: a reading that lands later asks for new records and divides those,
   // not these (useFlatsArchive stamp).
   const recordsStampNow = useMemo(
-    () => ({ days: readingDays, holding: holdingNow, version: readingsRecordsVersion, refresh: refreshReadings }),
-    [readingDays, holdingNow, readingsRecordsVersion, refreshReadings]
+    () => ({ days: readingDays, holding: holdingNow, refresh: refreshReadings }),
+    [readingDays, holdingNow, refreshReadings]
   );
   const {
     flats: archiveFlats, stamp: archiveStamp, loading: loadingArchive, progress: flatsProgress,

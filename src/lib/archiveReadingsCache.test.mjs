@@ -12,7 +12,7 @@ import { strict as assert } from "node:assert";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { readingDaysByCountry, readingsSignature, holdingSpecs, archiveHolding, holdingSignature, holdingLags, holdingFactsSignature,
-  archiveReadingScope, archiveRecordCells, heldReadingDays, weightedCount } from "./archiveReadings.js";
+  archiveReadingScope, archiveRecordCells, heldReadingDays, weightedCount, recordReadingsSignature } from "./archiveReadings.js";
 
 const SRC = readFileSync(new URL("./useData.js", import.meta.url), "utf8");
 const BLOCK = SRC.slice(SRC.indexOf("const ARCHIVE_READINGS_TTL_MS"), SRC.indexOf("/** Full readings of every market ("));
@@ -509,31 +509,6 @@ test("records loads during a holding outage do not push the next check out", asy
   assert.deepEqual(await run(true), quiet, "the same checks with the records loads");
 });
 
-test("the records' version follows the days and the facts, not a refresh of the cube", async () => {
-  const h = stagedHarness();
-  h.st.facts = [{ d: ["SK", "2026-11-02"], m: { n: 7500 } }];               // the 6th's facts not in yet
-  h.st.cube = [{ d: ["SK", "2026-11"], m: { n: 7500 } }];
-  const a = await h._loadArchiveReadings("u", true);
-  assert.ok(a.recordsVersion, "a version for the records");
-  h.st.facts = [{ d: ["SK", "2026-11-02"], m: { n: 7500 } }, { d: ["SK", "2026-11-06"], m: { n: 7500 } }];
-  const b = await h._loadArchiveReadings("u", true);
-  assert.notEqual(b.recordsVersion, a.recordsVersion, "the facts caught up with the 6th");
-  h.st.cube = [{ d: ["SK", "2026-11"], m: { n: 15000 } }];
-  const c = await h._loadArchiveReadings("u", true);
-  assert.notEqual(c.version, b.version, "the grains' version follows the cube");
-  assert.equal(c.recordsVersion, b.recordsVersion, "the records are not the cube's");
-  h.st.days = h.st.days.slice(0, 1);                                        // the 6th withdrawn
-  h.st.facts = h.st.facts.slice(0, 1);
-  h.st.cube = [{ d: ["SK", "2026-11"], m: { n: 7500 } }];
-  const d = await h._loadArchiveReadings("u", true);
-  assert.notEqual(d.recordsVersion, c.recordsVersion, "a withdrawn reading");
-  h.st.days = [{ day: "2026-11-02", country: "SK", readings: 2 }];          // a second reading the same day
-  h.st.cube = [{ d: ["SK", "2026-11"], m: { n: 15000 } }];
-  h.st.facts = [{ d: ["SK", "2026-11-02"], m: { n: 15000 } }];
-  const e = await h._loadArchiveReadings("u", true);
-  assert.notEqual(e.recordsVersion, d.recordsVersion, "a new reading on a day already held");
-});
-
 // useFlatsArchive run as written, with a stand-in for React, the session and the database.
 const FLATS_HOOK = (() => {
   const from = SRC.indexOf("let _archiveCache = null;");
@@ -541,7 +516,7 @@ const FLATS_HOOK = (() => {
   const end = SRC.indexOf("\n}\n", start) + 3;
   return SRC.slice(from, end).replace("export function useFlatsArchive(", "function useFlatsArchive(");
 })();
-function flatsHarness(db) {
+function flatsHarness(db, country = "SK") {
   const slots = [];
   const deps = [];
   const cleanups = [];
@@ -567,7 +542,7 @@ function flatsHarness(db) {
       let range = null;
       const b = {
         select(_c, o) { head = !!o?.head; return b; },
-        in() { return b; }, gte() { return b; }, lt() { return b; }, order() { return b; },
+        in() { return b; }, gte() { return b; }, lt() { return b; }, order() { return b; }, eq() { return b; },
         range(f, t) { range = [f, t]; return b; },
         run() {
           if (head) return Promise.resolve({ count: db.rows.length, error: null });
@@ -581,10 +556,12 @@ function flatsHarness(db) {
     },
   };
   const useFlatsArchive = new Function(
-    "useState", "useEffect", "useAuth", "useCountry", "isSupabaseReady", "supabaseData", "sbRead", "_eqCountry", "_toEurDisplay", "console",
+    "useState", "useEffect", "useAuth", "useCountry", "isSupabaseReady", "supabaseData", "sbRead", "_eqCountry", "_toEurDisplay",
+    "recordReadingsSignature", "isAllCountries", "console",
     `${FLATS_HOOK}\nreturn useFlatsArchive;`,
-  )(useState, useEffect, () => ({ loading: false, user: { id: "u" }, profile: { tier: "pro" } }), () => ({ country: "SK" }),
-    () => true, supabaseData, (b) => b.run(), (q) => q, (a) => a, { error() {}, warn() {} });
+  )(useState, useEffect, () => ({ loading: false, user: { id: "u" }, profile: { tier: "pro" } }), () => ({ country }),
+    () => true, supabaseData, (b) => b.run(), (q) => q, (a) => a,
+    recordReadingsSignature, (c) => c === "all", { error() {}, warn() {} });
   return (...args) => { i = 0; pending = []; const out = useFlatsArchive(...args); for (const p of pending) p(); return out; };
 }
 const settle = () => new Promise((r) => setTimeout(r, 0));
@@ -597,16 +574,17 @@ const octHolding = (days) => {
   const sp = holdingSpecs(days);
   return archiveHolding(sp.from, [], [...days.SK.keys()].map((d) => ({ d: ["SK", d], m: { n: 7500 } })), days);
 };
+const readingsAt = (days) => ({ days, holding: octHolding(days) });
 const shownCount = ({ flats, stamp }) => Math.round(weightedCount(flats, archiveRecordCells(
   heldReadingDays(stamp.days, stamp.holding, false), archiveReadingScope([{ key: "snapshot_month", mode: "in", values: ["2026-10"] }]), ["project_name"])));
 
 test("records read after a reading the kept readings missed are not divided by those readings", async () => {
   // 10:05 — the database holds both October readings; the readings kept since 09:55, one
   const db = { rows: [...octRows("2026-10-01"), ...octRows("2026-10-05")] };
-  const readings = { now: { recordsVersion: "oct5" } };                    // what a read now says
+  const readings = { now: readingsAt(OCT5) };                                // what a read now says
   const refresh = async () => readings.now;
-  const stale = { days: OCT1, holding: octHolding(OCT1), version: "oct1", refresh };
-  const fresh = { days: OCT5, holding: octHolding(OCT5), version: "oct5", refresh };
+  const stale = { ...readingsAt(OCT1), refresh };
+  const fresh = { ...readingsAt(OCT5), refresh };
   const render = flatsHarness(db);
   render(["2026-10"], null, true, stale);
   await settle();
@@ -623,12 +601,12 @@ test("records read after a reading the kept readings missed are not divided by t
 
 test("a reading approved while the records are paged asks for them again", async () => {
   const db = { rows: octRows("2026-10-01") };
-  const readings = { now: { recordsVersion: "oct1" } };
+  const readings = { now: readingsAt(OCT1) };
   const refresh = async () => readings.now;
-  const before = { days: OCT1, holding: octHolding(OCT1), version: "oct1", refresh };
-  const after = { days: OCT5, holding: octHolding(OCT5), version: "oct5", refresh };
+  const before = { ...readingsAt(OCT1), refresh };
+  const after = { ...readingsAt(OCT5), refresh };
   db.onPage = (n) => {                                                      // the 5th approved after the first page
-    if (n === 1) { db.rows = [...octRows("2026-10-05"), ...octRows("2026-10-01")]; readings.now = { recordsVersion: "oct5" }; }
+    if (n === 1) { db.rows = [...octRows("2026-10-05"), ...octRows("2026-10-01")]; readings.now = readingsAt(OCT5); }
   };
   const render = flatsHarness(db);
   render(["2026-10"], null, true, before);
@@ -645,10 +623,10 @@ test("a reading approved while the records are paged asks for them again", async
 
 test("a withdrawn reading asks for the records again; the old ones stay with their own readings meanwhile", async () => {
   const db = { rows: [...octRows("2026-10-01"), ...octRows("2026-10-05")] };
-  const readings = { now: { recordsVersion: "oct5" } };
+  const readings = { now: readingsAt(OCT5) };
   const refresh = async () => readings.now;
-  const two = { days: OCT5, holding: octHolding(OCT5), version: "oct5", refresh };
-  const one = { days: OCT1, holding: octHolding(OCT1), version: "oct1", refresh };
+  const two = { ...readingsAt(OCT5), refresh };
+  const one = { ...readingsAt(OCT1), refresh };
   const render = flatsHarness(db);
   render(["2026-10"], null, true, two);
   await settle();
@@ -657,7 +635,7 @@ test("a withdrawn reading asks for the records again; the old ones stay with the
   const pagesBefore = db.pages;
   // the 5th withdrawn: its rows leave the facts, the readings say so
   db.rows = octRows("2026-10-01");
-  readings.now = { recordsVersion: "oct1" };
+  readings.now = readingsAt(OCT1);
   const meanwhile = render(["2026-10"], null, true, one);
   assert.equal(meanwhile.stamp, two, "the old records with their own readings");
   assert.equal(shownCount(meanwhile), 7500);
@@ -672,16 +650,134 @@ test("a withdrawn reading asks for the records again; the old ones stay with the
 test("records without readings (no analytics) are read without asking for them", async () => {
   const db = { rows: octRows("2026-10-01") };
   const render = flatsHarness(db);
-  render(["2026-10"], null, true, { days: null, holding: undefined, version: "", refresh: null });
+  render(["2026-10"], null, true, { days: null, holding: undefined, refresh: null });
   await settle();
-  const got = render(["2026-10"], null, true, { days: null, holding: undefined, version: "", refresh: null });
+  const got = render(["2026-10"], null, true, { days: null, holding: undefined, refresh: null });
   assert.equal(got.flats.length, 7500);
   assert.equal(got.loading, false);
 });
 
-test("the Pivot hands the records its readings' records version and a fresh read; the hook only when enabled", () => {
+// ── the loader and the records hook together, as the Pivot wires them ──
+function readingsWorld(st) {
+  let now = Date.UTC(2026, 9, 6, 9, 0);
+  Object.assign(st, { dayReads: 0, cubeAsks: 0, factsAsks: 0 });
+  const supabaseData = {
+    rpc: async (_n, { p_spec }) => {
+      if (p_spec.dims[1] === "snapshot_month") {
+        st.cubeAsks += 1;
+        return { data: st.cube.map(([c, m, n]) => ({ d: [c, m], m: { n } })), error: null };
+      }
+      st.factsAsks += 1;
+      return { data: st.facts.map(([c, d, n]) => ({ d: [c, d], m: { n } })), error: null };
+    },
+    from: () => { const b = { select() { return b; }, order() { return b; }, range() { st.dayReads += 1; return Promise.resolve({ data: st.days, error: null }); } }; return b; },
+  };
+  const { _loadArchiveReadings } = new Function(
+    "sbReadAll", "sbRead", "supabaseData", "readingDaysByCountry", "readingsSignature",
+    "holdingSpecs", "archiveHolding", "holdingSignature", "holdingLags", "holdingFactsSignature", "_pivotGrainCache", "Date", "console",
+    `${BLOCK}\nreturn { _loadArchiveReadings };`,
+  )(async (make) => make(0, 999), (b) => b, supabaseData, readingDaysByCountry, readingsSignature,
+    holdingSpecs, archiveHolding, holdingSignature, holdingLags, holdingFactsSignature, new Map(), { now: () => now }, { error() {} });
+  // the Pivot's stamp of what the readings hook renders
+  const stampOf = (e) => ({ days: e.days, holding: e.holding, refresh: (within) => _loadArchiveReadings("u", true, within) });
+  return { load: () => _loadArchiveReadings("u"), stampOf, advance: (ms) => { now += ms; } };
+}
+const fewRows = (n) => Array.from({ length: n }, (_, i) => ({ id: i, country: "SK", batch_timestamp: "2026-09-04T05:00:00+00:00", snapshot_month: "2026-09" }));
+
+// ── W2: the records are asked again for a reading of THEIR market and months only ──
+test("an SK user's September records stay for a CZ reading, a retry and a cube refresh, and go for a withdrawn September reading", async () => {
+  const st = {
+    days: [{ day: "2026-09-04", country: "SK", readings: 1 }, { day: "2026-09-08", country: "SK", readings: 1 },
+      { day: "2026-10-02", country: "SK", readings: 1 }, { day: "2026-10-02", country: "CZ", readings: 1 }],
+    facts: [["SK", "2026-10-02", 7500], ["CZ", "2026-10-02", 4000]],
+    cube: [["SK", "2026-10", 7500], ["CZ", "2026-10", 4000]],
+  };
+  const w = readingsWorld(st);
+  const db = { rows: fewRows(30) };
+  const render = flatsHarness(db, "SK");
+  const show = async () => {                                               // the next check lands, the page renders
+    w.advance(16 * MIN);
+    const e = await w.load();
+    render(["2026-09"], null, true, w.stampOf(e));
+    await settle();
+    return render(["2026-09"], null, true, w.stampOf(e));
+  };
+  const first = await show();
+  assert.equal(first.flats.length, 30);
+  const pages = db.pages;
+  st.facts.push(["SK", "2026-10-07", 60]);                                  // a not-due morning's retry of 2 SK projects
+  await show();
+  assert.equal(db.pages, pages, "a retry");
+  st.days.push({ day: "2026-10-06", country: "CZ", readings: 1 });          // a CZ reading
+  st.facts.push(["CZ", "2026-10-06", 4000]);
+  await show();
+  assert.equal(db.pages, pages, "another market's reading");
+  st.days.push({ day: "2026-10-09", country: "SK", readings: 1 });          // an SK reading in October
+  st.facts.push(["SK", "2026-10-09", 7500]);
+  await show();
+  assert.equal(db.pages, pages, "another month's reading");
+  st.cube = [["SK", "2026-10", 15060], ["CZ", "2026-10", 8000]];
+  await show();
+  assert.equal(db.pages, pages, "a cube refresh");
+  st.days = st.days.filter((d) => d.day !== "2026-09-08");                 // September's 8th withdrawn
+  const after = await show();
+  assert.ok(db.pages > pages, "a reading of their own month withdrawn");
+  assert.ok(!after.stamp.days.SK.has("2026-09-08"));
+});
+
+test("records of the newest month are asked again for its new reading and for its facts catching up, not for a retry", async () => {
+  const st = {
+    days: [{ day: "2026-10-02", country: "SK", readings: 1 }, { day: "2026-10-05", country: "SK", readings: 1 }],
+    facts: [["SK", "2026-10-02", 7500]],                                    // the 5th's sync failed
+    cube: [["SK", "2026-10", 7500]],
+  };
+  const w = readingsWorld(st);
+  const db = { rows: fewRows(30) };
+  const render = flatsHarness(db, "all");
+  const show = async () => {
+    w.advance(16 * MIN);
+    const e = await w.load();
+    render(["2026-10"], null, true, w.stampOf(e));
+    await settle();
+    return render(["2026-10"], null, true, w.stampOf(e));
+  };
+  await show();
+  let pages = db.pages;
+  st.facts.push(["SK", "2026-10-05", 7500]);                                // resynced
+  await show();
+  assert.ok(db.pages > pages, "the facts caught up with the 5th");
+  pages = db.pages;
+  st.facts.push(["SK", "2026-10-07", 60]);                                  // a retry
+  await show();
+  assert.equal(db.pages, pages, "a retry");
+  st.days.push({ day: "2026-10-09", country: "CZ", readings: 1 });          // every market on screen
+  st.facts.push(["CZ", "2026-10-09", 4000]);
+  st.cube.push(["CZ", "2026-10", 4000]);
+  await show();
+  assert.ok(db.pages > pages, "a CZ reading, all markets on screen");
+});
+
+test("the records' readings are those of their market and months, as the facts hold them", () => {
+  const days = readingDaysByCountry([{ day: "2026-09-04", country: "SK", readings: 1 }, { day: "2026-10-02", country: "SK", readings: 1 },
+    { day: "2026-10-05", country: "SK", readings: 2 }, { day: "2026-10-02", country: "CZ", readings: 1 }]);
+  const sp = holdingSpecs(days);
+  const holding = (facts) => archiveHolding(sp.from, [], facts.map(([c, d]) => ({ d: [c, d], m: { n: 100 } })), days);
+  const all = holding([["SK", "2026-10-02"], ["SK", "2026-10-05"], ["CZ", "2026-10-02"]]);
+  const sig = (h, scope) => recordReadingsSignature(days, h, scope);
+  assert.equal(sig(all, { country: "SK", months: ["2026-10"] }), "SK:2026-10-02=1;2026-10-05=2");
+  assert.equal(sig(all, { country: "SK", dates: ["2026-09-04"] }), "SK:2026-09-04=1", "a day: its whole month");
+  assert.equal(sig(all, {}), "CZ:2026-10-02=1,SK:2026-09-04=1;2026-10-02=1;2026-10-05=2");
+  assert.equal(sig(holding([["SK", "2026-10-02"], ["CZ", "2026-10-02"]]), { country: "SK", months: ["2026-10"] }), "SK:2026-10-02=1",
+    "a day the facts do not hold");
+  assert.equal(sig(holding([["SK", "2026-10-02"], ["SK", "2026-10-05"], ["SK", "2026-10-07"], ["CZ", "2026-10-02"]]), { country: "SK", months: ["2026-10"] }),
+    sig(all, { country: "SK", months: ["2026-10"] }), "a retry");
+  assert.equal(recordReadingsSignature(null, null, {}), "");
+});
+
+test("the Pivot hands the records its readings and a fresh read; the hook only when enabled", () => {
   const PIVOT = readFileSync(new URL("../pages/PivotV2.jsx", import.meta.url), "utf8");
-  assert.match(PIVOT, /\(\{ days: readingDays, holding: holdingNow, version: readingsRecordsVersion, refresh: refreshReadings \}\)/);
-  assert.match(SRC, /recordsVersion: entry\?\.recordsVersion \?\? "", refresh: enabled \? refresh : null,/);
-  assert.match(SRC, /recordsVersion: `\$\{daysSig\}\/\$\{holdingFactsSignature\(holding\)\}`/);
+  assert.match(PIVOT, /\(\{ days: readingDays, holding: holdingNow, refresh: refreshReadings \}\)/);
+  assert.match(SRC, /\brefresh: enabled \? refresh : null,/);
+  const hook = SRC.slice(SRC.indexOf("export function useFlatsArchive("), SRC.indexOf("export function useFlatsArchive(") + 9000);
+  assert.match(hook, /\$\{enabled \? "1" : "0"\}::\$\{readingsKey\}`/);
 });

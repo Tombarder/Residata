@@ -2,7 +2,8 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { supabaseData, supabasePublic, isSupabaseReady } from "./supabase";
 import { useAuth } from "./useAuth";
 import { useCountry, isAllCountries } from "./useCountry";
-import { readingDaysByCountry, readingsSignature, holdingSpecs, archiveHolding, holdingSignature, holdingLags, holdingFactsSignature } from "./archiveReadings";
+import { readingDaysByCountry, readingsSignature, holdingSpecs, archiveHolding, holdingSignature, holdingLags,
+  recordReadingsSignature } from "./archiveReadings";
 
 /**
  * sbRead — the single settle-guarantee wrapper every RLS-gated read goes through.
@@ -1305,25 +1306,29 @@ let _archiveCacheStamp = null;
  *  readings in force when it asks (days and holding). They are handed back with the
  *  records they were asked with (and cached with them), so a reading that lands later
  *  does not divide records loaded before it: October loaded with one reading, then the
- *  5th approved, read 7 500 as 3 750 for the rest of the session. Its `version` is part
- *  of the records' identity, so a new or withdrawn reading asks for them again (the old
- *  ones stay, with their own readings, until the new land), and its `refresh` is awaited
- *  before they are read, so the readings they are kept with are no older than they are:
- *  kept readings 10 minutes old missed the reading the records held, and October read
- *  15 000 for 7 500. */
+ *  5th approved, read 7 500 as 3 750 for the rest of the session. What of them divides
+ *  THESE records (recordReadingsSignature: their market and months) is part of the
+ *  records' identity, so a new or withdrawn reading there asks for them again (the old
+ *  ones stay, with their own readings, until the new land) and one elsewhere does not;
+ *  and its `refresh` is awaited around the read, so the readings they are kept with are
+ *  no older than they are: kept readings 10 minutes old missed the reading the records
+ *  held, and October read 15 000 for 7 500. */
 export function useFlatsArchive(months, dates, enabled = true, stamp = null) {
   const { loading: authLoading, user, profile } = useAuth();
   const { country } = useCountry();
   const datesArr = Array.isArray(dates) && dates.length ? dates.slice().sort() : null;
   const monthsKey = Array.isArray(months) ? months.slice().sort().join(",") : "all";
   const datesKey = datesArr ? datesArr.join(",") : "all";
+  const readingsOf = (r) => (r ? recordReadingsSignature(r.days, r.holding,
+    { country: isAllCountries(country) ? null : country, months, dates: datesArr }) : "");
+  const readingsKey = readingsOf(stamp);
   // country is part of the identity signature so switching country refetches
   // instead of serving a stale other-country cache. flats_archive carries a
   // `country` column ('SK'/'CZ'); without this filter SK paid users saw SK+CZ
   // rows mixed in the Pivot.
   const identityKey = (user
     ? `${user.id}::${profile?.tier || ""}::${profile?.chosen_project_id || ""}`
-    : "anon") + `::${monthsKey}::${datesKey}::${country}::${enabled ? "1" : "0"}::${stamp?.version || ""}`;
+    : "anon") + `::${monthsKey}::${datesKey}::${country}::${enabled ? "1" : "0"}::${readingsKey}`;
   const [flats, setFlats] = useState(_archiveCacheKey === identityKey ? (_archiveCache || []) : []);
   const [flatsStamp, setFlatsStamp] = useState(_archiveCacheKey === identityKey ? _archiveCacheStamp : null);
   const [loading, setLoading] = useState(_archiveCacheKey !== identityKey);
@@ -1357,17 +1362,18 @@ export function useFlatsArchive(months, dates, enabled = true, stamp = null) {
     setLoading(true);
     setProgress(0);
     setError(null); setTruncated(false); setTooLarge(null);
-    // Whether the readings, read now, are no longer those this request is kept with (or
-    // this request was dropped meanwhile). A read that fails leaves them as they were.
+    // Whether the readings, read now, no longer divide these records as those they are
+    // kept with do (or this request was dropped meanwhile). A read that fails leaves them
+    // as they were.
     const readingsMoved = async () => {
       if (!stamp?.refresh) return cancelled;
       let now = null;
       try { now = await stamp.refresh(); } catch { /* the readings' own state says so */ }
-      return cancelled || (!!now && (now.recordsVersion ?? "") !== (stamp.version || ""));
+      return cancelled || (!!now && readingsOf(now) !== readingsKey);
     };
     (async () => {
       // The readings first, fresh: if they moved on, the caller asks again under the new
-      // version and this request is dropped (see `stamp`).
+      // ones and this request is dropped (see `stamp`).
       if (await readingsMoved()) return;
       const all = [];
       let hadError = false;
@@ -1786,9 +1792,6 @@ function _loadArchiveReadings(key, force = false) {
     entry = {
       ...entry, holding, holdingSig, holdingKnown: true, holdingFailed: failed, failures,
       lagging, ...lag, cubeGen, version: `${daysSig}/${cubeGen}`, at: now, ...prev,
-      // what the archive's records (the facts) are asked with: a new or withdrawn reading,
-      // or the facts catching up with one, is a new question for them
-      recordsVersion: `${daysSig}/${holdingFactsSignature(holding)}`,
     };
     _archiveReadingsCache.set(key, entry);
     _publishReadings(key);
@@ -1853,8 +1856,8 @@ export function useArchiveReadingDays({ enabled = false } = {}) {
       clearInterval(timer);
     };
   }, [enabled, key, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Read the readings again now, whatever their age — before the archive's records are
-  // asked, so the readings they are kept with are no older than they are.
+  // Read the readings again now, whatever their age — around a read of the archive's
+  // records, so the readings they are kept with are no older than they are.
   const refresh = useCallback(() => _loadArchiveReadings(key, true), [key]);
   const entry = enabled ? rendered : null;
   const days = entry ? entry.days : null;
@@ -1862,7 +1865,7 @@ export function useArchiveReadingDays({ enabled = false } = {}) {
   return {
     days, holding: entry ? entry.holding : null, holdingKnown: !!entry?.holdingKnown,
     version: entry ? entry.version : "", prevVersion: entry?.prevVersion ?? null, prevHolding: entry?.prevHolding ?? null,
-    recordsVersion: entry?.recordsVersion ?? "", refresh: enabled ? refresh : null,
+    refresh: enabled ? refresh : null,
     loading: !!enabled && !days && !error, error,
   };
 }

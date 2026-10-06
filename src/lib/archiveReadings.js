@@ -432,6 +432,32 @@ export function holdingFactsSignature(holding) {
   return [...holding.facts].sort().map(([c, s]) => `${c}:${[...s].sort().join(";")}`).join(",");
 }
 
+/** What divides the archive's records of one request, as a fingerprint: each market's
+ *  full readings as the facts hold them (heldReadingDays, not via the cube) in the months
+ *  the request covers. `country` is its market (null: every market); `months` the
+ *  snapshot months it asks and `dates` the days (null: all) — by whole months, a month's
+ *  records being divided by the readings of its days, which the Datum filter may take
+ *  beyond the days fetched. A reading of another market or month, a not-due morning's
+ *  retry (no full reading) and the cube leave it as it is. */
+export function recordReadingsSignature(days, holding, { country = null, months = null, dates = null } = {}) {
+  if (!days) return "";
+  const held = heldReadingDays(days, holding, false);
+  const inMonths = Array.isArray(months) && months.length ? new Set(months.map((m) => String(m).slice(0, 7))) : null;
+  const ds = Array.isArray(dates) && dates.length ? dates.map((d) => String(d).slice(0, 10)).sort() : null;
+  const lo = ds ? ds[0].slice(0, 7) : null;
+  const hi = ds ? ds[ds.length - 1].slice(0, 7) : null;
+  const parts = [];
+  for (const c of Object.keys(held || {}).sort()) {
+    if (country && c !== country) continue;
+    const kept = [...held[c]].filter(([d]) => {
+      const mo = d.slice(0, 7);
+      return (!inMonths || inMonths.has(mo)) && (!lo || (mo >= lo && mo <= hi));
+    }).map(([d, n]) => `${d}=${n}`).sort();
+    if (kept.length) parts.push(`${c}:${kept.join(";")}`);
+  }
+  return parts.join(",");
+}
+
 /** Readings per market-month ({ 'SK|2026-10': 8 }) from readingDaysByCountry(). */
 export function monthReadings(days) {
   const out = {};
