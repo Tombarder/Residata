@@ -1,5 +1,7 @@
 import { useEffect, useState, useCallback, useRef, createContext, useContext } from "react";
-import { supabase, isSupabaseReady } from "./supabase";
+import { supabase, supabaseData, isSupabaseReady } from "./supabase";
+import { createAuthStateHandler } from "./authStateHandler";
+import { getSignedInUser } from "./authToken";
 import { installErrorReporting } from "./errorReport";
 
 // F-104: gate debug log behind import.meta.env.DEV so production builds
@@ -31,10 +33,15 @@ const AuthContext = createContext(null);
 // Permission/RLS errors (42xxx / PGRST301) are permanent → not retried. maybeSingle() returns
 // {data:null,error:null} for a genuinely-absent row, which the caller uses to detect a stale
 // session — so we only retry on an actual error, never on a clean "no row".
+//
+// Read through supabaseData (the lock-free token store), never the AUTH client:
+// a request on the auth client first awaits auth.getSession(), i.e. gotrue's lock,
+// and this read runs right after auth events (see authStateHandler.js for the
+// day that lock wedged the whole tab).
 async function fetchProfileWithRetry(userId, tries = 3) {
   let last = { data: null, error: null };
   for (let i = 0; i < tries; i++) {
-    last = await supabase.from("user_profiles").select("*").eq("id", userId).maybeSingle();
+    last = await supabaseData.from("user_profiles").select("*").eq("id", userId).maybeSingle();
     if (!last.error) return last;
     const code = String(last.error.code || "");
     if (code.startsWith("42") || code === "PGRST301") break; // permission/RLS — won't change
@@ -54,10 +61,16 @@ function useAuthInternal() {
   const profileRef = useRef(profile);
   useEffect(() => { profileRef.current = profile; }, [profile]);
 
+  // Several loads can overlap (an auth event, a tab focus, reloadProfile after a
+  // save). Only the LATEST may write the result, or a slow older read could put a
+  // stale tier back on screen after a newer one landed.
+  const loadSeq = useRef(0);
   const loadProfile = useCallback(async (userId) => {
     if (!userId) { setProfile(null); return; }
+    const seq = ++loadSeq.current;
     log("loadProfile start", userId);
     const { data, error } = await fetchProfileWithRetry(userId);
+    if (seq !== loadSeq.current) return;
     if (error) {
       log("loadProfile ERROR", error.message, error);
       setProfileError(error.message);
@@ -116,28 +129,13 @@ function useAuthInternal() {
         setLoading(false);
       }
 
-      // ⚠️ This callback must NEVER `await` a supabase.auth.* call: gotrue invokes
-      // it from INSIDE its own auth lock while emitting an event (e.g. SIGNED_OUT
-      // during signOut), so awaiting another auth op here would self-deadlock the
-      // lock until its 35s safety cap. loadProfile() only hits PostgREST (not the
-      // auth endpoint / lock), so it's safe. Defer any future auth work with
-      // setTimeout(fn, 0) to run it outside the lock.
-      const { data } = supabase.auth.onAuthStateChange(async (event, sess) => {
-        log("onAuthStateChange", event, sess?.user?.email || "null");
-        setUser(sess?.user || null);
-        if (sess?.user) {
-          // Fresh in-tab login (SIGNED_IN with no profile yet): raise `loading` so consumers
-          // show the auth spinner instead of briefly resolving the just-logged-in user to
-          // anon/free while the profile fetches — the sub-second "wrong tier flash". We do
-          // NOT raise it on TOKEN_REFRESHED / USER_UPDATED (they fire ~hourly and keep the
-          // existing profile → flashing a spinner there would be worse). finally guarantees
-          // loading can never get stuck on.
-          const freshLogin = event === "SIGNED_IN" && !profileRef.current;
-          if (freshLogin) setLoading(true);
-          try { await loadProfile(sess.user.id); }
-          finally { if (freshLogin) setLoading(false); }
-        } else { setProfile(null); setProfileError(null); }
-      });
+      // The callback runs INSIDE gotrue's auth lock and must return at once —
+      // anything async is deferred past the lock. See authStateHandler.js: awaiting
+      // the profile load here is what wedged every save on the site (2026-10-06).
+      const { data } = supabase.auth.onAuthStateChange(createAuthStateHandler({
+        setUser, setProfile, setProfileError, setLoading, loadProfile,
+        hasProfile: () => Boolean(profileRef.current),
+      }));
       unsub = () => data.subscription.unsubscribe();
     })();
     return () => { clearTimeout(loadingSafety); unsub(); };
@@ -146,9 +144,11 @@ function useAuthInternal() {
   // Reload profile keď user vráti do tab-u
   useEffect(() => {
     if (!isSupabaseReady()) return;
-    const onFocus = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) await loadProfile(session.user.id);
+    // Who is signed in comes from the lock-free token store, not getSession():
+    // a focus must never wait on gotrue's lock (authStateHandler.js).
+    const onFocus = () => {
+      const u = getSignedInUser();
+      if (u) loadProfile(u.id);
     };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);

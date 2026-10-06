@@ -3,6 +3,7 @@ import { useAuth } from "../lib/useAuth";
 import { getLiveT } from "../lib/liveLang";
 import { validateBusinessEmail, signupEmailAllowed } from "../lib/emailValidation";
 import { track } from "../lib/track";
+import { loginErrorMessage } from "../lib/loginErrors";
 import { useBreakpointDown, BP } from "../lib/breakpoints";
 import { useEscape } from "../lib/useDismiss";
 import { dangerInk, orangeInk } from "../lib/theme";
@@ -72,7 +73,7 @@ export default function LoginModal({ open, onClose, onSignedIn, lang = "en" }) {
     const { error } = await signIn(email);
     setBusy(false);
     if (error) {
-      setError(error.message || String(error));
+      setError(loginErrorMessage(error, lang));
       track("login_code_request_error", { message: String(error.message || error).slice(0, 200) });
     } else {
       setSent(true);
@@ -110,11 +111,18 @@ export default function LoginModal({ open, onClose, onSignedIn, lang = "en" }) {
     }
   };
 
+  // Says what the server said. It used to show "New code sent ✓" whatever
+  // happened — a refused request (rate limit) then looked like a lost e-mail.
   const resend = async () => {
     setVerifyError(null); setResent(false); setBusyResend(true);
     setCode("");
-    await signIn(email);
+    const { error } = await signIn(email);
     setBusyResend(false);
+    if (error) {
+      setVerifyError(loginErrorMessage(error, lang));
+      track("login_code_resend_error", { message: String(error.message || error).slice(0, 200) });
+      return;
+    }
     setResent(true);
   };
 

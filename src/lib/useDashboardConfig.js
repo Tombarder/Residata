@@ -20,7 +20,7 @@
  */
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useAuth } from "./useAuth";
-import { supabase, supabaseData } from "./supabase";
+import { supabaseData } from "./supabase";
 
 export const DASHBOARD_VERSION = 2;
 
@@ -172,7 +172,7 @@ export function useDashboardConfig() {
         setSaveState("saving");
         clearTimeout(saveTimer.current);
         saveTimer.current = setTimeout(async () => {
-          const { error } = await supabase.from("user_dashboards").upsert(
+          const { error } = await supabaseData.from("user_dashboards").upsert(
             { user_id: user.id, config: resolved, updated_at: new Date().toISOString() },
             { onConflict: "user_id" }
           );

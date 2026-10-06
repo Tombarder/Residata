@@ -27,7 +27,8 @@ import { useProjects } from "../lib/useData";
 import DashboardHome from "./DashboardHome";
 import { useCountry, isAllCountries } from "../lib/useCountry";
 import { localeTag, PUBLIC_LANGS } from "../lib/locale";
-import { supabase, supabaseData, SUPABASE_URL, SUPABASE_ANON_KEY } from "../lib/supabase";
+import { supabaseData, SUPABASE_URL, SUPABASE_ANON_KEY } from "../lib/supabase";
+import { getFreshAccessToken } from "../lib/sessionGuard";
 import { useActivateTrial } from "../lib/useActivateTrial";
 import { startCheckout, openBillingPortal } from "../lib/billing";
 import { pushRoute } from "../lib/routing";
@@ -1433,9 +1434,11 @@ function PlatformSettings({ lang }) {
   const deleteMyAccount = async () => {
     setDbusy(true); setDmsg(null);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) throw new Error(lang === "sk" ? "Relácia vypršala — obnov stránku a prihlás sa." : "Session expired — reload and sign in.");
+      // The lock-free token (sessionGuard), never getSession(): that waits on
+      // gotrue's lock, which is how a click becomes "nothing happened".
+      let token;
+      try { token = await getFreshAccessToken(); }
+      catch { throw new Error(lang === "sk" ? "Relácia vypršala — obnov stránku a prihlás sa." : "Session expired — reload and sign in."); }
       const res = await fetch("/api/admin/delete-user", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -1496,7 +1499,7 @@ function PlatformSettings({ lang }) {
     // bypassing the intake-clean discipline. cleanText strips HTML tag chars
     // + CSV-formula triggers, cleanUrl rejects non-http(s) schemes,
     // cleanPhone keeps only digit-shaped characters.
-    const { data, error } = await supabase.from("user_profiles").update({
+    const { data, error } = await supabaseData.from("user_profiles").update({
       full_name: cleanText(form.full_name, { max: 120 }) || null,
       company: cleanText(form.company, { max: 120 }) || null,
       position: cleanText(form.position, { max: 60 }) || null,

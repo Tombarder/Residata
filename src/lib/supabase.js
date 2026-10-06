@@ -2,13 +2,14 @@
  * Supabase clients.
  * Publishable key is safe in browser — RLS policies protect all gating.
  *
- * TWO clients by design:
+ * THREE clients by design (the third, supabaseData, is further down):
  *
- *   · `supabase`        — the AUTHED client. Persists + auto-refreshes the
- *     user's session (localStorage). Used for everything that depends on WHO
- *     the caller is: login/profile (useAuth) and the RLS-gated unit-level
- *     reads (flats_current / flats_archive / archive_months) where a paid user
- *     sees more rows than anon.
+ *   · `supabase`        — the AUTH client. Persists + auto-refreshes the
+ *     user's session (localStorage). Used ONLY for signing in and out
+ *     (useAuth). Every request on it first waits for gotrue's auth lock, so no
+ *     data request — read or write — may use it: since 2026-10-06 that is
+ *     enforced by lib/authClientBoundary.test.mjs (see lib/authStateHandler.js
+ *     for the day that lock froze every save on the site).
  *
  *   · `supabasePublic`  — the ANON client. NEVER attaches a user session
  *     (persistSession:false, no storage). Always queries as the anon role
@@ -70,7 +71,7 @@ export const supabase = url && key ? createClient(url, key, {
   },
   // Bound EVERY request on the auth client: /auth/v1/* at 8s (so a hung/slow token
   // refresh can never hold the auth lock indefinitely) AND all other traffic
-  // (loadProfile + privileged WRITES) at 35s (so a dead socket can't strand a save
+  // (anything else) at 35s (so a dead socket can't strand a request
   // or the admin panel forever either). Composed: the data-timeout wraps the
   // auth-timeout, so auth calls keep their tighter 8s bound while everything else
   // gets the 35s ceiling. The heavy paged reads no longer run on THIS client (they
@@ -101,14 +102,15 @@ if (supabase) initAuthTokenSync(supabase);
  *
  * IMPORTANT: never call `supabaseData.auth.*` — a client configured with
  * `accessToken` throws on any auth access. Session management stays entirely on
- * the `supabase` (auth) client, used only by useAuth / sessionGuard.
+ * the `supabase` (auth) client, used only by useAuth (sign-in / sign-out).
  *
- * It carries the user's bearer token, so it is also the right client for the
- * rare WRITE that has to be attributed to the signed-in user — today that is
- * lib/errorReport inserting into `client_errors`. (It said "read-only" here for
- * a while, which was true when it was written.) The auth client is still the
- * wrong choice for any data traffic: routing reads through it is what caused
- * the Loading-hang this client exists to cure.
+ * It carries the user's bearer token, so it is also THE client for every write
+ * made as the signed-in user — profile, settings, articles, dashboards, map
+ * areas, report subscriptions, the activity log, error reports. Until
+ * 2026-10-06 those writes stayed on the auth client, and a wedged auth lock
+ * turned every one of them into a click that silently did nothing (Boss's admin
+ * tier change was how it surfaced). The auth client is the wrong choice for any
+ * data traffic, read or write.
  *
  * A distinct storageKey keeps it fully isolated from both other clients.
  */

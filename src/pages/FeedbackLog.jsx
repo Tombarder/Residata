@@ -13,7 +13,7 @@
  *   admin_update_feedback(id,status,note)   reply via /api/feedback/reply
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { supabase } from "../lib/supabase";
+import { supabaseData } from "../lib/supabase";
 import Picker from "../components/Picker";
 
 import { accent as green, accentInk, orange as amber, blue, text as textLight, dim, border, bg, surfaceDark as bg2, mono , orangeInk as amberInk, infoInk} from "../lib/theme";
@@ -105,8 +105,8 @@ export default function FeedbackLog({ lang = "sk" }) {
       // sign every screenshot path so they render inline (no popups / window.open)
       const paths = [];
       (data?.messages || []).forEach((m) => { if (m.attachment_path) paths.push(m.attachment_path); if (m.auto_screenshot_path) paths.push(m.auto_screenshot_path); });
-      if (paths.length && supabase) {
-        const { data: signed } = await supabase.storage.from("feedback-attachments").createSignedUrls(paths, 3600);
+      if (paths.length && supabaseData) {
+        const { data: signed } = await supabaseData.storage.from("feedback-attachments").createSignedUrls(paths, 3600);
         const map = {}; (signed || []).forEach((s) => { if (s && s.signedUrl && s.path) map[s.path] = s.signedUrl; });
         setShotUrls(map);
       }

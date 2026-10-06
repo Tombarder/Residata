@@ -12,8 +12,9 @@ import { daysUntil } from "../lib/dates";
 import { fmtSelloutValue } from "../lib/absorption";
 import { useCurrency } from "../lib/useCurrency";
 import { useCountry } from "../lib/useCountry";
-import { supabase, supabaseData } from "../lib/supabase";
+import { supabaseData } from "../lib/supabase";
 import { getFreshAccessToken, authErrorMessage } from "../lib/sessionGuard";
+import { resolveAccess } from "../lib/access";
 import { getLiveT, ll } from "../lib/liveLang";
 import { goBack } from "../lib/routing";
 import { track } from "../lib/track";
@@ -2693,7 +2694,7 @@ function ChooseProjectGate({ projectId, projectName, profile, reloadProfile, set
 
     try {
       // Step 1: UPDATE chosen_project_id — source of truth is the DB row.
-      const { error: updErr } = await supabase.from("user_profiles")
+      const { error: updErr } = await supabaseData.from("user_profiles")
         .update({ chosen_project_id: projectId })
         .eq("id", profile.id);
       if (import.meta.env.DEV) console.log(`[ChooseProject] UPDATE returned after ${Math.round(performance.now() - t0)}ms`, { updErr });
@@ -3356,30 +3357,16 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
 
   const premiumSet = new Set(premiumDomains.map(d => d.domain.toLowerCase()));
 
+  // Tier change = an entitlement change, so it goes where every other one goes:
+  // /api/admin/set-subscription (server, service role, admin-checked, written to
+  // admin_audit_log). It used to be a PATCH from this page on the auth client —
+  // and on 2026-10-06 Boss picked "paid" for a new user and nothing happened at
+  // all: the auth client had wedged on a token refresh (lib/authStateHandler.js)
+  // and the PATCH never left the browser. subAction reports every outcome.
   const setTier = async (id, tier) => {
-    if (id === self?.id) {
-      alert(lang === "sk" ? "Nemôžeš meniť svoj vlastný tier odtiaľto." : "Can't change your own tier from here.");
-      return;
-    }
-    const patch = { tier };
-    if (tier !== "pending") patch.approved_at = new Date().toISOString();
-    // Refresh the session first so the update never goes out with a dead token
-    // (an expired admin session would otherwise hit "permission denied").
-    try { await getFreshAccessToken(); }
-    catch (e) { alert(authErrorMessage(e, lang)); return; }
-    // .select() so we KNOW the row actually changed. Without it a 0-row update
-    // (lost session / missing admin rights) returns no error, and we'd falsely
-    // show success that reverts on the next refresh ("I changed the tier and it
-    // didn't stick"). Confirm-after-write + a clear message instead.
-    const { data, error } = await supabase.from("user_profiles").update(patch).eq("id", id).select();
-    if (error) { alert(authErrorMessage(error, lang)); return; }
-    if (!data || data.length === 0) {
-      alert(lang === "sk"
-        ? "Zmena sa neuložila (0 riadkov) — pravdepodobne vypršala prihlasovacia relácia alebo chýbajú admin práva. Obnov stránku a skús znova."
-        : "Change didn't save (0 rows) — your session likely expired or admin rights are missing. Reload and try again.");
-      return;
-    }
-    setUsers(u => u.map(x => x.id === id ? { ...x, ...data[0] } : x));
+    const u = users.find(x => x.id === id);
+    if (!u || u.tier === tier) return;
+    await subAction(u, { tier });
   };
 
   // Grant or revoke a 7-day trial for a user. Routes through the
@@ -3627,7 +3614,7 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
       {tab === "domains" && (
         <PremiumDomainsPanel
           domains={premiumDomains}
-          reload={() => supabase.from("premium_domains").select("*").order("domain").then(({ data }) => setPremiumDomains(data || []))}
+          reload={() => supabaseData.from("premium_domains").select("*").order("domain").then(({ data }) => setPremiumDomains(data || []))}
         />
       )}
       {tab === "ai_chat" && <AiChatLogsPanel users={users} lang={lang} />}
@@ -4436,7 +4423,7 @@ function PremiumDomainsPanel({ domains, reload }) {
   const add = async () => {
     if (!newDomain.trim()) return;
     setBusy(true); setErr(null);
-    const { error } = await supabase.from("premium_domains").insert({
+    const { error } = await supabaseData.from("premium_domains").insert({
       domain: newDomain.trim().toLowerCase(),
       default_tier: newTier,
       note: newNote.trim() || null,
@@ -4448,7 +4435,7 @@ function PremiumDomainsPanel({ domains, reload }) {
 
   const remove = async (domain) => {
     if (!confirm(`Remove ${domain}?`)) return;
-    const { error } = await supabase.from("premium_domains").delete().eq("domain", domain);
+    const { error } = await supabaseData.from("premium_domains").delete().eq("domain", domain);
     if (error) alert(error.message); else reload();
   };
 
@@ -4546,7 +4533,7 @@ function UserTable({ users, setTier, deleteUser, trialAction, subAction, selfId,
                   <td style={{ ...td, color: dim }}>{u.full_name || "—"}</td>
                   <td style={{ ...td, color: dim }}>{u.company || "—"}</td>
                   <td style={{ ...td, color: dim, fontFamily: mono, fontSize: "0.75rem" }}>{u.position || "—"}</td>
-                  <td style={td}><TierBadge tier={u.tier} /></td>
+                  <td style={td}><TierBadge tier={u.tier} /><AccessNote u={u} lang={lang} /></td>
                   <td style={{ ...td, color: dim, fontFamily: mono, fontSize: "0.75rem" }}>{u.created_at?.slice(0, 10)}</td>
                   <td style={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>
                     <span
@@ -4694,6 +4681,30 @@ function SectionHeader({ children }) {
 
 function CountBadge({ n }) {
   return <span style={{ background: "#f5a623", color: "var(--bg)", fontSize: "0.7rem", padding: "1px 7px", borderRadius: 10, fontWeight: 700 }}>{n}</span>;
+}
+
+// What the user ACTUALLY gets, under their raw tier — the same rule the site
+// enforces (lib/access.js). Dates drive access, not the tier column, so the badge
+// alone can say "paid" for someone whose paid period ended or who is paused, and
+// "free" for someone with a paid window or a trial. Silent when the two agree and
+// there is no date worth knowing.
+function AccessNote({ u, lang }) {
+  const sk = lang === "sk";
+  const a = resolveAccess(u.tier || "anon", u);
+  const day = (ms) => new Date(ms).toLocaleDateString(localeTag(lang), { day: "numeric", month: "short", year: "numeric", timeZone: "Europe/Bratislava" });
+  let text = null, warn = false;
+  if (u.tier === "admin" || u.tier === "pending") text = null;
+  else if (a.paidPaused) { text = sk ? "pozastavené — bez platených dát" : "paused — no paid access"; warn = true; }
+  else if (a.paidWindowActive) text = sk ? `platené do ${day(a.paidUntil)}` : `paid until ${day(a.paidUntil)}`;
+  else if (a.trialActive) text = sk ? `trial do ${day(a.trialUntil)}` : `trial until ${day(a.trialUntil)}`;
+  else if (u.tier === "paid" && a.paidUntil) { text = sk ? `platené skončilo ${day(a.paidUntil)} — vidí ako free` : `paid ended ${day(a.paidUntil)} — sees free`; warn = true; }
+  else if (u.tier === "paid") text = sk ? "platené bez konca" : "paid, no end date";
+  if (!text) return null;
+  return (
+    <div style={{ fontSize: "0.68rem", marginTop: 4, color: warn ? orangeInk : dim, whiteSpace: "nowrap" }}>
+      {text}
+    </div>
+  );
 }
 
 function TierBadge({ tier }) {

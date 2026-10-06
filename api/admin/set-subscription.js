@@ -7,6 +7,11 @@
 //
 // Body: any subset of:
 //   { user_id:           string,           required
+//     tier:              'pending' | 'free' | 'paid' | 'admin'
+//                                          the admin panel's tier picker. Not your
+//                                          own (refused). Any tier but 'pending'
+//                                          also stamps approved_at, as the old
+//                                          client-side PATCH did.
 //     trial_until:       ISO string | null,
 //     trial_started_at:  ISO string | null,
 //     paid_until:        ISO string | null,
@@ -25,6 +30,8 @@ import { createClient } from "@supabase/supabase-js";
 import { isTrustedRequest as isTrustedOrigin } from "../_lib/origin.js";
 
 export const maxDuration = 10;
+
+const TIERS = ["pending", "free", "paid", "admin"];
 
 function isoOrNull(v) {
   if (v === null) return null;
@@ -66,6 +73,9 @@ export default async function handler(req, res) {
 
     const userId = String(body.user_id || "").trim();
     if (!userId) return res.status(400).json({ error: "user_id required" });
+    if ("tier" in body && userId === user.id) {
+      return res.status(400).json({ error: "you cannot change your own tier" });
+    }
 
     // Read current row so shortcut actions (extend / unpause) can
     // do their relative math without race. We ignore stale-read
@@ -78,6 +88,16 @@ export default async function handler(req, res) {
     if (!target) return res.status(404).json({ error: "target user not found" });
 
     const patch = {};
+
+    // Tier — the admin panel's picker. Since 2026-10-06 it comes here instead of
+    // a PATCH from the browser, so every tier change is server-checked and in the
+    // audit log like the rest of a user's entitlements (and a signed-in user can
+    // no longer write it at all: supabase_migration_2026_10_entitlements_are_ours).
+    if ("tier" in body) {
+      if (!TIERS.includes(body.tier)) return res.status(400).json({ error: "bad tier" });
+      patch.tier = body.tier;
+      if (body.tier !== "pending") patch.approved_at = new Date().toISOString();
+    }
 
     // Direct date / null setters
     for (const key of ["trial_until", "trial_started_at", "paid_until", "paid_started_at", "paid_pause_started"]) {
