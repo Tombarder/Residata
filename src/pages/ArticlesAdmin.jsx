@@ -1,10 +1,13 @@
 /**
- * /app/articles — manage the /analyzy analyses without a developer.
+ * /app/articles (admin → Analýzy) — manage the /analyzy analyses without a developer.
  *
  * WHAT IT DOES
- *   Lists every analysis including drafts, publishes and withdraws with one
- *   click, and opens one in an editor where every piece of text on the page can
- *   be changed in both languages and saved.
+ *   Lists every analysis including drafts — filtered (all / on the site / drafts)
+ *   and searchable — publishes, withdraws and deletes with one click, and opens
+ *   one in an editor where every piece of text can be changed in both languages,
+ *   any block (a paragraph, a heading, a chart, a table) added, moved or deleted,
+ *   and the result previewed exactly as the public page will draw it before it
+ *   is saved.
  *
  * WHY NO RICH-TEXT EDITOR
  *   The app has four runtime dependencies and the analyses have a deliberate
@@ -13,35 +16,31 @@
  *   to do it. Each block gets the input its type needs instead: a heading is one
  *   line, a paragraph is a textarea, a figure's image is fixed and only its
  *   caption is editable. Charts are generated files, not something to retype.
+ *   The preview is the public page's own component (insightsView ArticleView),
+ *   so what it shows cannot drift from what readers get.
  *
  * WHY NO API ROUTE
  *   The app is at exactly 12 of 12 Vercel Hobby functions. Writes go straight to
  *   PostgREST and RLS decides who may make them — see the migration.
  *
  * SAFETY
- *   Nothing saves until Save is pressed, the button only lights up when
- *   something actually changed, and leaving with unsaved edits asks first.
+ *   Nothing saves until Save (or ⌘S) is pressed, the button only lights up when
+ *   something actually changed, and leaving with unsaved edits asks first. Every
+ *   question is the platform's own dialog (components/Modal), never the browser's
+ *   alert/confirm/prompt — those block the tab and read like a message from
+ *   another site.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useArticles, useArticle, setArticlePublished, saveArticle, createArticle, deleteArticle } from "../lib/useArticles";
 import { filesNotLive } from "../lib/articleFiles";
 import { SITE_BASE } from "../lib/seo";
 import { openManualSteps } from "../lib/articleSeo";
+import { articleMatches, articleCounts, slugProblem, ARTICLE_FILTERS } from "../lib/articlesAdmin.js";
+import Modal from "../components/Modal";
 import ArticleSeoPanel from "./articleSeoPanel";
+import { ArticleView } from "./insightsView";
 
-/**
- * Edit history for the editor.
- *
- * Boss cleared the Slovak title while trying the editor and there was no way
- * back — the previous value only existed in the database, and only until Save.
- * This keeps the last HISTORY_LIMIT states in memory so ⌘Z walks backwards and
- * ⇧⌘Z forwards, the same as any editor.
- *
- * Deliberately in memory and not persisted: it covers the mistake it exists for
- * (a wrong keystroke in this sitting) without pretending to be version history,
- * which the database already provides through updated_at and a re-seed.
- */
 const HISTORY_LIMIT = 20;
 
 /** Block kinds an editor can add. `lead` is excluded: an article has one, first. */
@@ -111,74 +110,126 @@ const MONO = "ui-monospace, SFMono-Regular, Menlo, monospace";
 
 const LABEL = {
   sk: {
-    heading: "Analýzy", sub: "Správa článkov na /analyzy",
-    published: "Publikované", draft: "Koncept", edit: "Upraviť", back: "← Späť na zoznam",
+    heading: "Analýzy", sub: "Články na residata.eu/analyzy — publikovanie, úpravy, mazanie.",
+    published: "Na webe", draft: "Koncept", edit: "Upraviť", back: "← Späť na zoznam",
     manualSteps: "ručné kroky",
-    publish: "Publikovať", unpublish: "Stiahnuť", view: "Zobraziť na webe",
+    publish: "Publikovať", unpublish: "Stiahnuť z webu", view: "Zobraziť na webe",
     save: "Uložiť zmeny", saving: "Ukladám…", saved: "Uložené", noChanges: "Žiadne zmeny",
     title: "Titulok", perex: "Perex", method: "Metodika", blocks: "Obsah",
-    lead: "Úvodný odsek", h2: "Nadpis sekcie", p: "Odsek", figure: "Graf — popis",
-    table: "Tabuľka — popis", caption: "Popis pod grafom", empty: "Zatiaľ žiadne články.",
-    loading: "Načítavam…", unsaved: "Máte neuložené zmeny. Naozaj odísť?",
+    lead: "Úvodný odsek", h2: "Nadpis sekcie", p: "Odsek", figure: "Graf",
+    table: "Tabuľka", caption: "Popis pod grafom", empty: "Zatiaľ žiadne články.",
+    noMatch: "Žiadny článok nezodpovedá filtru.",
+    loading: "Načítavam…",
     lastEdit: "Naposledy upravené",
-    undo: "Späť", redo: "Dopredu", revert: "Zahodiť všetky zmeny",
+    undo: "Späť", redo: "Dopredu", revert: "Zahodiť zmeny",
     steps: "krokov v pamäti",
     emptyTitle: "Titulok nesmie byť prázdny — bez neho je článok na webe bez nadpisu.",
     emptyPerex: "Perex nesmie byť prázdny — zobrazuje sa v zozname a vo vyhľadávaní.",
     emptyDate: "Dátum musí byť vyplnený — určuje poradie článkov na webe.",
     liveNow: "Článok je na webe", draftNow: "Článok nie je na webe",
-    confirmUnpublish: "Stiahnuť článok z webu? Prestane byť verejne dostupný.",
     date: "Dátum článku", ogImage: "Zdieľaný obrázok (cesta k súboru)",
     alt: "Alternatívny text obrázka (pre čítačky a vyhľadávače)",
-    newArticle: "Nový článok", newSlug: "URL nového článku (napr. trh-novostavieb-2026-10)",
-    addBlock: "Pridať", up: "Hore", down: "Dole", removeBlock: "Zmazať blok",
-    confirmRemoveBlock: "Zmazať tento blok? Undo (⌘Z) ho vráti.",
+    newArticle: "Nový článok", newSlug: "Adresa článku", newSlugHint: "Malé písmená, čísla a pomlčky — napr. trh-novostavieb-2026-10. Adresu po vytvorení už nemeňte, odkazy na ňu by prestali fungovať.",
+    create: "Vytvoriť a otvoriť",
+    slugErr: {
+      empty: "Vyplňte adresu článku.",
+      format: "Adresa smie obsahovať len malé písmená bez diakritiky, číslice a pomlčky (nie na začiatku ani na konci).",
+      taken: "Článok s touto adresou už existuje.",
+    },
+    addBlock: "Pridať blok", up: "Posunúť hore", down: "Posunúť dole", removeBlock: "Zmazať blok",
     bAddP: "Odsek", bAddH2: "Nadpis", bAddFigure: "Graf", bAddTable: "Tabuľka", bAddBullets: "Odrážky",
     imgPath: "Cesta k obrázku (SK)", imgPathEn: "Cesta k obrázku (EN)",
     tableHead: "Hlavička (stĺpce oddelené |)", tableRows: "Riadky (bunky |, riadok na nový riadok)",
     deleteArticle: "Zmazať článok",
-    confirmDeleteArticle: "Nenávratne zmazať tento článok? Publikovaný článok najprv stiahnite.",
-    cannotDeletePublished: "Publikovaný článok sa nedá zmazať — najprv ho stiahnite z webu.",
     filesNotLive: "Článok sa zatiaľ nedá publikovať: tieto grafy alebo obrázok na zdieľanie ešte nie sú na webe. Najprv ich treba nahrať do repozitára a počkať na nasadenie:",
     loadFailed: "Články sa nepodarilo načítať.",
     conflict: "Článok medzitým zmenil niekto iný. Načítajte ho znova, inak prepíšete jeho zmeny.",
     reloadArticle: "Načítať znova",
     methodTooShort: "Metodika musí mať aspoň 40 znakov v oboch jazykoch.",
+    search: "Hľadať v názve, perexe alebo adrese…",
+    filters: { all: "Všetky", published: "Na webe", draft: "Koncepty" },
+    tabEdit: "Úpravy", tabPreview: "Náhľad",
+    previewNote: "Takto bude článok vyzerať na webe — vrátane neuložených zmien.",
+    cancel: "Zrušiť", close: "Zavrieť",
+    // dialogs
+    qUnpublishT: "Stiahnuť článok z webu?",
+    qUnpublishB: "Prestane byť verejne dostupný a zmizne zo zoznamu analýz aj z mapy stránky. Web sa obnoví do pár minút. Neskôr ho môžete znova publikovať.",
+    qDeleteT: "Natrvalo zmazať článok?",
+    qDeleteB: (title) => `„${title}" bude nenávratne zmazaný vrátane celého textu. Toto sa nedá vrátiť.`,
+    qDeleteLiveB: (title) => `„${title}" je teraz na webe. Najprv ho stiahneme z webu a potom nenávratne zmažeme vrátane celého textu. Toto sa nedá vrátiť.`,
+    qRemoveBlockT: "Zmazať tento blok?",
+    qRemoveBlockB: (what) => `${what} zmizne z článku. Kým neuložíte, vráti ho tlačidlo Späť (⌘Z).`,
+    qRevertT: "Zahodiť neuložené zmeny?",
+    qRevertB: "Článok sa vráti do poslednej uloženej verzie.",
+    qLeaveT: "Odísť bez uloženia?",
+    qLeaveB: "Máte neuložené zmeny. Ak odídete, stratia sa.",
+    leave: "Odísť bez uloženia",
+    // toasts
+    tPublished: "Publikované — na webe do pár minút.",
+    tWithdrawn: "Stiahnuté z webu — zmizne do pár minút.",
+    tDeleted: "Článok zmazaný.",
+    tSaved: "Uložené.",
+    tSavedLive: "Uložené — web sa obnoví do pár minút.",
   },
   en: {
-    heading: "Analyses", sub: "Manage the articles at /analyzy",
-    published: "Published", draft: "Draft", edit: "Edit", back: "← Back to list",
+    heading: "Analyses", sub: "The articles at residata.eu/analyzy — publish, edit, delete.",
+    published: "On the site", draft: "Draft", edit: "Edit", back: "← Back to list",
     manualSteps: "manual steps",
     publish: "Publish", unpublish: "Withdraw", view: "View on the site",
     save: "Save changes", saving: "Saving…", saved: "Saved", noChanges: "No changes",
     title: "Title", perex: "Standfirst", method: "Method note", blocks: "Body",
-    lead: "Opening paragraph", h2: "Section heading", p: "Paragraph", figure: "Chart — caption",
-    table: "Table — caption", caption: "Caption", empty: "No articles yet.",
-    loading: "Loading…", unsaved: "You have unsaved changes. Leave anyway?",
+    lead: "Opening paragraph", h2: "Section heading", p: "Paragraph", figure: "Chart",
+    table: "Table", caption: "Caption", empty: "No articles yet.",
+    noMatch: "No article matches the filter.",
+    loading: "Loading…",
     lastEdit: "Last edited",
-    undo: "Undo", redo: "Redo", revert: "Discard all changes",
+    undo: "Undo", redo: "Redo", revert: "Discard changes",
     steps: "steps remembered",
     emptyTitle: "The title cannot be empty — the article would have no headline.",
     emptyPerex: "The standfirst cannot be empty — it is shown in the list and in search results.",
     emptyDate: "The date is required — it orders the articles on the site.",
     liveNow: "Live on the site", draftNow: "Not on the site",
-    confirmUnpublish: "Withdraw from the site? It will stop being publicly available.",
     date: "Article date", ogImage: "Share image (file path)",
     alt: "Image alt text (for screen readers and search)",
-    newArticle: "New article", newSlug: "URL for the new article (e.g. trh-novostavieb-2026-10)",
-    addBlock: "Add", up: "Up", down: "Down", removeBlock: "Delete block",
-    confirmRemoveBlock: "Delete this block? Undo (⌘Z) brings it back.",
+    newArticle: "New article", newSlug: "Article address", newSlugHint: "Lower-case letters, digits and hyphens — e.g. trh-novostavieb-2026-10. Do not change it once created; links to it would break.",
+    create: "Create and open",
+    slugErr: {
+      empty: "Fill in the article address.",
+      format: "The address may hold only lower-case letters without accents, digits and hyphens (not first or last).",
+      taken: "An article with this address already exists.",
+    },
+    addBlock: "Add block", up: "Move up", down: "Move down", removeBlock: "Delete block",
     bAddP: "Paragraph", bAddH2: "Heading", bAddFigure: "Chart", bAddTable: "Table", bAddBullets: "Bullets",
     imgPath: "Image path (SK)", imgPathEn: "Image path (EN)",
     tableHead: "Header (columns separated by |)", tableRows: "Rows (cells by |, one row per line)",
     deleteArticle: "Delete article",
-    confirmDeleteArticle: "Permanently delete this article? Withdraw it from the site first.",
-    cannotDeletePublished: "A published article cannot be deleted — withdraw it from the site first.",
     filesNotLive: "This article cannot be published yet: these charts or the share image are not on the site. Commit them and wait for the deploy first:",
     loadFailed: "The articles could not be loaded.",
     conflict: "Someone else changed this article in the meantime. Reload it, or you will overwrite their changes.",
     reloadArticle: "Reload",
     methodTooShort: "The method note needs at least 40 characters in both languages.",
+    search: "Search title, standfirst or address…",
+    filters: { all: "All", published: "On the site", draft: "Drafts" },
+    tabEdit: "Edit", tabPreview: "Preview",
+    previewNote: "This is how the article will look on the site — unsaved changes included.",
+    cancel: "Cancel", close: "Close",
+    qUnpublishT: "Withdraw the article?",
+    qUnpublishB: "It stops being publicly available and leaves the analyses list and the sitemap. The site updates within minutes. You can publish it again later.",
+    qDeleteT: "Delete the article for good?",
+    qDeleteB: (title) => `"${title}" will be deleted permanently, all its text included. This cannot be undone.`,
+    qDeleteLiveB: (title) => `"${title}" is on the site now. It will be withdrawn first and then deleted permanently, all its text included. This cannot be undone.`,
+    qRemoveBlockT: "Delete this block?",
+    qRemoveBlockB: (what) => `${what} leaves the article. Until you save, Undo (⌘Z) brings it back.`,
+    qRevertT: "Discard unsaved changes?",
+    qRevertB: "The article goes back to its last saved version.",
+    qLeaveT: "Leave without saving?",
+    qLeaveB: "You have unsaved changes. They will be lost if you leave.",
+    leave: "Leave without saving",
+    tPublished: "Published — on the site within minutes.",
+    tWithdrawn: "Withdrawn — gone from the site within minutes.",
+    tDeleted: "Article deleted.",
+    tSaved: "Saved.",
+    tSavedLive: "Saved — the site updates within minutes.",
   },
 };
 
@@ -186,6 +237,13 @@ const box = {
   background: "var(--surface)", border: "1px solid var(--border-soft)",
   borderRadius: 10, padding: "1rem 1.1rem",
 };
+
+const fieldLabel = {
+  fontFamily: MONO, fontSize: "0.66rem", letterSpacing: "0.09em",
+  textTransform: "uppercase", color: "var(--text-dim)", marginBottom: "0.45rem",
+};
+
+const DANGER_BTN = { color: "var(--danger)", borderColor: "color-mix(in srgb, var(--danger) 55%, transparent)" };
 
 function Pill({ on, children }) {
   return (
@@ -210,11 +268,8 @@ function BiField({ label, value, onChange, rows = 3, mono = false }) {
   };
   return (
     <div style={{ marginBottom: "1.1rem" }}>
-      <div style={{
-        fontFamily: MONO, fontSize: "0.66rem", letterSpacing: "0.09em",
-        textTransform: "uppercase", color: "var(--text-dim)", marginBottom: "0.45rem",
-      }}>{label}</div>
-      <div style={{ display: "grid", gap: "0.55rem", gridTemplateColumns: "1fr 1fr" }}>
+      {label ? <div style={fieldLabel}>{label}</div> : null}
+      <div className="rd-form" style={{ gap: "0.55rem" }}>
         {["sk", "en"].map((lc) => (
           <div key={lc}>
             <div style={{ fontSize: "0.65rem", color: "var(--text-faint)", marginBottom: "0.25rem" }}>
@@ -232,124 +287,292 @@ function BiField({ label, value, onChange, rows = 3, mono = false }) {
   );
 }
 
+/* ───────────────────────────── dialogs ───────────────────────────── */
+
+/**
+ * The page's questions and notices: `confirm()` resolves true/false from the
+ * platform dialog, `notify()` shows a toast. Promise-shaped so a call site reads
+ * like the browser's confirm it replaced: `if (!(await confirm({...}))) return;`.
+ */
+function useDialogs(t) {
+  const [ask, setAsk] = useState(null);       // { title, body, okLabel, danger, resolve }
+  const [toast, setToast] = useState(null);   // { kind: 'ok'|'err'|'warn', text }
+  const timer = useRef(null);
+
+  const confirm = useCallback((opts) => new Promise((resolve) => setAsk({ ...opts, resolve })), []);
+  const notify = useCallback((kind, text) => {
+    clearTimeout(timer.current);
+    setToast({ kind, text });
+    if (kind === "ok") timer.current = setTimeout(() => setToast(null), 4500);
+  }, []);
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  const answer = (yes) => { ask?.resolve(yes); setAsk(null); };
+
+  const ui = (
+    <>
+      <Modal open={!!ask} onClose={() => answer(false)} title={ask?.title} width={480}
+        footer={(
+          <>
+            <button type="button" className="rd-btn" onClick={() => answer(false)} data-autofocus>{t.cancel}</button>
+            <button type="button" className={`rd-btn ${ask?.danger ? "rd-btn--warn" : "rd-btn--primary"}`}
+                    style={ask?.danger ? DANGER_BTN : undefined} onClick={() => answer(true)}>
+              {ask?.okLabel}
+            </button>
+          </>
+        )}>
+        <p style={{ margin: 0, color: "var(--text-2)", lineHeight: 1.6, fontSize: "0.86rem", whiteSpace: "pre-line" }}>
+          {ask?.body}
+        </p>
+      </Modal>
+      {toast && (
+        <div className={`rd-toast rd-alert ${toast.kind === "ok" ? "rd-alert--ok" : toast.kind === "warn" ? "rd-alert--warn" : "rd-alert--err"}`}
+             role={toast.kind === "ok" ? "status" : "alert"}>
+          <span style={{ whiteSpace: "pre-line" }}>{toast.text}</span>
+          <button type="button" className="rd-alert__x" onClick={() => setToast(null)} aria-label={t.close}>×</button>
+        </div>
+      )}
+    </>
+  );
+  return { confirm, notify, ui };
+}
+
+/** A new article starts from its address — the one thing that must not change later.
+ *  Mounted only while open, so every opening starts from a fresh form. */
+function NewArticleDialog({ t, taken, onClose, onCreate }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [slug, setSlug] = useState(`trh-novostavieb-${today.slice(0, 7)}`);
+  const [date, setDate] = useState(today);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  const code = slugProblem(slug, taken);
+  const problem = code ? t.slugErr[code] : null;
+  async function submit(e) {
+    e?.preventDefault();
+    if (problem) { setError(problem); return; }
+    setBusy(true); setError(null);
+    try { await onCreate({ slug: slug.trim(), date: date || today }); }
+    catch (err) { setError(err.message); setBusy(false); }
+  }
+
+  return (
+    <Modal open onClose={onClose} title={t.newArticle} width={520} dismissable={false}
+      footer={(
+        <>
+          <button type="button" className="rd-btn" onClick={onClose}>{t.cancel}</button>
+          <button type="submit" form="rd-new-article" className="rd-btn rd-btn--primary" disabled={busy || !!problem}>
+            {busy ? "…" : t.create}
+          </button>
+        </>
+      )}>
+      <form id="rd-new-article" className="rd-form" onSubmit={submit}>
+        <label className="rd-form__item rd-form__full">
+          <span className="rd-label">{t.newSlug}<span className="rd-form__req">*</span></span>
+          <input className="rd-field" value={slug} data-autofocus spellCheck={false}
+                 style={{ fontFamily: MONO }}
+                 onChange={(e) => setSlug(e.target.value.toLowerCase())} />
+          <span className="rd-form__hint">residata.eu/analyzy/{slug || "…"} — {t.newSlugHint}</span>
+        </label>
+        <label className="rd-form__item">
+          <span className="rd-label">{t.date}</span>
+          <input className="rd-field" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </label>
+        {(error || (slug && problem)) && (
+          <div className="rd-form__full rd-alert rd-alert--err" role="alert">{error || problem}</div>
+        )}
+      </form>
+    </Modal>
+  );
+}
+
 /* ────────────────────────────── the list ────────────────────────────── */
 
-function ArticleList({ lang, onEdit }) {
-  const t = LABEL[lang === "en" ? "en" : "sk"];
+function ArticleList({ t, dialogs, onEdit }) {
   const { articles, loading, error, reload } = useArticles({ admin: true });
   const [busy, setBusy] = useState(null);
   const [creating, setCreating] = useState(false);
+  const [filter, setFilter] = useState("all");
+  const [query, setQuery] = useState("");
+  const { confirm, notify } = dialogs;
+
+  const counts = useMemo(() => articleCounts(articles), [articles]);
+  const shown = useMemo(
+    () => articles.filter((a) => articleMatches(a, filter, query)),
+    [articles, filter, query],
+  );
 
   async function remove(a) {
-    if (a.published) { alert(t.cannotDeletePublished); return; }
-    if (!window.confirm(t.confirmDeleteArticle)) return;
+    const title = a.title?.sk || a.title?.en || a.slug;
+    const ok = await confirm({
+      title: t.qDeleteT, body: a.published ? t.qDeleteLiveB(title) : t.qDeleteB(title),
+      okLabel: t.deleteArticle, danger: true,
+    });
+    if (!ok) return;
     setBusy(a.id);
-    try { await deleteArticle(a.id); await reload(); }
-    catch (e) { alert(e.code === "PUBLISHED" ? t.cannotDeletePublished : e.message); }
+    try {
+      // The table refuses to delete a published row (deleteArticle → PUBLISHED),
+      // so an article on the site is withdrawn first — one decision, two writes.
+      if (a.published) await setArticlePublished(a.id, false);
+      await deleteArticle(a.id);
+      await reload();
+      notify("ok", t.tDeleted);
+    } catch (e) { notify("err", e.message); }
     finally { setBusy(null); }
   }
 
-  async function create() {
-    const slug = window.prompt(t.newSlug, `trh-novostavieb-${new Date().toISOString().slice(0, 7)}`);
-    if (!slug) return;
-    setCreating(true);
-    try {
-      const made = await createArticle({ slug: slug.trim(), date: new Date().toISOString().slice(0, 10) });
-      await reload();
-      onEdit(made);                       // straight into the editor, which is the point
-    } catch (e) { alert(e.message); }
-    finally { setCreating(false); }
-  }
-
   async function toggle(a) {
+    if (a.published && !(await confirm({ title: t.qUnpublishT, body: t.qUnpublishB, okLabel: t.unpublish }))) return;
     setBusy(a.id);
     try {
       // A chart is a file the deploy ships, not part of the row (board 693ea7):
       // publishing before it is on the site would put a broken image in the article.
       if (!a.published) {
         const missing = await filesNotLive(a);
-        if (missing.length) { alert(`${t.filesNotLive}\n\n${missing.map((m) => `${m.path} (${m.why})`).join("\n")}`); return; }
+        if (missing.length) {
+          notify("err", `${t.filesNotLive}\n${missing.map((m) => `${m.path} (${m.why})`).join("\n")}`);
+          return;
+        }
       }
-      await setArticlePublished(a.id, !a.published); await reload();
+      await setArticlePublished(a.id, !a.published);
+      await reload();
+      notify("ok", a.published ? t.tWithdrawn : t.tPublished);
     }
-    catch (e) { alert(e.message); }
+    catch (e) { notify("err", e.message); }
     finally { setBusy(null); }
+  }
+
+  async function create({ slug, date }) {
+    const made = await createArticle({ slug, date });
+    setCreating(false);
+    await reload();
+    onEdit(made);                       // straight into the editor, which is the point
   }
 
   if (loading) return <div style={{ color: "var(--text-dim)" }}>{t.loading}</div>;
   if (error) {
-    return (
-      <div style={{
-        padding: "0.8rem 1rem", borderRadius: 8, color: "#ffb3b3",
-        background: "rgba(255,107,107,0.10)", border: "1px solid rgba(255,107,107,0.35)",
-      }}>⚠ {t.loadFailed} <span style={{ opacity: 0.7 }}>({error})</span></div>
-    );
+    return <div className="rd-alert rd-alert--err" role="alert">⚠ {t.loadFailed} <span style={{ opacity: 0.7 }}>({error})</span></div>;
   }
 
   return (
-    <div style={{ display: "grid", gap: "0.7rem" }}>
-      <div style={{ marginBottom: "0.3rem" }}>
-        <button className="rd-btn rd-btn--sm rd-btn--primary" disabled={creating} onClick={create}>
-          {creating ? "…" : "+ " + t.newArticle}
+    <div>
+      <div style={{ display: "flex", gap: "0.8rem", alignItems: "flex-end", flexWrap: "wrap", marginBottom: "1rem" }}>
+        <div className="rd-tabs" role="tablist" style={{ flex: "1 1 320px" }}>
+          {ARTICLE_FILTERS.map((f) => (
+            <button key={f} type="button" role="tab" className="rd-tab" aria-selected={filter === f}
+                    onClick={() => setFilter(f)}>
+              {t.filters[f]}<span className="rd-tab__n">{counts[f]}</span>
+            </button>
+          ))}
+        </div>
+        <button className="rd-btn rd-btn--sm rd-btn--primary" onClick={() => setCreating(true)}>
+          + {t.newArticle}
         </button>
       </div>
-      {!articles.length && <div style={{ color: "var(--text-dim)" }}>{t.empty}</div>}
-      {articles.map((a) => (
-        <div key={a.id} style={{ ...box, display: "flex", gap: "1rem", alignItems: "flex-start" }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", marginBottom: "0.4rem" }}>
-              <Pill on={a.published}>{a.published ? t.published : t.draft}</Pill>
-              {/* The steps no system can take (lib/articleSeo MANUAL_STEPS) —
-                  counted here so an article is not left half-promoted. */}
-              {openManualSteps(a) > 0 && (
-                <span style={{
-                  fontSize: "0.66rem", padding: "0.12rem 0.45rem", borderRadius: 999,
-                  border: "1px solid color-mix(in srgb, var(--warning) 50%, transparent)", color: "var(--warning)",
-                }}>{openManualSteps(a)} {t.manualSteps}</span>
+
+      <input className="rd-field" type="search" value={query} placeholder={t.search}
+             aria-label={t.search} onChange={(e) => setQuery(e.target.value)}
+             style={{ width: "100%", marginBottom: "1rem" }} />
+
+      <div style={{ display: "grid", gap: "0.7rem" }}>
+        {!articles.length && <div style={{ color: "var(--text-dim)" }}>{t.empty}</div>}
+        {articles.length > 0 && !shown.length && <div style={{ color: "var(--text-dim)" }}>{t.noMatch}</div>}
+        {shown.map((a) => (
+          <div key={a.id} style={{ ...box, display: "flex", gap: "1rem", alignItems: "flex-start", flexWrap: "wrap" }}>
+            <div style={{ flex: "1 1 320px", minWidth: 0 }}>
+              <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", marginBottom: "0.4rem", flexWrap: "wrap" }}>
+                <Pill on={a.published}>{a.published ? t.published : t.draft}</Pill>
+                {/* The steps no system can take (lib/articleSeo MANUAL_STEPS) —
+                    counted here so an article is not left half-promoted. */}
+                {a.published && openManualSteps(a) > 0 && (
+                  <span style={{
+                    fontSize: "0.66rem", padding: "0.12rem 0.45rem", borderRadius: 999,
+                    border: "1px solid color-mix(in srgb, var(--warning) 50%, transparent)", color: "var(--warning)",
+                  }}>{openManualSteps(a)} {t.manualSteps}</span>
+                )}
+                <span style={{ fontFamily: MONO, fontSize: "0.7rem", color: "var(--text-faint)" }}>{a.date}</span>
+              </div>
+              <button type="button" onClick={() => onEdit(a.slug)} style={{
+                all: "unset", cursor: "pointer", display: "block",
+                fontWeight: 600, color: "var(--text)", marginBottom: "0.3rem",
+              }}>
+                {a.title?.sk || a.title?.en || a.slug}
+              </button>
+              <div style={{ fontSize: "0.8rem", color: "var(--text-dim)", lineHeight: 1.55 }}>
+                {(a.perex?.sk || a.perex?.en || "").slice(0, 180)}
+              </div>
+              <div style={{ fontFamily: MONO, fontSize: "0.66rem", color: "var(--text-faint)", marginTop: "0.5rem" }}>
+                /analyzy/{a.slug}
+                {a.updatedAt && ` · ${t.lastEdit} ${String(a.updatedAt).slice(0, 16).replace("T", " ")}`}
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", flexShrink: 0, minWidth: 150 }}>
+              <button className="rd-btn rd-btn--sm" onClick={() => onEdit(a.slug)}>{t.edit}</button>
+              <button className={"rd-btn rd-btn--sm" + (a.published ? "" : " rd-btn--primary")}
+                      disabled={busy === a.id} onClick={() => toggle(a)}>
+                {busy === a.id ? "…" : (a.published ? t.unpublish : t.publish)}
+              </button>
+              {a.published && (
+                <a className="rd-btn rd-btn--sm rd-btn--ghost" href={`${SITE_BASE}/analyzy/${a.slug}`}
+                   target="_blank" rel="noreferrer">{t.view} ↗</a>
               )}
-              <span style={{ fontFamily: MONO, fontSize: "0.7rem", color: "var(--text-faint)" }}>
-                {a.date}
-              </span>
-            </div>
-            <div style={{ fontWeight: 600, color: "var(--text)", marginBottom: "0.3rem" }}>
-              {a.title?.sk || a.title?.en || a.slug}
-            </div>
-            <div style={{ fontSize: "0.8rem", color: "var(--text-dim)", lineHeight: 1.55 }}>
-              {(a.perex?.sk || a.perex?.en || "").slice(0, 160)}
-            </div>
-            <div style={{ fontFamily: MONO, fontSize: "0.66rem", color: "var(--text-faint)", marginTop: "0.5rem" }}>
-              /analyzy/{a.slug}
-              {a.updatedAt && ` · ${t.lastEdit} ${String(a.updatedAt).slice(0, 16).replace("T", " ")}`}
-            </div>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", flexShrink: 0 }}>
-            <button className="rd-btn rd-btn--sm" onClick={() => onEdit(a.slug)}>{t.edit}</button>
-            <button className={"rd-btn rd-btn--sm" + (a.published ? "" : " rd-btn--primary")}
-                    disabled={busy === a.id} onClick={() => toggle(a)}>
-              {busy === a.id ? "…" : (a.published ? t.unpublish : t.publish)}
-            </button>
-            <a className="rd-btn rd-btn--sm rd-btn--ghost" href={`${SITE_BASE}/analyzy/${a.slug}`}
-               target="_blank" rel="noreferrer">{t.view}</a>
-            {!a.published && (
               <button className="rd-btn rd-btn--sm rd-btn--ghost" disabled={busy === a.id}
-                      onClick={() => remove(a)}>{t.deleteArticle}</button>
-            )}
+                      style={{ color: "var(--danger)" }} onClick={() => remove(a)}>{t.deleteArticle}</button>
+            </div>
           </div>
+        ))}
+      </div>
+
+      {creating && (
+        <NewArticleDialog t={t} taken={articles.map((a) => a.slug)}
+                          onClose={() => setCreating(false)} onCreate={create} />
+      )}
+    </div>
+  );
+}
+
+/* ───────────────────────────── the preview ───────────────────────────── */
+
+/**
+ * The draft drawn by the public page's own component, in the public page's own
+ * (dark) colours whatever theme the admin uses — `.rd-article-preview` in
+ * styles/ui.css pins the tokens and takes off the site's fixed-header padding.
+ * Unsaved edits included: that is what a preview is for.
+ */
+function ArticlePreview({ draft, published, t }) {
+  const [lang, setLang] = useState("sk");
+  const article = useMemo(
+    () => ({ ...draft, published, blocks: stripKeys(draft.blocks) }),
+    [draft, published],
+  );
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.8rem", marginBottom: "0.8rem", flexWrap: "wrap" }}>
+        <div className="rd-seg" role="group" aria-label="Language">
+          {["sk", "en"].map((lc) => (
+            <button key={lc} type="button" className="rd-seg__btn" aria-pressed={lang === lc}
+                    onClick={() => setLang(lc)}>{lc.toUpperCase()}</button>
+          ))}
         </div>
-      ))}
+        <span style={{ fontSize: "0.76rem", color: "var(--text-dim)" }}>{t.previewNote}</span>
+      </div>
+      <div className="rd-article-preview">
+        <ArticleView article={article} related={[]} navigate={() => {}} lang={lang} />
+      </div>
     </div>
   );
 }
 
 /* ───────────────────────────── the editor ───────────────────────────── */
 
-function ArticleEditor({ slug, lang, onBack, onChanged }) {
-  const t = LABEL[lang === "en" ? "en" : "sk"];
+function ArticleEditor({ slug, t, dialogs, onBack, onChanged }) {
   const { article, loading } = useArticle(slug, { admin: true });
+  const { confirm, notify } = dialogs;
   const [saved, setSaved] = useState(null);      // last state known to be in the DB
-  const [state, setState] = useState("idle");    // idle | saving | saved
+  const [state, setState] = useState("idle");    // idle | saving
   const [err, setErr] = useState(null);
   const [busyPub, setBusyPub] = useState(false);
+  const [view, setView] = useState("edit");      // edit | preview
   // `published` is a live fact about the row, not editable content, so it is NOT
   // in the history stack: undo after publishing would otherwise show KONCEPT
   // while the database said published.
@@ -401,17 +624,38 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
     return out;
   }, [draft, t]);
 
+  const save = useCallback(async () => {
+    if (!dirty || state === "saving") return;
+    if (problems.length) { setErr(problems[0]); return; }
+    setState("saving"); setErr(null); setConflict(false);
+    try {
+      const next = await saveArticle(
+        draft.id, { ...draft, blocks: stripKeys(draft.blocks) }, { expectUpdatedAt: version });
+      setSaved(JSON.parse(JSON.stringify(draft)));
+      setVersion(next);
+      onChanged?.();
+      notify("ok", published ? t.tSavedLive : t.tSaved);
+    } catch (e) {
+      if (e.code === "CONFLICT") { setConflict(true); setErr(t.conflict); }
+      else setErr(e.message);
+    } finally { setState("idle"); }
+  }, [dirty, state, problems, draft, version, onChanged, notify, published, t]);
+
   // ⌘Z / ⇧⌘Z anywhere in the editor, including inside a textarea — the browser's
-  // own undo only covers the focused field, not a block you deleted.
+  // own undo only covers the focused field, not a block you deleted. ⌘S saves.
+  // Not while a dialog is open: its keys are its own.
   useEffect(() => {
     const onKey = (e) => {
-      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "z") return;
+      if (!(e.metaKey || e.ctrlKey) || document.querySelector(".rd-modal")) return;
+      const k = e.key.toLowerCase();
+      if (k === "s") { e.preventDefault(); save(); return; }
+      if (k !== "z") return;
       e.preventDefault();
       if (e.shiftKey) hist.redo(); else hist.undo();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [hist]);
+  }, [hist, save]);
 
   // Losing an edit to a stray click is the one unrecoverable thing here.
   useEffect(() => {
@@ -421,8 +665,8 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
 
-  function leave() {
-    if (dirty && !window.confirm(t.unsaved)) return;
+  async function leave() {
+    if (dirty && !(await confirm({ title: t.qLeaveT, body: t.qLeaveB, okLabel: t.leave, danger: true }))) return;
     onBack();
   }
 
@@ -438,8 +682,9 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
     setDraft((d) => ({ ...d, blocks: [...d.blocks, ...withKeys([emptyBlock(type)])] }));
   }
 
-  function removeBlock(i) {
-    if (!window.confirm(t.confirmRemoveBlock)) return;
+  async function removeBlock(i) {
+    const what = blockLabel(draft.blocks[i]);
+    if (!(await confirm({ title: t.qRemoveBlockT, body: t.qRemoveBlockB(what), okLabel: t.removeBlock, danger: true }))) return;
     setDraft((d) => ({ ...d, blocks: d.blocks.filter((_, x) => x !== i) }));
   }
 
@@ -453,28 +698,15 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
     });
   }
 
-  async function save() {
-    if (problems.length) { setErr(problems[0]); return; }
-    setState("saving"); setErr(null); setConflict(false);
-    try {
-      const next = await saveArticle(
-        draft.id, { ...draft, blocks: stripKeys(draft.blocks) }, { expectUpdatedAt: version });
-      setSaved(JSON.parse(JSON.stringify(draft)));
-      setVersion(next);
-      setState("saved");
-      onChanged?.();
-      setTimeout(() => setState("idle"), 2200);
-    } catch (e) {
-      if (e.code === "CONFLICT") { setConflict(true); setErr(t.conflict); }
-      else setErr(e.message);
-      setState("idle");
-    }
+  async function revert() {
+    if (!(await confirm({ title: t.qRevertT, body: t.qRevertB, okLabel: t.revert, danger: true }))) return;
+    hist.reset(JSON.parse(JSON.stringify(saved)));
   }
 
   /** Publish / withdraw from inside the editor — not only from the list. */
   async function togglePublished() {
     const next = !published;
-    if (!next && !window.confirm(t.confirmUnpublish)) return;
+    if (!next && !(await confirm({ title: t.qUnpublishT, body: t.qUnpublishB, okLabel: t.unpublish }))) return;
     setBusyPub(true); setErr(null);
     try {
       // Same refusal as the list's button: the charts must already be on the site.
@@ -486,36 +718,57 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
       setPublished(next);
       if (stamp) setVersion(stamp);
       onChanged?.();
+      notify("ok", next ? t.tPublished : t.tWithdrawn);
     } catch (e) { setErr(e.message); }
     finally { setBusyPub(false); }
   }
 
-  if (loading || !draft) return <div style={{ color: "var(--text-dim)" }}>{t.loading}</div>;
+  async function removeArticle() {
+    const title = saved?.title?.sk || saved?.title?.en || draft.slug;
+    const ok = await confirm({
+      title: t.qDeleteT, body: published ? t.qDeleteLiveB(title) : t.qDeleteB(title),
+      okLabel: t.deleteArticle, danger: true,
+    });
+    if (!ok) return;
+    setBusyPub(true); setErr(null);
+    try {
+      if (published) await setArticlePublished(draft.id, false);
+      await deleteArticle(draft.id);
+      onChanged?.();
+      notify("ok", t.tDeleted);
+      onBack();
+    } catch (e) { setErr(e.message); setBusyPub(false); }
+  }
 
-  const blockLabel = (b) => ({ lead: t.lead, h2: t.h2, p: t.p, figure: t.figure, table: t.table, bullets: t.bAddBullets }[b.type] || b.type);
+  function blockLabel(b) {
+    return ({ lead: t.lead, h2: t.h2, p: t.p, figure: t.figure, table: t.table, bullets: t.bAddBullets }[b?.type] || b?.type);
+  }
+
+  if (loading || !draft) return <div style={{ color: "var(--text-dim)" }}>{t.loading}</div>;
 
   return (
     <div>
       <div style={{
         position: "sticky", top: 0, zIndex: 5, background: "var(--bg)",
-        paddingBottom: "0.8rem", marginBottom: "1.4rem",
+        paddingBottom: "0.8rem", marginBottom: "1.2rem",
         borderBottom: "1px solid var(--border-soft)",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap" }}>
           <button className="rd-btn rd-btn--sm rd-btn--ghost" onClick={leave}>{t.back}</button>
 
           {/* Publish state and its control together — the badge says what is true,
-              the button next to it is what changes it. Previously this lived only
-              on the list and was not findable from inside the editor. */}
+              the button next to it is what changes it. */}
           <Pill on={published}>{published ? t.published : t.draft}</Pill>
           <button className={"rd-btn rd-btn--sm" + (published ? "" : " rd-btn--primary")}
                   disabled={busyPub} onClick={togglePublished}>
             {busyPub ? "…" : (published ? t.unpublish : t.publish)}
           </button>
-          <a className="rd-btn rd-btn--sm rd-btn--ghost"
-             href={`${SITE_BASE}/analyzy/${draft.slug}`} target="_blank" rel="noreferrer">
-            {t.view}
-          </a>
+          {published && (
+            <a className="rd-btn rd-btn--sm rd-btn--ghost"
+               href={`${SITE_BASE}/analyzy/${draft.slug}`} target="_blank" rel="noreferrer">
+              {t.view} ↗
+            </a>
+          )}
 
           <span style={{ width: 1, height: 20, background: "var(--border-soft)", margin: "0 0.2rem" }} />
 
@@ -525,8 +778,7 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
                   disabled={!hist.canUndo} title="⌘Z">↶ {t.undo}</button>
           <button className="rd-btn rd-btn--sm rd-btn--ghost" onClick={hist.redo}
                   disabled={!hist.canRedo} title="⇧⌘Z">↷ {t.redo}</button>
-          <button className="rd-btn rd-btn--sm rd-btn--ghost" disabled={!dirty}
-                  onClick={() => { if (window.confirm(t.revert + "?")) hist.reset(JSON.parse(JSON.stringify(saved))); }}>
+          <button className="rd-btn rd-btn--sm rd-btn--ghost" disabled={!dirty} onClick={revert}>
             {t.revert}
           </button>
           <span style={{ fontFamily: MONO, fontSize: "0.62rem", color: "var(--text-faint)" }}>
@@ -534,15 +786,20 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
           </span>
 
           <div style={{ flex: 1 }} />
-          {state === "saved" && <span style={{ color: "var(--accent)", fontSize: "0.8rem" }}>✓ {t.saved}</span>}
-          <button className="rd-btn rd-btn--sm rd-btn--primary"
+          <button className="rd-btn rd-btn--sm rd-btn--primary" title="⌘S"
                   disabled={!dirty || state === "saving" || problems.length > 0}
                   onClick={save}>
             {state === "saving" ? t.saving : (dirty ? t.save : t.noChanges)}
           </button>
         </div>
 
-        <div style={{ display: "flex", gap: "0.7rem", alignItems: "center", marginTop: "0.5rem" }}>
+        <div style={{ display: "flex", gap: "0.7rem", alignItems: "center", marginTop: "0.6rem", flexWrap: "wrap" }}>
+          <div className="rd-tabs" role="tablist" style={{ borderBottom: "none" }}>
+            {[["edit", t.tabEdit], ["preview", t.tabPreview]].map(([k, label]) => (
+              <button key={k} type="button" role="tab" className="rd-tab" aria-selected={view === k}
+                      onClick={() => setView(k)}>{label}</button>
+            ))}
+          </div>
           <span style={{ fontFamily: MONO, fontSize: "0.68rem", color: "var(--text-faint)" }}>
             /analyzy/{draft.slug}
           </span>
@@ -555,19 +812,10 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
             cleared, saved, and the public page had no headline. Save stays off
             until it is filled. */}
         {problems.map((msg) => (
-          <div key={msg} style={{
-            marginTop: "0.6rem", padding: "0.5rem 0.7rem", borderRadius: 7,
-            background: "rgba(255,107,107,0.10)", border: "1px solid rgba(255,107,107,0.35)",
-            color: "#ffb3b3", fontSize: "0.78rem",
-          }}>⚠ {msg}</div>
+          <div key={msg} className="rd-alert rd-alert--err" role="alert" style={{ marginTop: "0.6rem" }}>⚠ {msg}</div>
         ))}
         {err && (
-          <div style={{
-            marginTop: "0.6rem", padding: "0.5rem 0.7rem", borderRadius: 7,
-            background: "rgba(255,107,107,0.10)", border: "1px solid rgba(255,107,107,0.35)",
-            color: "#ffb3b3", fontSize: "0.78rem",
-            display: "flex", gap: "0.7rem", alignItems: "center",
-          }}>
+          <div className="rd-alert rd-alert--err" role="alert" style={{ marginTop: "0.6rem", alignItems: "center" }}>
             <span style={{ flex: 1 }}>{err}</span>
             {conflict && (
               <button className="rd-btn rd-btn--sm" onClick={() => window.location.reload()}>
@@ -578,187 +826,192 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
         )}
       </div>
 
-      <div style={{ display: "grid", gap: "0.55rem", gridTemplateColumns: "200px 1fr", marginBottom: "1.1rem" }}>
-        <div>
-          <div style={{
-            fontFamily: MONO, fontSize: "0.66rem", letterSpacing: "0.09em",
-            textTransform: "uppercase", color: "var(--text-dim)", marginBottom: "0.45rem",
-          }}>{t.date}</div>
-          <input type="date" value={draft.date || ""}
-                 onChange={(e) => setDraft((d) => ({ ...d, date: e.target.value }))}
-                 style={{
-                   width: "100%", background: "var(--bg)", color: "var(--text)",
-                   border: "1px solid var(--border-soft)", borderRadius: 7,
-                   padding: "0.6rem 0.7rem", fontSize: "0.88rem", fontFamily: MONO,
-                 }} />
-        </div>
-        <div>
-          <div style={{
-            fontFamily: MONO, fontSize: "0.66rem", letterSpacing: "0.09em",
-            textTransform: "uppercase", color: "var(--text-dim)", marginBottom: "0.45rem",
-          }}>{t.ogImage}</div>
-          <input value={draft.ogImage || ""}
-                 onChange={(e) => setDraft((d) => ({ ...d, ogImage: e.target.value }))}
-                 placeholder="/analyzy/og-2026-09.png"
-                 style={{
-                   width: "100%", background: "var(--bg)", color: "var(--text)",
-                   border: "1px solid var(--border-soft)", borderRadius: 7,
-                   padding: "0.6rem 0.7rem", fontSize: "0.88rem", fontFamily: MONO,
-                 }} />
-        </div>
-      </div>
-
-      <BiField label={t.title} rows={2} value={draft.title}
-               onChange={(v) => setDraft((d) => ({ ...d, title: v }))} />
-      <BiField label={t.perex} rows={3} value={draft.perex}
-               onChange={(v) => setDraft((d) => ({ ...d, perex: v }))} />
-
-      <div style={{
-        fontFamily: MONO, fontSize: "0.66rem", letterSpacing: "0.09em",
-        textTransform: "uppercase", color: "var(--text-dim)",
-        margin: "2rem 0 0.8rem", paddingTop: "1rem", borderTop: "1px solid var(--border-soft)",
-      }}>{t.blocks}</div>
-
-      {draft.blocks.map((b, i) => (
-        <div key={b._k || i} style={{ ...box, marginBottom: "0.9rem" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.6rem" }}>
-            <div style={{
-              fontFamily: MONO, fontSize: "0.62rem", letterSpacing: "0.09em",
-              textTransform: "uppercase", color: "var(--text-faint)", flex: 1,
-            }}>
-              {i + 1}. {blockLabel(b)}
+      {view === "preview" ? <ArticlePreview draft={draft} published={published} t={t} /> : (
+        <>
+          <div className="rd-form" style={{ gap: "0.55rem", marginBottom: "1.1rem" }}>
+            <div>
+              <div style={fieldLabel}>{t.date}</div>
+              <input type="date" value={draft.date || ""}
+                     onChange={(e) => setDraft((d) => ({ ...d, date: e.target.value }))}
+                     style={{
+                       width: "100%", background: "var(--bg)", color: "var(--text)",
+                       border: "1px solid var(--border-soft)", borderRadius: 7,
+                       padding: "0.6rem 0.7rem", fontSize: "0.88rem", fontFamily: MONO,
+                     }} />
             </div>
-            <button className="rd-btn rd-btn--sm rd-btn--ghost" title={t.up}
-                    disabled={i === 0} onClick={() => moveBlock(i, -1)}>↑</button>
-            <button className="rd-btn rd-btn--sm rd-btn--ghost" title={t.down}
-                    disabled={i === draft.blocks.length - 1} onClick={() => moveBlock(i, 1)}>↓</button>
-            <button className="rd-btn rd-btn--sm rd-btn--ghost" title={t.removeBlock}
-                    onClick={() => removeBlock(i)}>✕</button>
+            <div>
+              <div style={fieldLabel}>{t.ogImage}</div>
+              <input value={draft.ogImage || ""}
+                     onChange={(e) => setDraft((d) => ({ ...d, ogImage: e.target.value }))}
+                     placeholder="/analyzy/og-2026-09.png"
+                     style={{
+                       width: "100%", background: "var(--bg)", color: "var(--text)",
+                       border: "1px solid var(--border-soft)", borderRadius: 7,
+                       padding: "0.6rem 0.7rem", fontSize: "0.88rem", fontFamily: MONO,
+                     }} />
+            </div>
           </div>
 
-          {(b.type === "lead" || b.type === "p" || b.type === "h2") && (
-            <BiField label="" rows={b.type === "h2" ? 1 : 5} value={b.text}
-                     onChange={(v) => setBlock(i, { text: v })} />
-          )}
+          <BiField label={t.title} rows={2} value={draft.title}
+                   onChange={(v) => setDraft((d) => ({ ...d, title: v }))} />
+          <BiField label={t.perex} rows={3} value={draft.perex}
+                   onChange={(v) => setDraft((d) => ({ ...d, perex: v }))} />
 
-          {b.type === "bullets" && (
-            <>
-              {(b.items || []).map((it, k) => (
-                <BiField key={k} label={`• ${k + 1}`} rows={2} value={it}
-                         onChange={(v) => setBlock(i, {
-                           items: (b.items || []).map((x, y) => (y === k ? v : x)),
-                         })} />
-              ))}
-              <button className="rd-btn rd-btn--sm rd-btn--ghost"
-                      onClick={() => setBlock(i, { items: [...(b.items || []), { sk: "", en: "" }] })}>
-                + {t.addBlock}
-              </button>
-            </>
-          )}
+          <div style={{ ...fieldLabel, margin: "2rem 0 0.8rem", paddingTop: "1rem", borderTop: "1px solid var(--border-soft)" }}>
+            {t.blocks} · {draft.blocks.length}
+          </div>
 
-          {(b.type === "figure" || b.type === "table") && (
-            <>
-              {b.src ? (
-                <div style={{ marginBottom: "0.8rem" }}>
-                  <img src={b.src} alt="" style={{
-                    width: "100%", maxWidth: 420, borderRadius: 8, background: "#fff",
-                    display: "block", border: "1px solid var(--border-soft)",
-                  }} />
+          {draft.blocks.map((b, i) => (
+            <div key={b._k || i} style={{ ...box, marginBottom: "0.9rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.6rem" }}>
+                <div style={{
+                  fontFamily: MONO, fontSize: "0.62rem", letterSpacing: "0.09em",
+                  textTransform: "uppercase", color: "var(--text-faint)", flex: 1,
+                }}>
+                  {i + 1}. {blockLabel(b)}
                 </div>
-              ) : null}
-              {b.type === "figure" && (
-                <div style={{ display: "grid", gap: "0.55rem", gridTemplateColumns: "1fr 1fr", marginBottom: "1.1rem" }}>
-                  {[["src", t.imgPath], ["srcEn", t.imgPathEn]].map(([field, label]) => (
-                    <div key={field}>
-                      <div style={{ fontSize: "0.65rem", color: "var(--text-faint)", marginBottom: "0.25rem" }}>
-                        {label}
+                <button className="rd-btn rd-btn--sm rd-btn--ghost" title={t.up} aria-label={t.up}
+                        disabled={i === 0} onClick={() => moveBlock(i, -1)}>↑</button>
+                <button className="rd-btn rd-btn--sm rd-btn--ghost" title={t.down} aria-label={t.down}
+                        disabled={i === draft.blocks.length - 1} onClick={() => moveBlock(i, 1)}>↓</button>
+                <button className="rd-btn rd-btn--sm rd-btn--ghost" title={t.removeBlock}
+                        style={{ color: "var(--danger)" }} onClick={() => removeBlock(i)}>✕ {t.removeBlock}</button>
+              </div>
+
+              {(b.type === "lead" || b.type === "p" || b.type === "h2") && (
+                <BiField label="" rows={b.type === "h2" ? 1 : 5} value={b.text}
+                         onChange={(v) => setBlock(i, { text: v })} />
+              )}
+
+              {b.type === "bullets" && (
+                <>
+                  {(b.items || []).map((it, k) => (
+                    <div key={k} style={{ display: "flex", gap: "0.4rem", alignItems: "flex-start" }}>
+                      <div style={{ flex: 1 }}>
+                        <BiField label={`• ${k + 1}`} rows={2} value={it}
+                                 onChange={(v) => setBlock(i, {
+                                   items: (b.items || []).map((x, y) => (y === k ? v : x)),
+                                 })} />
                       </div>
-                      <input value={b[field] || ""} placeholder="/analyzy/…svg"
-                             onChange={(e) => setBlock(i, field === "src"
-                               // A new chart: what the generator recorded about the
-                               // OLD one (its phone drawing, its sizes) no longer
-                               // applies — keeping srcM would show phones a different chart.
-                               ? { src: e.target.value, srcM: undefined, w: undefined, h: undefined, wM: undefined, hM: undefined }
-                               : { [field]: e.target.value })}
-                             style={{
-                               width: "100%", background: "var(--bg)", color: "var(--text)",
-                               border: "1px solid var(--border-soft)", borderRadius: 7,
-                               padding: "0.55rem 0.7rem", fontSize: "0.82rem", fontFamily: MONO,
-                             }} />
+                      <button className="rd-btn rd-btn--sm rd-btn--ghost" title={t.removeBlock} aria-label={t.removeBlock}
+                              style={{ marginTop: "1.4rem" }}
+                              onClick={() => setBlock(i, { items: (b.items || []).filter((_, y) => y !== k) })}>✕</button>
                     </div>
                   ))}
-                </div>
-              )}
-              {b.type === "table" && (
-                <>
-                  {/* A table's contents had no editor at all, so "+ Tabuľka"
-                      could only ever produce an empty table. Pipes and newlines
-                      keep it typeable without a grid widget. */}
-                  <BiField label={t.tableHead} rows={1}
-                           value={{ sk: (b.head?.sk || []).join(" | "), en: (b.head?.en || []).join(" | ") }}
-                           onChange={(v) => setBlock(i, {
-                             head: { sk: splitCells(v.sk), en: splitCells(v.en) },
-                           })} />
-                  <div style={{ marginBottom: "1.1rem" }}>
-                    <div style={{
-                      fontFamily: MONO, fontSize: "0.66rem", letterSpacing: "0.09em",
-                      textTransform: "uppercase", color: "var(--text-dim)", marginBottom: "0.45rem",
-                    }}>{t.tableRows}</div>
-                    {/* A cell may be a {sk, en} pair — the decimal mark differs
-                        by language, so a generated table carries both. Render the
-                        Slovak side here; editing a generated table by hand would
-                        flatten it, which is why tables come from the generator. */}
-                    <textarea rows={5} value={(b.rows || []).map(
-                      (r) => r.map((c) => (c && typeof c === "object" ? (c.sk ?? "") : c)).join(" | ")
-                    ).join("\n")}
-                              onChange={(e) => setBlock(i, {
-                                rows: e.target.value.split("\n").filter((l) => l.trim()).map(splitCells),
-                              })}
-                              style={{
-                                width: "100%", background: "var(--bg)", color: "var(--text)",
-                                border: "1px solid var(--border-soft)", borderRadius: 7,
-                                padding: "0.6rem 0.7rem", fontSize: "0.85rem", fontFamily: MONO,
-                                lineHeight: 1.6, resize: "vertical",
-                              }} />
-                  </div>
+                  <button className="rd-btn rd-btn--sm rd-btn--ghost"
+                          onClick={() => setBlock(i, { items: [...(b.items || []), { sk: "", en: "" }] })}>
+                    + {t.bAddBullets}
+                  </button>
                 </>
               )}
-              <BiField label={t.caption} rows={2} value={b.caption}
-                       onChange={(v) => setBlock(i, { caption: v })} />
-              {b.type === "figure" && (
-                <BiField label={t.alt} rows={1} value={b.alt}
-                         onChange={(v) => setBlock(i, { alt: v })} />
+
+              {(b.type === "figure" || b.type === "table") && (
+                <>
+                  {b.src ? (
+                    <div style={{ marginBottom: "0.8rem" }}>
+                      <img src={b.src} alt="" style={{
+                        width: "100%", maxWidth: 420, borderRadius: 8, background: "#fff",
+                        display: "block", border: "1px solid var(--border-soft)",
+                      }} />
+                    </div>
+                  ) : null}
+                  {b.type === "figure" && (
+                    <div className="rd-form" style={{ gap: "0.55rem", marginBottom: "1.1rem" }}>
+                      {[["src", t.imgPath], ["srcEn", t.imgPathEn]].map(([field, label]) => (
+                        <div key={field}>
+                          <div style={{ fontSize: "0.65rem", color: "var(--text-faint)", marginBottom: "0.25rem" }}>
+                            {label}
+                          </div>
+                          <input value={b[field] || ""} placeholder="/analyzy/…svg"
+                                 onChange={(e) => setBlock(i, field === "src"
+                                   // A new chart: what the generator recorded about the
+                                   // OLD one (its phone drawing, its sizes) no longer
+                                   // applies — keeping srcM would show phones a different chart.
+                                   ? { src: e.target.value, srcM: undefined, w: undefined, h: undefined, wM: undefined, hM: undefined }
+                                   : { [field]: e.target.value })}
+                                 style={{
+                                   width: "100%", background: "var(--bg)", color: "var(--text)",
+                                   border: "1px solid var(--border-soft)", borderRadius: 7,
+                                   padding: "0.55rem 0.7rem", fontSize: "0.82rem", fontFamily: MONO,
+                                 }} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {b.type === "table" && (
+                    <>
+                      {/* A table's contents had no editor at all, so "+ Tabuľka"
+                          could only ever produce an empty table. Pipes and newlines
+                          keep it typeable without a grid widget. */}
+                      <BiField label={t.tableHead} rows={1}
+                               value={{ sk: (b.head?.sk || []).join(" | "), en: (b.head?.en || []).join(" | ") }}
+                               onChange={(v) => setBlock(i, {
+                                 head: { sk: splitCells(v.sk), en: splitCells(v.en) },
+                               })} />
+                      <div style={{ marginBottom: "1.1rem" }}>
+                        <div style={fieldLabel}>{t.tableRows}</div>
+                        {/* A cell may be a {sk, en} pair — the decimal mark differs
+                            by language, so a generated table carries both. Render the
+                            Slovak side here; editing a generated table by hand would
+                            flatten it, which is why tables come from the generator. */}
+                        <textarea rows={5} value={(b.rows || []).map(
+                          (r) => r.map((c) => (c && typeof c === "object" ? (c.sk ?? "") : c)).join(" | ")
+                        ).join("\n")}
+                                  onChange={(e) => setBlock(i, {
+                                    rows: e.target.value.split("\n").filter((l) => l.trim()).map(splitCells),
+                                  })}
+                                  style={{
+                                    width: "100%", background: "var(--bg)", color: "var(--text)",
+                                    border: "1px solid var(--border-soft)", borderRadius: 7,
+                                    padding: "0.6rem 0.7rem", fontSize: "0.85rem", fontFamily: MONO,
+                                    lineHeight: 1.6, resize: "vertical",
+                                  }} />
+                      </div>
+                    </>
+                  )}
+                  <BiField label={t.caption} rows={2} value={b.caption}
+                           onChange={(v) => setBlock(i, { caption: v })} />
+                  {b.type === "figure" && (
+                    <BiField label={t.alt} rows={1} value={b.alt}
+                             onChange={(v) => setBlock(i, { alt: v })} />
+                  )}
+                </>
               )}
-            </>
-          )}
-        </div>
-      ))}
+            </div>
+          ))}
 
-      <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", alignItems: "center", marginTop: "0.4rem" }}>
-        <span style={{ fontFamily: MONO, fontSize: "0.66rem", color: "var(--text-dim)" }}>
-          {t.addBlock}:
-        </span>
-        {ADDABLE.map((type) => (
-          <button key={type} className="rd-btn rd-btn--sm rd-btn--ghost" onClick={() => addBlock(type)}>
-            + {{ h2: t.bAddH2, p: t.bAddP, figure: t.bAddFigure, table: t.bAddTable, bullets: t.bAddBullets }[type]}
-          </button>
-        ))}
-      </div>
+          <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", alignItems: "center", marginTop: "0.4rem" }}>
+            <span style={{ fontFamily: MONO, fontSize: "0.66rem", color: "var(--text-dim)" }}>
+              {t.addBlock}:
+            </span>
+            {ADDABLE.map((type) => (
+              <button key={type} className="rd-btn rd-btn--sm rd-btn--ghost" onClick={() => addBlock(type)}>
+                + {{ h2: t.bAddH2, p: t.bAddP, figure: t.bAddFigure, table: t.bAddTable, bullets: t.bAddBullets }[type]}
+              </button>
+            ))}
+          </div>
 
-      <div style={{ marginTop: "2rem", paddingTop: "1rem", borderTop: "1px solid var(--border-soft)" }}>
-        <BiField label={t.method} rows={6} value={draft.method}
-                 onChange={(v) => setDraft((d) => ({ ...d, method: v }))} />
-      </div>
+          <div style={{ marginTop: "2rem", paddingTop: "1rem", borderTop: "1px solid var(--border-soft)" }}>
+            <BiField label={t.method} rows={6} value={draft.method}
+                     onChange={(v) => setDraft((d) => ({ ...d, method: v }))} />
+          </div>
 
-      {/* What Google and LinkedIn will show, whether the live page has caught
-          up with the last save, and the steps that stay manual. */}
-      <ArticleSeoPanel
-        draft={{ ...draft, promoChecklist: checklist }}
-        published={published}
-        updatedAt={version}
-        onSeoTitle={(v) => setDraft((d) => ({ ...d, seoTitle: v }))}
-        onChecklist={setChecklist}
-      />
+          {/* What Google and LinkedIn will show, whether the live page has caught
+              up with the last save, and the steps that stay manual. */}
+          <ArticleSeoPanel
+            draft={{ ...draft, promoChecklist: checklist }}
+            published={published}
+            updatedAt={version}
+            onSeoTitle={(v) => setDraft((d) => ({ ...d, seoTitle: v }))}
+            onChecklist={setChecklist}
+          />
+
+          <div style={{ marginTop: "2.4rem", paddingTop: "1rem", borderTop: "1px solid var(--border-soft)" }}>
+            <button className="rd-btn rd-btn--sm rd-btn--warn" style={DANGER_BTN} disabled={busyPub}
+                    onClick={removeArticle}>{t.deleteArticle}</button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -768,9 +1021,10 @@ function ArticleEditor({ slug, lang, onBack, onChanged }) {
 export default function ArticlesAdmin({ lang = "sk" }) {
   const t = LABEL[lang === "en" ? "en" : "sk"];
   const [editing, setEditing] = useState(null);
-  // Bumped whenever the editor publishes or saves, so returning to the list
-  // shows the change rather than a cached row.
+  // Bumped whenever the editor publishes, saves or deletes, so returning to the
+  // list shows the change rather than a cached row.
   const [rev, setRev] = useState(0);
+  const dialogs = useDialogs(t);
 
   return (
     <div style={{ padding: "1.5rem 1.75rem 4rem", maxWidth: 1000 }}>
@@ -781,12 +1035,14 @@ export default function ArticlesAdmin({ lang = "sk" }) {
       <h1 style={{ fontSize: "1.4rem", fontWeight: 700, margin: "0 0 0.3rem", color: "var(--text)" }}>
         {t.heading}
       </h1>
-      <p style={{ color: "var(--text-dim)", fontSize: "0.86rem", margin: "0 0 1.8rem" }}>{t.sub}</p>
+      <p style={{ color: "var(--text-dim)", fontSize: "0.86rem", margin: "0 0 1.6rem" }}>{t.sub}</p>
 
       {editing
-        ? <ArticleEditor slug={editing} lang={lang} onBack={() => setEditing(null)}
+        ? <ArticleEditor slug={editing} t={t} dialogs={dialogs} onBack={() => setEditing(null)}
                          onChanged={() => setRev((r) => r + 1)} />
-        : <ArticleList key={rev} lang={lang} onEdit={setEditing} />}
+        : <ArticleList key={rev} t={t} dialogs={dialogs} onEdit={setEditing} />}
+
+      {dialogs.ui}
     </div>
   );
 }

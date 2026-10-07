@@ -131,6 +131,10 @@ async function main() {
     const feedLink = `<link rel="alternate" type="application/rss+xml" title="Residata — Analýzy" href="${HOME}/analyzy/feed.xml" />`;
 
     const articles = orderArticles(rows.map(toArticle));
+    // Nothing published = no section (lib/analysesSection): no index page and no
+    // feed, so /analyzy is not a page of the site at all.
+    const { sectionIsLive } = await load("/src/lib/analysesSection.js");
+    const sectionLive = sectionIsLive(articles.length);
     const written = [];
 
     // ── every published article ──────────────────────────────────────────
@@ -172,7 +176,7 @@ async function main() {
     }
 
     // ── the index ─────────────────────────────────────────────────────────
-    {
+    if (sectionLive) {
       const meta = seoMetaFor("Insights", SECTION_LANG, { siteBase: HOME, price: build.monthly_price, anchor: build.anchor_price, snapshot: build });
       const markup = renderToStaticMarkup(framed(createElement(IndexView, { articles, lang: SECTION_LANG, navigate: () => {} })));
       const url = meta.url;
@@ -274,6 +278,7 @@ async function main() {
     if (!written.includes(SK_PATHS.Home)) writeHead(SK_PATHS.Home, "Home", "sk");
 
     // ── the feed ──────────────────────────────────────────────────────────
+    if (sectionLive) {
     const feedItems = articles.slice()
       .sort((x, y) => String(y.date).localeCompare(String(x.date)) || seriesRank(x.slug) - seriesRank(y.slug))
       .map((x) => ({ title: headline(x), url: canonicalUrl(x, HOME), date: x.date, description: perex(x) }));
@@ -284,13 +289,15 @@ async function main() {
       lang: seoLang(articles[0] || { title: { sk: "x" } }),
       buildDate: new Date().toISOString(),
     }));
+    }
 
     // Articles, the index, every public route, and every route's Slovak twin
     // (routing.SK_PATHS — each written once, the Slovak homepage included).
-    const expected = articles.length + 1 + HEAD_ONLY_PATHS.length + Object.keys(SK_PATHS).length;
+    const expected = articles.length + (sectionLive ? 1 : 0) + HEAD_ONLY_PATHS.length + Object.keys(SK_PATHS).length;
     if (written.length !== expected) die(`wrote ${written.length} pages, expected ${expected}`);
-    console.log(`[prerender] ${articles.length} articles, the index, ${HEAD_ONLY_PATHS.length} routes `
-      + `(+${Object.keys(SK_PATHS).length} Slovak) and the feed — `
+    console.log(`[prerender] ${articles.length} articles, ${sectionLive ? "the index" : "no index (nothing published)"}, `
+      + `${HEAD_ONLY_PATHS.length} routes (+${Object.keys(SK_PATHS).length} Slovak)`
+      + `${sectionLive ? " and the feed" : ", no feed"} — `
       + `${warnings.length} warning(s)`);
   } finally {
     await vite.close();

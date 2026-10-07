@@ -43,6 +43,7 @@ import { PUBLIC_LANGS } from '../src/lib/locale.js';
 import { SK_PATHS, pathToPage } from '../src/lib/routing.js';
 import { FALLBACK_MONTHLY_CENTS, FALLBACK_MONTHLY_DISPLAY, FALLBACK_ANCHOR_DISPLAY } from '../src/lib/pricingDefaults.js';
 import { everyPhrase } from '../src/lib/refreshCadence.js';
+import { sectionIsLive } from '../src/lib/analysesSection.js';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -187,6 +188,14 @@ const monthLabel = (() => {
   return dt.toLocaleString('en-US', { month: 'long', year: 'numeric' });
 })();
 
+// The /analyzy section is on the site only while something is published
+// (lib/analysesSection). A list that could not be read keeps the line, as the
+// rest of this file keeps what it could not see.
+const analysesOffSite = Array.isArray(articles) && !sectionIsLive(articles.length);
+function analysesSurfaceLine() {
+  return analysesOffSite ? '' : `- Published market analyses (Slovak, quarterly): ${HOME}/analyzy\n`;
+}
+
 // Every published analysis, one line each, for the AI readers robots.txt invites
 // (they fetch llms.txt and rarely run JavaScript). Empty when the list could
 // not be read — this file never states something it could not see.
@@ -254,8 +263,7 @@ Full details: https://residata.eu/imprint
 - Marketing site: ${HOME}/
 - Live dashboard (every active project): ${HOME}/live
 - What the data looks like, with live figures: ${HOME}/sample
-- Published market analyses (Slovak, quarterly): ${HOME}/analyzy
-- The site in Slovak: ${HOME}/sk (pricing ${HOME}/sk/cennik, use cases ${HOME}/sk/vyuzitie, sample ${HOME}/sk/ukazka, live dashboard ${HOME}/sk/live)
+${analysesSurfaceLine()}- The site in Slovak: ${HOME}/sk (pricing ${HOME}/sk/cennik, use cases ${HOME}/sk/vyuzitie, sample ${HOME}/sk/ukazka, live dashboard ${HOME}/sk/live)
 ${articlesSection()}
 Numbers above are regenerated from the live database on every deploy.
 `;
@@ -430,7 +438,7 @@ const SITEMAP_URLS = [
 // (src/lib/routing.js SK_PATHS): the English entry above and its Slovak twin
 // are both listed, and each names the other as its alternate — until 2026-09-28
 // both languages shared one URL, so there was no Slovak page to list.
-const MARKETING_URLS = SITEMAP_URLS.flatMap((e) => {
+const MARKETING_URLS = SITEMAP_URLS.filter((e) => !(analysesOffSite && e.loc === '/analyzy')).flatMap((e) => {
   const twin = SK_PATHS[pathToPage(e.loc)];
   if (!twin) return [e];
   const alt = { en: e.loc, sk: twin };

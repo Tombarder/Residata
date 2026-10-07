@@ -204,7 +204,7 @@ export function articleJsonLd(article, siteBase) {
     "@type": "Organization",
     name: COMPANY.legalName,
     url: `${siteBase}/`,
-    logo: { "@type": "ImageObject", url: `${siteBase}/favicon.svg` },
+    logo: { "@type": "ImageObject", url: `${siteBase}/icon-512.png`, width: 512, height: 512 },
   };
   const keywords = text(article?.seoKeywords, lang) || undefined;
   const graph = [

@@ -147,6 +147,12 @@ const IconFeedback = () => (
   </svg>
 );
 
+const IconArticles = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 4h13a2 2 0 0 1 2 2v12a2 2 0 0 0 2 2H6a2 2 0 0 1-2-2V4z"/><path d="M19 9h2v9a2 2 0 0 1-2 2"/><path d="M8 8h7M8 12h7M8 16h4"/>
+  </svg>
+);
+
 // Map view is lazy-loaded — MapLibre is a heavy dep we only want on /app/map.
 const MapView = lazy(() => import("./MapView"));
 const MapView2 = lazy(() => import("./MapView2"));
@@ -180,7 +186,7 @@ const NAV = [
     { page: "App:Locations", label: { en: "Locations", sk: "Polohy" }, Icon: IconMap, adminOnly: true },
     { page: "App:Texts", label: { en: "Texts", sk: "Texty" }, Icon: IconDoc, adminOnly: true },
     { page: "App:Usage", label: { en: "Usage", sk: "Používanie" }, Icon: IconChart, adminOnly: true },
-    { page: "App:Articles", label: { en: "Analyses", sk: "Analýzy" }, Icon: IconFeedback, adminOnly: true },
+    { page: "App:Articles", label: { en: "Analyses", sk: "Analýzy" }, Icon: IconArticles, adminOnly: true },
     { page: "App:Admin", label: { en: "Admin", sk: "Admin" }, Icon: IconShield, adminOnly: true },
   ]},
 ];

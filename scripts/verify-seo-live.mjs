@@ -155,8 +155,11 @@ async function indexNow(entries) {
   const key = process.env.INDEXNOW_KEY;
   if (!key) { console.log("[indexnow] no INDEXNOW_KEY — skipped"); return; }
   const since = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10);
+  // The index and the feed only while the section is on the site — the sitemap
+  // lists /analyzy exactly then (lib/analysesSection).
+  const section = entries.some((e) => e.url === `${SITE}/analyzy`);
   const urlList = entries.filter((e) => e.lastmod >= since).map((e) => e.url)
-    .concat([`${SITE}/analyzy`, `${SITE}/analyzy/feed.xml`]);
+    .concat(section ? [`${SITE}/analyzy`, `${SITE}/analyzy/feed.xml`] : []);
   const host = new URL(SITE).host;
   const r = await fetch("https://api.indexnow.org/indexnow", {
     method: "POST",

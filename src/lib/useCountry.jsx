@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabasePublic, isSupabaseReady } from "./supabase";
+import { startingCountry, SESSION_KEY, ALL_COUNTRIES } from "./marketStart.js";
 
 /**
  * useCountry — global selected-country state for the multi-market display layer.
@@ -8,11 +9,10 @@ import { supabasePublic, isSupabaseReady } from "./supabase";
  * (useProjects / useMarketTotals) need the selected country WITHOUT every
  * page threading a prop into them. A context lets the hooks read it directly.
  *
- * Default is 'SK'. With only Slovakia active, the switcher is dormant
- * (renders nothing — see CountrySwitcher) and every hook filters to 'SK',
- * which is byte-identical to the pre-multi-market behaviour. The moment a
- * second country has active projects, `countries` grows and the switcher
- * appears automatically — no further frontend work needed.
+ * Default is 'all' — every visit opens on the whole market (see SESSION_KEY).
+ * With a single active country the switcher is dormant (renders nothing — see
+ * CountrySwitcher) and every hook filters to that country; with two or more,
+ * `countries` grows and the switcher appears automatically.
  *
  * Available countries are DERIVED from data: distinct `country` values in
  * public.projects_live (anon-readable, active projects only). So the list is
@@ -40,14 +40,10 @@ export function countryName(code, lang = "en") {
  *  country filter" — every hook treats it as: drop `.eq('country', …)` on table
  *  reads, and pass `p_country = null` to RPCs. All stored money is EUR, so the
  *  combined view is inherently EUR. */
-export const ALL_COUNTRIES = "all";
+export { ALL_COUNTRIES };
 export function isAllCountries(c) { return c === ALL_COUNTRIES; }
 
 const DEFAULT_COUNTRY = ALL_COUNTRIES;   // platform + site open on the whole market
-const LS_KEY = "residata_country";
-// One-time reset so existing users (who had a single-country localStorage from
-// the old default) land on the new "All" default once. They can re-pick anytime.
-const LS_MIGRATED = "residata_country_all_default_v1";
 
 const CountryContext = createContext({
   country: DEFAULT_COUNTRY,
@@ -57,16 +53,9 @@ const CountryContext = createContext({
 });
 
 export function CountryProvider({ children }) {
-  const [country, setCountryRaw] = useState(() => {
-    try {
-      if (!localStorage.getItem(LS_MIGRATED)) {
-        localStorage.setItem(LS_MIGRATED, "1");
-        localStorage.setItem(LS_KEY, DEFAULT_COUNTRY);
-        return DEFAULT_COUNTRY;
-      }
-      return localStorage.getItem(LS_KEY) || DEFAULT_COUNTRY;
-    } catch { return DEFAULT_COUNTRY; }
-  });
+  const [country, setCountryRaw] = useState(() => startingCountry(
+    typeof sessionStorage !== "undefined" ? sessionStorage : null,
+    typeof localStorage !== "undefined" ? localStorage : null));
   // Switcher options: ['all', ...real countries] once ≥2 markets exist; a single
   // market shows just itself (no point in an "All" of one).
   const [countries, setCountries] = useState([DEFAULT_COUNTRY]);
@@ -74,7 +63,7 @@ export function CountryProvider({ children }) {
 
   const setCountry = (c) => {
     setCountryRaw(c);
-    try { localStorage.setItem(LS_KEY, c); } catch { /* private mode — ignore */ }
+    try { sessionStorage.setItem(SESSION_KEY, c); } catch { /* private mode — ignore */ }
   };
 
   useEffect(() => {

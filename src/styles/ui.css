@@ -566,6 +566,23 @@ input[type="checkbox"], input[type="radio"] { width: 15px; height: 15px; cursor:
   .rd-analysis a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 0.75em; color: #6b7280; }
 }
 
+/* The same article inside admin → Analýzy (ArticlesAdmin's preview): the public
+   page is always dark, so its tokens are pinned here whatever theme the admin
+   uses — a preview in light colours would show something no reader ever sees.
+   The site's 9rem top padding clears a fixed nav that is not here. */
+.rd-article-preview {
+  --bg: #0a0a0b; --surface: #14141a; --surface-2: #0e0e12; --surface-3: #1c1c22;
+  --border: #222228; --border-soft: #2c2c34;
+  --text: #e8e8ed; --text-2: #c4c4cc; --text-dim: #8a8a96; --text-faint: #55555f;
+  --accent-ink: #00e5a0;
+  color-scheme: dark;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.rd-article-preview .rd-analysis { min-height: 0 !important; }
+.rd-article-preview .rd-analysis > div { padding: 2.4rem clamp(1rem, 4vw, 2rem) 3rem !important; }
+
 /* ── WORKBENCH: a table beside the field panel ───────────────────────────────
    Used by the Unit database and Sales. It lives here rather than inline because
    the important half is a MEDIA QUERY, and an inline style cannot hold one — the

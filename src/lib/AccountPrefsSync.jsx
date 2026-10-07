@@ -1,10 +1,9 @@
-import { useCountry, ALL_COUNTRIES } from "./useCountry";
 import { useCurrency } from "./useCurrency";
 import { useThemeMode, setTheme } from "./theme-mode";
 import { useAccountUiPref } from "./useAccountUiPref";
 
 /**
- * AccountPrefsSync — makes the GLOBAL UI selectors (market, currency, theme) follow
+ * AccountPrefsSync — makes the GLOBAL UI selectors (currency, theme) follow
  * the ACCOUNT across devices, the same way every page's filters do. Each selector
  * keeps its own localStorage as the instant per-browser cache; the account
  * (`user_profiles.ui_prefs`, via the preference store in accountPrefs.js) is the
@@ -19,13 +18,12 @@ import { useAccountUiPref } from "./useAccountUiPref";
  * Analytics setting on navigation (see accountPrefs.js).
  */
 export default function AccountPrefsSync() {
-  const { country, setCountry } = useCountry();
   const { chosen, setCurrency } = useCurrency();
   const [themeMode] = useThemeMode();
 
-  // Market — a plain "all" is the default, so only a real market choice made on this
-  // device is pushed up; a fresh device never writes noise into the account.
-  useAccountUiPref("market", country, setCountry, { defaultValue: ALL_COUNTRIES });
+  // Market — deliberately NOT an account preference: every visit opens on "all"
+  // (lib/useCountry SESSION_KEY, Boss 2026-10-07). Syncing it made one click on a
+  // country follow the user to every later visit on every device.
 
   // Currency — `chosen` is null when the user hasn't picked one (the currency then
   // follows the market). Only an explicit ISO choice is ever stored: null is not a

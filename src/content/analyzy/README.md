@@ -133,6 +133,28 @@ link saying "I am the homepage". Now:
   fails), and the scraper's nightly `integrity_check.articles_are_live`
   compares the database with the site: every published article live at its
   latest version, nothing withdrawn still live, the rebuild queue moving.
+- **The section exists while anything is published** (`src/lib/analysesSection.js`,
+  Boss 2026-10-07). Withdrawing every article takes the whole of `/analyzy` off
+  the site at the next build — the menu link, the pages, the feed, the sitemap
+  entries and the llms.txt line — and publishing one brings it all back.
+
+## The admin screen (admin → Analýzy, `/app/articles`)
+
+Boss runs the analyses from here without a developer:
+
+- **The list** — tabs *Všetky / Na webe / Koncepty* with counts, a search over
+  title, perex and address (case and accents ignored), and per article: edit,
+  publish or withdraw, open on the site, and **delete** — a published article is
+  withdrawn and deleted in one confirmed step.
+- **The editor** — every text in both languages, blocks added (paragraph,
+  heading, chart, table, bullets), moved and **deleted, charts included**; undo
+  and redo (⌘Z / ⇧⌘Z) over the last 20 states; ⌘S saves; leaving with unsaved
+  edits asks first. **Náhľad** draws the draft — unsaved edits included — with
+  the public page's own component in the public page's colours, so what it shows
+  is what readers will get.
+- Every question is the platform's dialog (`components/Modal`), never the
+  browser's alert/confirm/prompt. The list's rules (tabs, search, a new
+  article's address) are `src/lib/articlesAdmin.js`, tested.
 
 A new issue therefore needs nothing SEO-specific from a person beyond step 5.
 The template carries the rest: `<!--SEOTITLE …-->` and `<!--KEYWORDS …-->` at

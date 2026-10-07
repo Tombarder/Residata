@@ -9,6 +9,7 @@ import { COMPANY, addressOneLine } from './src/lib/company.js'
 import { FALLBACK_MONTHLY_CENTS } from './src/lib/pricingDefaults.js'
 import { firstPaintScript } from './src/lib/trialBannerState.js'
 import { everyPhrase } from './src/lib/refreshCadence.js'
+import { analysesLiveDefine } from './src/lib/analysesSection.js'
 
 /**
  * residataIndexHtmlContent
@@ -158,6 +159,24 @@ function maplibreWorkerAssets() {
   };
 }
 
+/**
+ * analysesSection — tells the app whether the /analyzy section exists
+ * (src/lib/analysesSection.js): live while the build's list of published
+ * articles (scripts/.articles.json, written by generate-static-content.mjs
+ * before vite runs) is not empty. No list, no define — the section stays.
+ */
+function analysesSection() {
+  return {
+    name: 'residata-analyses-section',
+    config() {
+      const file = path.resolve(__dirname, 'scripts/.articles.json')
+      let rows = null
+      try { rows = JSON.parse(fs.readFileSync(file, 'utf-8')) } catch { rows = null }
+      return { define: analysesLiveDefine(rows) }
+    },
+  }
+}
+
 export default defineConfig({
-  plugins: [react(), residataIndexHtmlContent(), maplibreWorkerAssets()],
+  plugins: [react(), residataIndexHtmlContent(), maplibreWorkerAssets(), analysesSection()],
 })

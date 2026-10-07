@@ -48,6 +48,11 @@ import { useCountry } from "./lib/useCountry";
 import { useMarketTotals, useDataSample, useHomeProjects, useTotalsList } from "./lib/useData";
 import { fmtSelloutValue } from "./lib/absorption";
 import { pushRoute, pathToPage, isAppPage, isInsightsPage, pageToPath } from "./lib/routing";
+import { ANALYSES_LIVE, navPagesFor, shownPage } from "./lib/analysesSection";
+
+/** The page an address shows (lib/analysesSection shownPage: an /analyzy address
+ *  with the section off the site shows the homepage). */
+const pageAt = (pathname) => shownPage(pathToPage(pathname));
 import { applySeo, historySincePhrase } from "./lib/seo";
 import { localeTag, PUBLIC_LANGS, DEFAULT_LANG, LANG_LABELS, coercePublicLang, LANG_STORAGE_KEY } from "./lib/locale";
 import { addressLang, storedPick, initialPick, shownLang } from "./lib/langChoice";
@@ -60,13 +65,20 @@ import { startPageEngagement, stopPageEngagement } from "./lib/engagement";
 const PlatformShell = lazy(() => import("./pages/Platform"));
 import { track } from "./lib/track";
 
-const pagesEN = ["Home", "Live", "What we deliver", "Use Cases", "Insights", "Pricing & Contact"];
-const pagesSK = ["Domov", "Live", "Čo dostanete", "Využitie", "Analýzy", "Cenník & Kontakt"];
+// The analyses link is in the menu only while the section exists
+// (lib/analysesSection: at least one article published). The three lists are
+// parallel — Nav reads pagesEN[i] for the i-th label of any language — so the
+// same position is dropped from all three.
+const NAV_EN = ["Home", "Live", "What we deliver", "Use Cases", "Insights", "Pricing & Contact"];
+const INSIGHTS_AT = NAV_EN.indexOf("Insights");
+const navPages = (all) => navPagesFor(all, INSIGHTS_AT);
+const pagesEN = navPages(NAV_EN);
+const pagesSK = navPages(["Domov", "Live", "Čo dostanete", "Využitie", "Analýzy", "Cenník & Kontakt"]);
 // Czech nav labels. Like pagesSK these are structural UI (not part of the
 // Texts-editable `t` dict), so CZ visitors get Czech nav even before body copy
 // is authored in the admin tool. Display-only: routing always keys off
 // pagesEN[i] (see Nav), so these never need pageMap entries.
-const pagesCS = ["Domů", "Live", "Co dostanete", "Využití", "Analýzy", "Ceník & Kontakt"];
+const pagesCS = navPages(["Domů", "Live", "Co dostanete", "Využití", "Analýzy", "Ceník & Kontakt"]);
 // Nav labels → internal page key. "Data" is the historical internal
 // name for the what-we-deliver / sample page; we keep it for route
 // stability (/sample URL still resolves) but the user-facing label
@@ -2191,7 +2203,7 @@ function AuthLoadingSpinner() {
 export default function App() {
   // Init page from current URL (so direct link / refresh works)
   const [current, setCurrent] = useState(() =>
-    typeof window !== "undefined" ? pathToPage(window.location.pathname) : "Home"
+    typeof window !== "undefined" ? pageAt(window.location.pathname) : "Home"
   );
   // The visitor's PICK, and the language of the address on screen (null for an
   // address without one). What is shown follows from the two — lib/langChoice.
@@ -2269,7 +2281,7 @@ export default function App() {
   // Listen to browser back/forward — sync state with URL
   useEffect(() => {
     const onPop = () => {
-      setCurrent(pathToPage(window.location.pathname));
+      setCurrent(pageAt(window.location.pathname));
       // Back to a /sk/… address is back to Slovak (the address says so); back to
       // any other address shows the pick.
       setAddrLang(addressLang(window.location.pathname));
@@ -2334,7 +2346,10 @@ export default function App() {
     if (typeof window === "undefined" || isAppPage(current)) return;
     const want = pageToPath(current, lang);
     const here = window.location.pathname.replace(/\/+$/, "") || "/";
-    if (here !== want && pathToPage(here) === current) {
+    // An /analyzy address with the section off the site is rewritten too: pageAt
+    // showed the homepage there, so the address must say so.
+    const stale = !ANALYSES_LIVE && isInsightsPage(pathToPage(here));
+    if (here !== want && (pathToPage(here) === current || stale)) {
       window.history.replaceState({ page: current }, "", want + window.location.search + window.location.hash);
       setAddrLang(addressLang(want));
     }
