@@ -880,6 +880,25 @@ async function handleWebhook(req, res) {
   }
 }
 
+// ─── mode (public) ──────────────────────────────────────────────────────
+// Which Stripe this deployment takes money with: "live", "test" or "missing" —
+// from the key's prefix only, never any part of a secret. Exists because a site
+// on a TEST key looks completely real: the customer pays, sees "thank you", gets
+// Premium in our database — and nothing reaches the bank. Nothing outside said
+// which key ran, so the only way to find out was a real purchase. Read nightly by
+// novostavby integrity_check.stripe_takes_real_money (with KamhalCo's /health).
+function stripeMode() {
+  const key = process.env.STRIPE_SECRET_KEY || "";
+  const mode = /^(sk|rk)_live_/.test(key) ? "live" : /^(sk|rk)_test_/.test(key) ? "test" : "missing";
+  const wh = process.env.STRIPE_WEBHOOK_SECRET || "";
+  return { mode, webhook_secret: wh.startsWith("whsec_") ? "set" : "missing" };
+}
+
+async function handleMode(req, res) {
+  res.setHeader("Cache-Control", "no-store");
+  return res.status(200).json(stripeMode());
+}
+
 // ─── router ──────────────────────────────────────────────────────────────
 /**
  * Which HTTP methods each action answers — declared beside the router, per action.
@@ -906,6 +925,7 @@ const METHODS = {
   "set-price": ["POST"],
   webhook: ["POST"],              // Stripe POSTs its events
   reconcile: ["GET", "POST"],     // Vercel cron GETs; POST stays for a manual run with the secret
+  mode: ["GET"],                  // public: "live" | "test" | "missing", no secret in it
 };
 
 export default async function handler(req, res) {
@@ -923,6 +943,7 @@ export default async function handler(req, res) {
     if (action === "set-price") return await handleSetPrice(req, res);
     if (action === "webhook") return await handleWebhook(req, res);
     if (action === "reconcile") return await handleReconcile(req, res);
+    if (action === "mode") return await handleMode(req, res);
     return res.status(400).json({ error: "unknown action" });
   } catch (e) {
     console.error("[stripe] crash", e);
