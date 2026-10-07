@@ -1,6 +1,6 @@
-// The /analyzy section is on the site exactly while something is published
-// (lib/analysesSection). Boss withdrew every analysis on 2026-10-07; publishing
-// one in /app/articles must bring the whole section back with no second switch.
+// The /analyzy section is on the site exactly while Boss's switch in admin →
+// Analýzy is on AND something is published (lib/analysesSection, Boss 2026-10-07).
+// Hiding it must take the whole section off; showing it must bring it all back.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { sectionIsLive, analysesLiveDefine, ANALYSES_LIVE, navPagesFor, shownPage } from "./analysesSection.js";
@@ -37,3 +37,16 @@ test("an /analyzy address shows the homepage while the section is off", () => {
   assert.equal(shownPage("Insights", true), "Insights");
   assert.equal(shownPage("Analyza:ba-prehlad-2026-q3", true), "Analyza:ba-prehlad-2026-q3");
 });
+
+test("the admin switch decides which published articles are on the site", async () => {
+  const { articlesOnSite } = await import("./analysesSection.js");
+  const pub = [{ slug: "a" }, { slug: "b" }];
+  assert.deepEqual(articlesOnSite(pub, { section: "analyzy", visible: true }), pub);
+  assert.deepEqual(articlesOnSite(pub, { section: "analyzy", visible: false }), []);
+  assert.deepEqual(articlesOnSite([], { section: "analyzy", visible: true }), []);
+  assert.throws(() => articlesOnSite(pub, undefined), /no 'analyzy' row/);
+  assert.throws(() => articlesOnSite(pub, { section: "analyzy" }), /no 'analyzy' row/);
+  assert.throws(() => articlesOnSite(pub, { visible: "true" }), /no 'analyzy' row/, "a string is not a boolean");
+  assert.throws(() => articlesOnSite(null, { visible: true }), /not read/);
+});
+

@@ -133,15 +133,22 @@ link saying "I am the homepage". Now:
   fails), and the scraper's nightly `integrity_check.articles_are_live`
   compares the database with the site: every published article live at its
   latest version, nothing withdrawn still live, the rebuild queue moving.
-- **The section exists while anything is published** (`src/lib/analysesSection.js`,
-  Boss 2026-10-07). Withdrawing every article takes the whole of `/analyzy` off
-  the site at the next build — the menu link, the pages, the feed, the sitemap
-  entries and the llms.txt line — and publishing one brings it all back.
+- **The section is on the site while Boss's switch is on AND anything is
+  published** (`src/lib/analysesSection.js`, Boss 2026-10-07). The switch is
+  the card at the top of admin → Analýzy (`public.site_sections`, row
+  `analyzy`; `src/lib/siteSections.js`). Hiding it — or withdrawing every
+  article — takes the whole of `/analyzy` off the site at the next build: the
+  menu link, the pages, the feed, the sitemap entries and the llms.txt line.
+  The articles keep their state and come back with the section. Flipping the
+  switch queues a rebuild like a publish does; a build that cannot read the
+  switch refuses, so the previous deployment stays live.
 
 ## The admin screen (admin → Analýzy, `/app/articles`)
 
 Boss runs the analyses from here without a developer:
 
+- **The section switch** — shown / hidden on the site, with what that means and
+  when the site follows (a few minutes: the rebuild).
 - **The list** — tabs *Všetky / Na webe / Koncepty* with counts, a search over
   title, perex and address (case and accents ignored), and per article: edit,
   publish or withdraw, open on the site, and **delete** — a published article is

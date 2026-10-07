@@ -43,7 +43,7 @@ import { PUBLIC_LANGS } from '../src/lib/locale.js';
 import { SK_PATHS, pathToPage } from '../src/lib/routing.js';
 import { FALLBACK_MONTHLY_CENTS, FALLBACK_MONTHLY_DISPLAY, FALLBACK_ANCHOR_DISPLAY } from '../src/lib/pricingDefaults.js';
 import { everyPhrase } from '../src/lib/refreshCadence.js';
-import { sectionIsLive } from '../src/lib/analysesSection.js';
+import { sectionIsLive, articlesOnSite } from '../src/lib/analysesSection.js';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -92,26 +92,39 @@ async function fetchView(table, params = {}) {
   throw last;
 }
 
-// ── The published analyses, read FIRST and written for prerender.mjs ──────
+// ── The analyses ON THE SITE, read FIRST and written for prerender.mjs ─────
 // One read, one snapshot: the sitemap, the feed, llms.txt and the static page
 // of every article are built from this same list, so they cannot disagree about
-// what is published. Read before anything else, so a failure in the market
+// what is on the site. Read before anything else, so a failure in the market
 // views below cannot leave the build without it.
+//
+// "On the site" = published AND the section switched on in admin → Analýzy
+// (public.site_sections, src/lib/analysesSection.js articlesOnSite). With the
+// switch off the list is empty and the whole section leaves the site; an
+// unreadable switch is a failed read like any other — no file, and prerender
+// refuses the Vercel build, so the previous deployment stays live.
 const ARTICLE_COLS =
   'id,slug,article_date,published,title,perex,blocks,method,og_image,seo_title,seo_keywords,updated_at,figures_measured_through';
 let articles = null;
 try {
-  articles = await fetchView('articles', {
-    // slug breaks the tie: most issues share a date, and without it every build
-    // listed them in whatever order the database returned them that time.
-    select: ARTICLE_COLS, published: 'eq.true', order: 'article_date.desc,slug.asc',
-  });
+  const [published, sections] = await Promise.all([
+    fetchView('articles', {
+      // slug breaks the tie: most issues share a date, and without it every build
+      // listed them in whatever order the database returned them that time.
+      select: ARTICLE_COLS, published: 'eq.true', order: 'article_date.desc,slug.asc',
+    }),
+    fetchView('site_sections', { select: 'section,visible', section: 'eq.analyzy' }),
+  ]);
+  articles = articlesOnSite(published, sections[0]);
   fs.writeFileSync(ARTICLES_FILE, JSON.stringify(articles));
-  console.log(`[gen-static] scripts/.articles.json — ${articles.length} published articles`);
+  console.log(sections[0].visible
+    ? `[gen-static] scripts/.articles.json — ${articles.length} published articles`
+    : `[gen-static] scripts/.articles.json — section hidden in admin → Analýzy; 0 of ${published.length} published articles on the site`);
 } catch (e) {
   // prerender.mjs fails the build on Vercel when this file is missing, which
   // keeps the previous deployment — with its correct article pages — live.
-  console.warn('[gen-static] could not read the published articles:', e.message);
+  articles = null;
+  console.warn('[gen-static] could not read the analyses or the section switch:', e.message);
 }
 
 // `market` uses public.totals_global (SK + CZ combined) so the static/LLM surfaces

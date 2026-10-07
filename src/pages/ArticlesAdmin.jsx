@@ -2,7 +2,8 @@
  * /app/articles (admin → Analýzy) — manage the /analyzy analyses without a developer.
  *
  * WHAT IT DOES
- *   Lists every analysis including drafts — filtered (all / on the site / drafts)
+ *   Holds Boss's switch for the whole section (shown / hidden on the site —
+ *   lib/siteSections, Boss 2026-10-07). Lists every analysis including drafts — filtered (all / on the site / drafts)
  *   and searchable — publishes, withdraws and deletes with one click, and opens
  *   one in an editor where every piece of text can be changed in both languages,
  *   any block (a paragraph, a heading, a chart, a table) added, moved or deleted,
@@ -37,6 +38,7 @@ import { filesNotLive } from "../lib/articleFiles";
 import { SITE_BASE } from "../lib/seo";
 import { openManualSteps } from "../lib/articleSeo";
 import { articleMatches, articleCounts, slugProblem, ARTICLE_FILTERS } from "../lib/articlesAdmin.js";
+import { useSiteSection } from "../lib/siteSections";
 import Modal from "../components/Modal";
 import ArticleSeoPanel from "./articleSeoPanel";
 import { ArticleView } from "./insightsView";
@@ -111,7 +113,7 @@ const MONO = "ui-monospace, SFMono-Regular, Menlo, monospace";
 const LABEL = {
   sk: {
     heading: "Analýzy", sub: "Články na residata.eu/analyzy — publikovanie, úpravy, mazanie.",
-    published: "Na webe", draft: "Koncept", edit: "Upraviť", back: "← Späť na zoznam",
+    published: "Publikované", draft: "Koncept", edit: "Upraviť", back: "← Späť na zoznam",
     manualSteps: "ručné kroky",
     publish: "Publikovať", unpublish: "Stiahnuť z webu", view: "Zobraziť na webe",
     save: "Uložiť zmeny", saving: "Ukladám…", saved: "Uložené", noChanges: "Žiadne zmeny",
@@ -127,6 +129,21 @@ const LABEL = {
     emptyPerex: "Perex nesmie byť prázdny — zobrazuje sa v zozname a vo vyhľadávaní.",
     emptyDate: "Dátum musí byť vyplnený — určuje poradie článkov na webe.",
     liveNow: "Článok je na webe", draftNow: "Článok nie je na webe",
+    liveHidden: "Publikovaný — ale sekcia je skrytá, na webe sa nezobrazuje",
+    secTitle: "Sekcia Analýzy na webe", secOn: "Zobrazená", secOff: "Skrytá",
+    secOnBody: "Návštevníci vidia v menu odkaz Analýzy a všetky publikované články.",
+    secOnEmpty: "Zapnutá, ale na webe sa nezobrazí, kým nie je publikovaný aspoň jeden článok.",
+    secOffBody: "Na webe nie je odkaz v menu, stránka /analyzy ani žiadny článok — ani v mape stránky pre Google. Články ostávajú tak, ako sú: po zobrazení sa vrátia publikované.",
+    secHide: "Skryť sekciu z webu", secShow: "Zobraziť sekciu na webe",
+    secChanged: "Naposledy zmenené", secDelay: "Zmena sa na webe prejaví do pár minút — web sa sám znovu zostaví.",
+    secLoadFailed: "Nastavenie sekcie sa nepodarilo načítať.", secNotAllowed: "Sekciu môže skryť alebo zobraziť len admin.",
+    qHideT: "Skryť celú sekciu Analýzy?",
+    qHideB: "Z webu zmizne odkaz v menu, stránka /analyzy aj všetky články, aj z mapy stránky pre Google. Nič sa nemaže — články ostanú publikované a po zobrazení sekcie sa vrátia. Prejaví sa do pár minút.",
+    qShowT: "Zobraziť sekciu Analýzy na webe?",
+    qShowB: (n) => n > 0
+      ? `Na webe sa objaví odkaz v menu a ${n} publikovaných článkov. Prejaví sa do pár minút.`
+      : "Sekcia sa zapne, ale na webe sa objaví až keď publikujete aspoň jeden článok.",
+    tHidden: "Sekcia skrytá — z webu zmizne do pár minút.", tShown: "Sekcia zobrazená — na webe do pár minút.",
     date: "Dátum článku", ogImage: "Zdieľaný obrázok (cesta k súboru)",
     alt: "Alternatívny text obrázka (pre čítačky a vyhľadávače)",
     newArticle: "Nový článok", newSlug: "Adresa článku", newSlugHint: "Malé písmená, čísla a pomlčky — napr. trh-novostavieb-2026-10. Adresu po vytvorení už nemeňte, odkazy na ňu by prestali fungovať.",
@@ -147,7 +164,7 @@ const LABEL = {
     reloadArticle: "Načítať znova",
     methodTooShort: "Metodika musí mať aspoň 40 znakov v oboch jazykoch.",
     search: "Hľadať v názve, perexe alebo adrese…",
-    filters: { all: "Všetky", published: "Na webe", draft: "Koncepty" },
+    filters: { all: "Všetky", published: "Publikované", draft: "Koncepty" },
     tabEdit: "Úpravy", tabPreview: "Náhľad",
     previewNote: "Takto bude článok vyzerať na webe — vrátane neuložených zmien.",
     cancel: "Zrušiť", close: "Zavrieť",
@@ -173,7 +190,7 @@ const LABEL = {
   },
   en: {
     heading: "Analyses", sub: "The articles at residata.eu/analyzy — publish, edit, delete.",
-    published: "On the site", draft: "Draft", edit: "Edit", back: "← Back to list",
+    published: "Published", draft: "Draft", edit: "Edit", back: "← Back to list",
     manualSteps: "manual steps",
     publish: "Publish", unpublish: "Withdraw", view: "View on the site",
     save: "Save changes", saving: "Saving…", saved: "Saved", noChanges: "No changes",
@@ -189,6 +206,21 @@ const LABEL = {
     emptyPerex: "The standfirst cannot be empty — it is shown in the list and in search results.",
     emptyDate: "The date is required — it orders the articles on the site.",
     liveNow: "Live on the site", draftNow: "Not on the site",
+    liveHidden: "Published — but the section is hidden, so it is not on the site",
+    secTitle: "The Analyses section on the site", secOn: "Shown", secOff: "Hidden",
+    secOnBody: "Visitors see the Analyses link in the menu and every published article.",
+    secOnEmpty: "Switched on, but it will not appear until at least one article is published.",
+    secOffBody: "The site has no menu link, no /analyzy page and no article — not in the sitemap for Google either. The articles stay as they are and come back published when the section is shown.",
+    secHide: "Hide the section", secShow: "Show the section",
+    secChanged: "Last changed", secDelay: "The site follows within minutes — it rebuilds itself.",
+    secLoadFailed: "The section setting could not be loaded.", secNotAllowed: "Only an admin can hide or show the section.",
+    qHideT: "Hide the whole Analyses section?",
+    qHideB: "The menu link, the /analyzy page and every article leave the site, the sitemap for Google included. Nothing is deleted — the articles stay published and come back when the section is shown. Takes effect within minutes.",
+    qShowT: "Show the Analyses section?",
+    qShowB: (n) => n > 0
+      ? `The menu link and ${n} published articles appear on the site. Takes effect within minutes.`
+      : "The section is switched on, but it appears only once an article is published.",
+    tHidden: "Section hidden — gone from the site within minutes.", tShown: "Section shown — on the site within minutes.",
     date: "Article date", ogImage: "Share image (file path)",
     alt: "Image alt text (for screen readers and search)",
     newArticle: "New article", newSlug: "Article address", newSlugHint: "Lower-case letters, digits and hyphens — e.g. trh-novostavieb-2026-10. Do not change it once created; links to it would break.",
@@ -209,7 +241,7 @@ const LABEL = {
     reloadArticle: "Reload",
     methodTooShort: "The method note needs at least 40 characters in both languages.",
     search: "Search title, standfirst or address…",
-    filters: { all: "All", published: "On the site", draft: "Drafts" },
+    filters: { all: "All", published: "Published", draft: "Drafts" },
     tabEdit: "Edit", tabPreview: "Preview",
     previewNote: "This is how the article will look on the site — unsaved changes included.",
     cancel: "Cancel", close: "Close",
@@ -386,9 +418,68 @@ function NewArticleDialog({ t, taken, onClose, onCreate }) {
   );
 }
 
+/* ───────────────────────────── the section switch ───────────────────────────── */
+
+/**
+ * Boss's switch for the whole /analyzy section (public.site_sections). Says what
+ * is true on the site now, what the button will do, and that the site follows
+ * after its rebuild — the database flips at once, the pages a few minutes later.
+ */
+function SectionCard({ t, section, publishedCount, dialogs }) {
+  const { confirm, notify } = dialogs;
+  const [busy, setBusy] = useState(false);
+  const { row, loading, error } = section;
+
+  if (loading) return <div style={{ ...box, marginBottom: "1.4rem", color: "var(--text-dim)" }}>{t.loading}</div>;
+  if (error) {
+    return <div className="rd-alert rd-alert--err" role="alert" style={{ marginBottom: "1.4rem" }}>⚠ {t.secLoadFailed} <span style={{ opacity: 0.7 }}>({error.message || error.code})</span></div>;
+  }
+
+  const shown = row.visible;
+  async function flip() {
+    const ok = await confirm(shown
+      ? { title: t.qHideT, body: t.qHideB, okLabel: t.secHide, danger: true }
+      : { title: t.qShowT, body: t.qShowB(publishedCount), okLabel: t.secShow });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await section.set(!shown);
+      notify("ok", shown ? t.tHidden : t.tShown);
+    } catch (e) {
+      notify("err", e.code === "NOT_ALLOWED" ? t.secNotAllowed : e.message);
+    } finally { setBusy(false); }
+  }
+
+  const empty = shown && publishedCount === 0;
+  return (
+    <div style={{
+      ...box, marginBottom: "1.4rem", display: "flex", gap: "1rem", alignItems: "center", flexWrap: "wrap",
+      borderColor: shown && !empty ? "color-mix(in srgb, var(--accent) 35%, var(--border-soft))" : "color-mix(in srgb, var(--accent-2) 45%, var(--border-soft))",
+    }}>
+      <div style={{ flex: "1 1 340px", minWidth: 0 }}>
+        <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", marginBottom: "0.35rem", flexWrap: "wrap" }}>
+          <span style={{ fontWeight: 650, color: "var(--text)" }}>{t.secTitle}</span>
+          <Pill on={shown && !empty}>{shown ? t.secOn : t.secOff}</Pill>
+        </div>
+        <div style={{ fontSize: "0.8rem", color: "var(--text-2)", lineHeight: 1.55 }}>
+          {!shown ? t.secOffBody : empty ? t.secOnEmpty : t.secOnBody}
+        </div>
+        <div style={{ fontSize: "0.7rem", color: "var(--text-faint)", marginTop: "0.4rem" }}>
+          {row.updatedAt && `${t.secChanged} ${String(row.updatedAt).slice(0, 16).replace("T", " ")} UTC · `}{t.secDelay}
+        </div>
+      </div>
+      <button type="button" disabled={busy}
+              className={`rd-btn rd-btn--sm ${shown ? "rd-btn--warn" : "rd-btn--primary"}`}
+              style={shown ? DANGER_BTN : undefined} onClick={flip}>
+        {busy ? "…" : (shown ? t.secHide : t.secShow)}
+      </button>
+    </div>
+  );
+}
+
 /* ────────────────────────────── the list ────────────────────────────── */
 
-function ArticleList({ t, dialogs, onEdit }) {
+function ArticleList({ t, dialogs, section, onEdit }) {
   const { articles, loading, error, reload } = useArticles({ admin: true });
   const [busy, setBusy] = useState(null);
   const [creating, setCreating] = useState(false);
@@ -454,8 +545,10 @@ function ArticleList({ t, dialogs, onEdit }) {
     return <div className="rd-alert rd-alert--err" role="alert">⚠ {t.loadFailed} <span style={{ opacity: 0.7 }}>({error})</span></div>;
   }
 
+  const sectionHidden = section.row?.visible === false;
   return (
     <div>
+      <SectionCard t={t} section={section} publishedCount={counts.published} dialogs={dialogs} />
       <div style={{ display: "flex", gap: "0.8rem", alignItems: "flex-end", flexWrap: "wrap", marginBottom: "1rem" }}>
         <div className="rd-tabs" role="tablist" style={{ flex: "1 1 320px" }}>
           {ARTICLE_FILTERS.map((f) => (
@@ -512,7 +605,7 @@ function ArticleList({ t, dialogs, onEdit }) {
                       disabled={busy === a.id} onClick={() => toggle(a)}>
                 {busy === a.id ? "…" : (a.published ? t.unpublish : t.publish)}
               </button>
-              {a.published && (
+              {a.published && !sectionHidden && (
                 <a className="rd-btn rd-btn--sm rd-btn--ghost" href={`${SITE_BASE}/analyzy/${a.slug}`}
                    target="_blank" rel="noreferrer">{t.view} ↗</a>
               )}
@@ -565,7 +658,7 @@ function ArticlePreview({ draft, published, t }) {
 
 /* ───────────────────────────── the editor ───────────────────────────── */
 
-function ArticleEditor({ slug, t, dialogs, onBack, onChanged }) {
+function ArticleEditor({ slug, t, dialogs, sectionHidden, onBack, onChanged }) {
   const { article, loading } = useArticle(slug, { admin: true });
   const { confirm, notify } = dialogs;
   const [saved, setSaved] = useState(null);      // last state known to be in the DB
@@ -763,7 +856,7 @@ function ArticleEditor({ slug, t, dialogs, onBack, onChanged }) {
                   disabled={busyPub} onClick={togglePublished}>
             {busyPub ? "…" : (published ? t.unpublish : t.publish)}
           </button>
-          {published && (
+          {published && !sectionHidden && (
             <a className="rd-btn rd-btn--sm rd-btn--ghost"
                href={`${SITE_BASE}/analyzy/${draft.slug}`} target="_blank" rel="noreferrer">
               {t.view} ↗
@@ -803,8 +896,8 @@ function ArticleEditor({ slug, t, dialogs, onBack, onChanged }) {
           <span style={{ fontFamily: MONO, fontSize: "0.68rem", color: "var(--text-faint)" }}>
             /analyzy/{draft.slug}
           </span>
-          <span style={{ fontSize: "0.72rem", color: published ? "var(--accent)" : "var(--text-faint)" }}>
-            {published ? "● " + t.liveNow : "○ " + t.draftNow}
+          <span style={{ fontSize: "0.72rem", color: published ? (sectionHidden ? "var(--accent-2)" : "var(--accent)") : "var(--text-faint)" }}>
+            {published ? (sectionHidden ? "◐ " + t.liveHidden : "● " + t.liveNow) : "○ " + t.draftNow}
           </span>
         </div>
 
@@ -1025,6 +1118,7 @@ export default function ArticlesAdmin({ lang = "sk" }) {
   // list shows the change rather than a cached row.
   const [rev, setRev] = useState(0);
   const dialogs = useDialogs(t);
+  const section = useSiteSection("analyzy");
 
   return (
     <div style={{ padding: "1.5rem 1.75rem 4rem", maxWidth: 1000 }}>
@@ -1038,9 +1132,10 @@ export default function ArticlesAdmin({ lang = "sk" }) {
       <p style={{ color: "var(--text-dim)", fontSize: "0.86rem", margin: "0 0 1.6rem" }}>{t.sub}</p>
 
       {editing
-        ? <ArticleEditor slug={editing} t={t} dialogs={dialogs} onBack={() => setEditing(null)}
+        ? <ArticleEditor slug={editing} t={t} dialogs={dialogs} sectionHidden={section.row?.visible === false}
+                         onBack={() => setEditing(null)}
                          onChanged={() => setRev((r) => r + 1)} />
-        : <ArticleList key={rev} t={t} dialogs={dialogs} onEdit={setEditing} />}
+        : <ArticleList key={rev} t={t} dialogs={dialogs} section={section} onEdit={setEditing} />}
 
       {dialogs.ui}
     </div>

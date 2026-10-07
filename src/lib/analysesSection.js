@@ -1,24 +1,43 @@
 /**
  * Whether the /analyzy section is on the site at all.
  *
- * The section exists while at least one analysis is published. Withdrawing every
- * article in /app/articles takes the WHOLE section off the site — the menu link,
- * the /analyzy addresses, the sitemap, the feed and llms.txt — and publishing one
- * brings all of it back. There is no second switch to forget: the published flag
- * the editor already writes is the only fact. (Boss, 2026-10-07: the section was
- * hidden until the analyses are worth reading.)
+ * Two facts decide it, and both must hold:
+ *   1. Boss has the section switched ON in admin → Analýzy (public.site_sections,
+ *      row 'analyzy' — novostavby v2/migrations/2026-10-07_site_sections_switch.sql).
+ *      Boss, 2026-10-07: "daj mi do admin button … kde to budem moct skryt a odokryt
+ *      celu tu sekciu zo stranky".
+ *   2. At least one analysis is published — an empty section is not shown.
+ * When either fails, the WHOLE section leaves the site: the menu link, the
+ * /analyzy addresses, the sitemap, the feed and llms.txt. The articles themselves
+ * are untouched — published stays published — and come back with the section.
  *
- * The count is the build's own list of published articles (scripts/.articles.json,
- * written by generate-static-content.mjs). Publishing or withdrawing an article
- * rebuilds the site (novostavby v2/migrations/2026-09-28_articles_publish_rebuilds
- * _the_site.sql), so the build always knows the current answer.
+ * The build decides once (scripts/generate-static-content.mjs): it writes the
+ * articles that are ON THE SITE to scripts/.articles.json — the published ones
+ * while the switch is on, none while it is off — and everything downstream counts
+ * that list. Flipping the switch or publishing / withdrawing an article queues a
+ * rebuild, so the build always knows the current answer.
  */
 
 import { isInsightsPage } from "./routing.js";
 
-/** The rule, in one place: the section is live while anything is published. */
-export function sectionIsLive(publishedCount) {
-  return Number(publishedCount) > 0;
+/** The rule, in one place: the section is live while anything is on the site. */
+export function sectionIsLive(onSiteCount) {
+  return Number(onSiteCount) > 0;
+}
+
+/**
+ * The articles the site carries: the published ones while Boss's switch is on,
+ * none while it is off. `section` is the site_sections row for 'analyzy'. A
+ * missing row or an unreadable one is an error, never a guess — the build then
+ * refuses and the previous deployment stays live, rather than showing a section
+ * Boss hid or hiding one he shows.
+ */
+export function articlesOnSite(published, section) {
+  if (!Array.isArray(published)) throw new Error("the published articles were not read");
+  if (!section || typeof section.visible !== "boolean") {
+    throw new Error("public.site_sections has no 'analyzy' row — cannot tell whether the section is shown");
+  }
+  return section.visible ? published : [];
 }
 
 /**
