@@ -84,6 +84,9 @@ test("the summary says what, how much and when — and that a declined cookie hi
   assert.match(en, /Active on 6 of the last 30 days, 2 h 14 min of active use/);
   assert.match(en, /Mostly Market Radar and Sales; usually Tue, Thu, 9:00–12:00\./);
   assert.match(en, /12 project views, 2 downloads, 3 AI questions\./);
+  assert.match(summarize(base({ cur: { active_days: 1, sign_ins: 1 } }), { lang: "sk", now: NOW }), /1 prihlásenie\./);
+  assert.match(summarize(base({ cur: { active_days: 2, sign_ins: 3 } }), { lang: "sk", now: NOW }), /3 prihlásenia\./);
+  assert.match(summarize(base({ cur: { active_days: 5, sign_ins: 9 } }), { lang: "en", now: NOW }), /9 sign-ins\./);
   assert.match(en, /Pressed Subscribe \(2×\) but has no subscription\./);
   assert.match(en, /Declined analytics cookies/);
   const sk = summarize(d, { lang: "sk", now: NOW, pageName: (k) => pageTitle(k, "sk") });
