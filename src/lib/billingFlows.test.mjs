@@ -434,3 +434,22 @@ test("deleting a card payer's account stops the card first; if Stripe is unreach
   // Stripe's "deleted" for the cancelled card arrives after the account is gone — harmless.
   assert.equal((await webhook("customer.subscription.deleted", ST.subs.get("sub_1"))).statusCode, 200);
 });
+
+// ── which Stripe takes the money ─────────────────────────────────────────
+
+test("the site says publicly whether it takes real money — and never any part of a key", async () => {
+  const ask = () => call(stripeApi, { method: "GET", query: { action: "mode" } });
+  const keep = process.env.STRIPE_SECRET_KEY;
+  try {
+    assert.deepEqual((await ask()).body, { mode: "test", webhook_secret: "set" });
+    process.env.STRIPE_SECRET_KEY = "sk_live_51Abc_secret_part";
+    const live = await ask();
+    assert.equal(live.body.mode, "live");
+    assert.doesNotMatch(JSON.stringify(live.body), /51Abc|secret_part|whsec_/);
+    delete process.env.STRIPE_SECRET_KEY;
+    assert.equal((await ask()).body.mode, "missing");
+    assert.equal((await call(stripeApi, { method: "POST", query: { action: "mode" } })).statusCode, 405);
+  } finally {
+    process.env.STRIPE_SECRET_KEY = keep;
+  }
+});
