@@ -3,22 +3,23 @@
  *
  * WHAT IT DOES
  *   Holds Boss's switch for the whole section (shown / hidden on the site —
- *   lib/siteSections, Boss 2026-10-07). Lists every analysis including drafts — filtered (all / on the site / drafts)
- *   and searchable — publishes, withdraws and deletes with one click, and opens
- *   one in an editor where every piece of text can be changed in both languages,
- *   any block (a paragraph, a heading, a chart, a table) added, moved or deleted,
- *   and the result previewed exactly as the public page will draw it before it
- *   is saved.
+ *   lib/siteSections, Boss 2026-10-07). Lists every analysis including drafts —
+ *   filtered (all / published / drafts) and searchable — publishes, withdraws
+ *   and deletes with one click, and opens one in an editor where every piece of
+ *   text can be changed in both languages, any block (a paragraph, a heading, a
+ *   chart, a table, a list) inserted anywhere, moved, collapsed or deleted, a
+ *   table edited cell by cell, and the result previewed exactly as the public
+ *   page will draw it before it is saved.
  *
  * WHY NO RICH-TEXT EDITOR
  *   The app has four runtime dependencies and the analyses have a deliberate
  *   fixed shape — declarative headline, lead, sections, figures, a mandatory
  *   method note. A WYSIWYG box would let that shape drift and would add ~100 kB
  *   to do it. Each block gets the input its type needs instead: a heading is one
- *   line, a paragraph is a textarea, a figure's image is fixed and only its
- *   caption is editable. Charts are generated files, not something to retype.
- *   The preview is the public page's own component (insightsView ArticleView),
- *   so what it shows cannot drift from what readers get.
+ *   line, a paragraph is a textarea, a table is a grid, a chart is a generated
+ *   file whose path, caption and alt text are edited. The preview is the public
+ *   page's own component (insightsView ArticleView), so what it shows cannot
+ *   drift from what readers get.
  *
  * WHY NO API ROUTE
  *   The app is at exactly 12 of 12 Vercel Hobby functions. Writes go straight to
@@ -26,27 +27,36 @@
  *
  * SAFETY
  *   Nothing saves until Save (or ⌘S) is pressed, the button only lights up when
- *   something actually changed, and leaving with unsaved edits asks first. Every
- *   question is the platform's own dialog (components/Modal), never the browser's
- *   alert/confirm/prompt — those block the tab and read like a message from
- *   another site.
+ *   something actually changed, and unsaved work is never lost without a
+ *   question: not by the back button, not by the platform's sidebar or the
+ *   browser's Back (lib/leaveGuard), not by closing the tab (beforeunload), and
+ *   publishing with unsaved edits saves them first. Undo keeps 100 steps, a
+ *   burst of typing in one field being one step (lib/articlesAdmin historyPush).
+ *   Every question is the platform's own dialog (components/Modal), never the
+ *   browser's alert/confirm/prompt — those block the tab and read like a message
+ *   from another site.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useArticles, useArticle, setArticlePublished, saveArticle, createArticle, deleteArticle } from "../lib/useArticles";
 import { filesNotLive } from "../lib/articleFiles";
 import { SITE_BASE } from "../lib/seo";
-import { openManualSteps } from "../lib/articleSeo";
-import { articleMatches, articleCounts, slugProblem, ARTICLE_FILTERS } from "../lib/articlesAdmin.js";
+import { openManualSteps, MANUAL_STEPS } from "../lib/articleSeo";
+import {
+  articleMatches, articleCounts, slugProblem, ARTICLE_FILTERS,
+  historyPush, insertBlockAt, blockSnippet,
+  normalizeTable, tableWidth, setHeadCell, setCell, addRow, removeRow, moveRow, addColumn, removeColumn,
+  formatStamp, formatDay,
+} from "../lib/articlesAdmin.js";
 import { useSiteSection } from "../lib/siteSections";
+import { setLeaveGuard } from "../lib/leaveGuard";
 import Modal from "../components/Modal";
 import ArticleSeoPanel from "./articleSeoPanel";
 import { ArticleView } from "./insightsView";
 
-const HISTORY_LIMIT = 20;
-
-/** Block kinds an editor can add. `lead` is excluded: an article has one, first. */
-const ADDABLE = ["h2", "p", "figure", "table", "bullets"];
+/** Block kinds an editor can add. `lead` only while the article has none: it is
+ *  the one opening paragraph, and it goes first. */
+const ADDABLE = ["p", "h2", "figure", "table", "bullets"];
 
 let keySeq = 0;
 /** Give every block a stable React key. Index keys reuse the wrong input the
@@ -55,14 +65,10 @@ const withKeys = (blocks) => (blocks || []).map((b) => ({ ...b, _k: b._k ?? `k${
 /** …and take them off again, so a client-side id never reaches the database. */
 const stripKeys = (blocks) => (blocks || []).map(({ _k, ...rest }) => rest);
 
-/** "a | b | c" -> ["a","b","c"]; empty string -> []. */
-const splitCells = (line) =>
-  (line || "").split("|").map((c) => c.trim()).filter((c, i, all) => c || i < all.length - 1);
-
 function emptyBlock(type) {
   const pair = { sk: "", en: "" };
   if (type === "figure") return { type, src: "", srcEn: "", alt: { ...pair }, caption: { ...pair } };
-  if (type === "table") return { type, head: { sk: [], en: [] }, rows: [], caption: { ...pair } };
+  if (type === "table") return { type, head: { sk: ["", ""], en: ["", ""] }, rows: [["", ""]], caption: { ...pair } };
   if (type === "bullets") return { type, items: [{ ...pair }] };
   return { type, text: { ...pair } };
 }
@@ -72,8 +78,10 @@ function emptyBlock(type) {
  *
  * Boss cleared the Slovak title while trying the editor and there was no way
  * back — the previous value existed only in the database, and only until Save.
- * This keeps the last HISTORY_LIMIT states so ⌘Z walks backwards and ⇧⌘Z
- * forwards, like any editor.
+ * ⌘Z walks backwards and ⇧⌘Z forwards, like any editor. The first version kept
+ * 20 states and pushed one per keystroke, so undo reached back about twenty
+ * characters; historyPush makes a burst of typing in one field one step and
+ * keeps 100.
  *
  * The stack and the cursor live in ONE state object on purpose. The first
  * version held them separately with a ref to bridge them, and they desynced:
@@ -86,25 +94,15 @@ function emptyBlock(type) {
  */
 function useHistory() {
   const [h, setH] = useState({ stack: [], at: -1 });
-
-  const reset = useCallback((value) => setH({ stack: [value], at: 0 }), []);
-
-  const push = useCallback((value) => setH((p) => {
-    const kept = p.stack.slice(0, p.at + 1);          // a new edit drops the redo tail
-    const next = [...kept, value];
-    const trimmed = next.length > HISTORY_LIMIT ? next.slice(next.length - HISTORY_LIMIT) : next;
-    return { stack: trimmed, at: trimmed.length - 1 };
-  }), []);
-
+  const reset = useCallback((value) => setH({ stack: [{ value, key: null, at: 0 }], at: 0 }), []);
+  const push = useCallback((value, key = null) => setH((p) => historyPush(p, value, key)), []);
   const undo = useCallback(() => setH((p) => ({ ...p, at: Math.max(0, p.at - 1) })), []);
   const redo = useCallback(() => setH((p) => ({ ...p, at: Math.min(p.stack.length - 1, p.at + 1) })), []);
-
   return {
-    value: h.at >= 0 ? h.stack[h.at] : undefined,
+    value: h.at >= 0 ? h.stack[h.at].value : undefined,
     push, reset, undo, redo,
     canUndo: h.at > 0,
     canRedo: h.at >= 0 && h.at < h.stack.length - 1,
-    depth: h.stack.length,
   };
 }
 
@@ -113,22 +111,20 @@ const MONO = "ui-monospace, SFMono-Regular, Menlo, monospace";
 const LABEL = {
   sk: {
     heading: "Analýzy", sub: "Články na residata.eu/analyzy — publikovanie, úpravy, mazanie.",
-    published: "Publikované", draft: "Koncept", edit: "Upraviť", back: "← Späť na zoznam",
-    manualSteps: "ručné kroky",
+    published: "Publikované", draft: "Koncept", edit: "Upraviť", back: "← Zoznam článkov",
+    manualSteps: "ručné kroky", manualStepsTip: "Ešte treba urobiť ručne:",
     publish: "Publikovať", unpublish: "Stiahnuť z webu", view: "Zobraziť na webe",
-    save: "Uložiť zmeny", saving: "Ukladám…", saved: "Uložené", noChanges: "Žiadne zmeny",
-    title: "Titulok", perex: "Perex", method: "Metodika", blocks: "Obsah",
+    save: "Uložiť zmeny", saving: "Ukladám…", noChanges: "Uložené", unsaved: "Neuložené zmeny",
+    title: "Titulok", perex: "Perex", method: "Metodika", blocks: "Obsah článku",
     lead: "Úvodný odsek", h2: "Nadpis sekcie", p: "Odsek", figure: "Graf",
-    table: "Tabuľka", caption: "Popis pod grafom", empty: "Zatiaľ žiadne články.",
-    noMatch: "Žiadny článok nezodpovedá filtru.",
-    loading: "Načítavam…",
-    lastEdit: "Naposledy upravené",
-    undo: "Späť", redo: "Dopredu", revert: "Zahodiť zmeny",
-    steps: "krokov v pamäti",
+    table: "Tabuľka", bullets: "Odrážky", caption: "Popis pod grafom", tableCaption: "Popis pod tabuľkou",
+    empty: "Zatiaľ žiadne články.", noMatch: "Žiadny článok nezodpovedá filtru.",
+    loading: "Načítavam…", lastEdit: "upravené",
+    undo: "Vrátiť", redo: "Znova", revert: "Zahodiť zmeny",
     emptyTitle: "Titulok nesmie byť prázdny — bez neho je článok na webe bez nadpisu.",
     emptyPerex: "Perex nesmie byť prázdny — zobrazuje sa v zozname a vo vyhľadávaní.",
     emptyDate: "Dátum musí byť vyplnený — určuje poradie článkov na webe.",
-    liveNow: "Článok je na webe", draftNow: "Článok nie je na webe",
+    liveNow: "Na webe", draftNow: "Nie je na webe",
     liveHidden: "Publikovaný — ale sekcia je skrytá, na webe sa nezobrazuje",
     secTitle: "Sekcia Analýzy na webe", secOn: "Zobrazená", secOff: "Skrytá",
     secOnBody: "Návštevníci vidia v menu odkaz Analýzy a všetky publikované články.",
@@ -138,14 +134,14 @@ const LABEL = {
     secChanged: "Naposledy zmenené", secDelay: "Zmena sa na webe prejaví do pár minút — web sa sám znovu zostaví.",
     secLoadFailed: "Nastavenie sekcie sa nepodarilo načítať.", secNotAllowed: "Sekciu môže skryť alebo zobraziť len admin.",
     qHideT: "Skryť celú sekciu Analýzy?",
-    qHideB: "Z webu zmizne odkaz v menu, stránka /analyzy aj všetky články, aj z mapy stránky pre Google. Nič sa nemaže — články ostanú publikované a po zobrazení sekcie sa vrátia. Prejaví sa do pár minút.",
+    qHideB: "Z webu zmizne odkaz v menu, stránka /analyzy aj všetky články, aj z mapy stránky pre Google. Nič sa nemaže — články ostanú publikované a po zobrazení sekcie sa vrátia. Prejaví sa do pár minút.\n\nPozor: kým je sekcia skrytá, Google články vyradí z vyhľadávania. Časté prepínanie im zhoršuje pozície.",
     qShowT: "Zobraziť sekciu Analýzy na webe?",
     qShowB: (n) => n > 0
       ? `Na webe sa objaví odkaz v menu a ${n} publikovaných článkov. Prejaví sa do pár minút.`
       : "Sekcia sa zapne, ale na webe sa objaví až keď publikujete aspoň jeden článok.",
     tHidden: "Sekcia skrytá — z webu zmizne do pár minút.", tShown: "Sekcia zobrazená — na webe do pár minút.",
-    date: "Dátum článku", ogImage: "Zdieľaný obrázok (cesta k súboru)",
-    alt: "Alternatívny text obrázka (pre čítačky a vyhľadávače)",
+    date: "Dátum článku", ogImage: "Obrázok pri zdieľaní (cesta k súboru)",
+    alt: "Popis obrázka pre nevidiacich a vyhľadávače",
     newArticle: "Nový článok", newSlug: "Adresa článku", newSlugHint: "Malé písmená, čísla a pomlčky — napr. trh-novostavieb-2026-10. Adresu po vytvorení už nemeňte, odkazy na ňu by prestali fungovať.",
     create: "Vytvoriť a otvoriť",
     slugErr: {
@@ -153,10 +149,16 @@ const LABEL = {
       format: "Adresa smie obsahovať len malé písmená bez diakritiky, číslice a pomlčky (nie na začiatku ani na konci).",
       taken: "Článok s touto adresou už existuje.",
     },
-    addBlock: "Pridať blok", up: "Posunúť hore", down: "Posunúť dole", removeBlock: "Zmazať blok",
-    bAddP: "Odsek", bAddH2: "Nadpis", bAddFigure: "Graf", bAddTable: "Tabuľka", bAddBullets: "Odrážky",
-    imgPath: "Cesta k obrázku (SK)", imgPathEn: "Cesta k obrázku (EN)",
-    tableHead: "Hlavička (stĺpce oddelené |)", tableRows: "Riadky (bunky |, riadok na nový riadok)",
+    addBlock: "Pridať na koniec", insertBelow: "Vložiť pod", insertHere: "Vložiť sem:",
+    up: "Posunúť hore", down: "Posunúť dole", removeBlock: "Zmazať",
+    collapse: "Zbaliť", expand: "Rozbaliť", collapseAll: "Zbaliť všetky", expandAll: "Rozbaliť všetky",
+    imgPath: "Graf SK — cesta k súboru", imgPathEn: "Graf EN — cesta k súboru",
+    imgMissing: "Na tejto adrese obrázok nie je — skontrolujte cestu. S chýbajúcim grafom sa článok nedá publikovať.",
+    imgNone: "bez obrázka",
+    headSk: "Hlavička SK", headEn: "Hlavička EN",
+    addRow: "+ Riadok", addCol: "+ Stĺpec", delRow: "Zmazať riadok", delCol: "Zmazať stĺpec",
+    rowUp: "Riadok hore", rowDown: "Riadok dole",
+    addItem: "+ Odrážka", delItem: "Zmazať odrážku", itemUp: "Odrážka hore", itemDown: "Odrážka dole",
     deleteArticle: "Zmazať článok",
     filesNotLive: "Článok sa zatiaľ nedá publikovať: tieto grafy alebo obrázok na zdieľanie ešte nie sú na webe. Najprv ich treba nahrať do repozitára a počkať na nasadenie:",
     loadFailed: "Články sa nepodarilo načítať.",
@@ -168,20 +170,21 @@ const LABEL = {
     tabEdit: "Úpravy", tabPreview: "Náhľad",
     previewNote: "Takto bude článok vyzerať na webe — vrátane neuložených zmien.",
     cancel: "Zrušiť", close: "Zavrieť",
-    // dialogs
     qUnpublishT: "Stiahnuť článok z webu?",
     qUnpublishB: "Prestane byť verejne dostupný a zmizne zo zoznamu analýz aj z mapy stránky. Web sa obnoví do pár minút. Neskôr ho môžete znova publikovať.",
+    qSavePubT: "Uložiť zmeny a publikovať?",
+    qSavePubB: "Článok má neuložené zmeny. Na web by išla posledná uložená verzia — najprv ich uložíme a potom článok publikujeme.",
+    saveAndPublish: "Uložiť a publikovať",
     qDeleteT: "Natrvalo zmazať článok?",
     qDeleteB: (title) => `„${title}" bude nenávratne zmazaný vrátane celého textu. Toto sa nedá vrátiť.`,
     qDeleteLiveB: (title) => `„${title}" je teraz na webe. Najprv ho stiahneme z webu a potom nenávratne zmažeme vrátane celého textu. Toto sa nedá vrátiť.`,
     qRemoveBlockT: "Zmazať tento blok?",
-    qRemoveBlockB: (what) => `${what} zmizne z článku. Kým neuložíte, vráti ho tlačidlo Späť (⌘Z).`,
+    qRemoveBlockB: (what) => `${what} zmizne z článku. Kým neuložíte, vráti ho tlačidlo Vrátiť (⌘Z).`,
     qRevertT: "Zahodiť neuložené zmeny?",
     qRevertB: "Článok sa vráti do poslednej uloženej verzie.",
     qLeaveT: "Odísť bez uloženia?",
     qLeaveB: "Máte neuložené zmeny. Ak odídete, stratia sa.",
     leave: "Odísť bez uloženia",
-    // toasts
     tPublished: "Publikované — na webe do pár minút.",
     tWithdrawn: "Stiahnuté z webu — zmizne do pár minút.",
     tDeleted: "Článok zmazaný.",
@@ -190,22 +193,20 @@ const LABEL = {
   },
   en: {
     heading: "Analyses", sub: "The articles at residata.eu/analyzy — publish, edit, delete.",
-    published: "Published", draft: "Draft", edit: "Edit", back: "← Back to list",
-    manualSteps: "manual steps",
+    published: "Published", draft: "Draft", edit: "Edit", back: "← All articles",
+    manualSteps: "manual steps", manualStepsTip: "Still to do by hand:",
     publish: "Publish", unpublish: "Withdraw", view: "View on the site",
-    save: "Save changes", saving: "Saving…", saved: "Saved", noChanges: "No changes",
-    title: "Title", perex: "Standfirst", method: "Method note", blocks: "Body",
+    save: "Save changes", saving: "Saving…", noChanges: "Saved", unsaved: "Unsaved changes",
+    title: "Title", perex: "Standfirst", method: "Method note", blocks: "Article body",
     lead: "Opening paragraph", h2: "Section heading", p: "Paragraph", figure: "Chart",
-    table: "Table", caption: "Caption", empty: "No articles yet.",
-    noMatch: "No article matches the filter.",
-    loading: "Loading…",
-    lastEdit: "Last edited",
+    table: "Table", bullets: "Bullets", caption: "Caption", tableCaption: "Caption under the table",
+    empty: "No articles yet.", noMatch: "No article matches the filter.",
+    loading: "Loading…", lastEdit: "edited",
     undo: "Undo", redo: "Redo", revert: "Discard changes",
-    steps: "steps remembered",
     emptyTitle: "The title cannot be empty — the article would have no headline.",
     emptyPerex: "The standfirst cannot be empty — it is shown in the list and in search results.",
     emptyDate: "The date is required — it orders the articles on the site.",
-    liveNow: "Live on the site", draftNow: "Not on the site",
+    liveNow: "On the site", draftNow: "Not on the site",
     liveHidden: "Published — but the section is hidden, so it is not on the site",
     secTitle: "The Analyses section on the site", secOn: "Shown", secOff: "Hidden",
     secOnBody: "Visitors see the Analyses link in the menu and every published article.",
@@ -215,14 +216,14 @@ const LABEL = {
     secChanged: "Last changed", secDelay: "The site follows within minutes — it rebuilds itself.",
     secLoadFailed: "The section setting could not be loaded.", secNotAllowed: "Only an admin can hide or show the section.",
     qHideT: "Hide the whole Analyses section?",
-    qHideB: "The menu link, the /analyzy page and every article leave the site, the sitemap for Google included. Nothing is deleted — the articles stay published and come back when the section is shown. Takes effect within minutes.",
+    qHideB: "The menu link, the /analyzy page and every article leave the site, the sitemap for Google included. Nothing is deleted — the articles stay published and come back when the section is shown. Takes effect within minutes.\n\nNote: while the section is hidden, Google drops the articles from search. Frequent switching costs them their ranking.",
     qShowT: "Show the Analyses section?",
     qShowB: (n) => n > 0
       ? `The menu link and ${n} published articles appear on the site. Takes effect within minutes.`
       : "The section is switched on, but it appears only once an article is published.",
     tHidden: "Section hidden — gone from the site within minutes.", tShown: "Section shown — on the site within minutes.",
     date: "Article date", ogImage: "Share image (file path)",
-    alt: "Image alt text (for screen readers and search)",
+    alt: "Image description for screen readers and search",
     newArticle: "New article", newSlug: "Article address", newSlugHint: "Lower-case letters, digits and hyphens — e.g. trh-novostavieb-2026-10. Do not change it once created; links to it would break.",
     create: "Create and open",
     slugErr: {
@@ -230,10 +231,16 @@ const LABEL = {
       format: "The address may hold only lower-case letters without accents, digits and hyphens (not first or last).",
       taken: "An article with this address already exists.",
     },
-    addBlock: "Add block", up: "Move up", down: "Move down", removeBlock: "Delete block",
-    bAddP: "Paragraph", bAddH2: "Heading", bAddFigure: "Chart", bAddTable: "Table", bAddBullets: "Bullets",
-    imgPath: "Image path (SK)", imgPathEn: "Image path (EN)",
-    tableHead: "Header (columns separated by |)", tableRows: "Rows (cells by |, one row per line)",
+    addBlock: "Add at the end", insertBelow: "Insert below", insertHere: "Insert here:",
+    up: "Move up", down: "Move down", removeBlock: "Delete",
+    collapse: "Collapse", expand: "Expand", collapseAll: "Collapse all", expandAll: "Expand all",
+    imgPath: "Chart SK — file path", imgPathEn: "Chart EN — file path",
+    imgMissing: "There is no image at this address — check the path. An article with a missing chart cannot be published.",
+    imgNone: "no image",
+    headSk: "Header SK", headEn: "Header EN",
+    addRow: "+ Row", addCol: "+ Column", delRow: "Delete row", delCol: "Delete column",
+    rowUp: "Row up", rowDown: "Row down",
+    addItem: "+ Bullet", delItem: "Delete bullet", itemUp: "Bullet up", itemDown: "Bullet down",
     deleteArticle: "Delete article",
     filesNotLive: "This article cannot be published yet: these charts or the share image are not on the site. Commit them and wait for the deploy first:",
     loadFailed: "The articles could not be loaded.",
@@ -247,6 +254,9 @@ const LABEL = {
     cancel: "Cancel", close: "Close",
     qUnpublishT: "Withdraw the article?",
     qUnpublishB: "It stops being publicly available and leaves the analyses list and the sitemap. The site updates within minutes. You can publish it again later.",
+    qSavePubT: "Save the changes and publish?",
+    qSavePubB: "The article has unsaved changes. The site would get the last saved version — so they are saved first, then the article is published.",
+    saveAndPublish: "Save and publish",
     qDeleteT: "Delete the article for good?",
     qDeleteB: (title) => `"${title}" will be deleted permanently, all its text included. This cannot be undone.`,
     qDeleteLiveB: (title) => `"${title}" is on the site now. It will be withdrawn first and then deleted permanently, all its text included. This cannot be undone.`,
@@ -275,12 +285,19 @@ const fieldLabel = {
   textTransform: "uppercase", color: "var(--text-dim)", marginBottom: "0.45rem",
 };
 
+const inputStyle = {
+  width: "100%", background: "var(--bg)", color: "var(--text)",
+  border: "1px solid var(--border-soft)", borderRadius: 7,
+  padding: "0.6rem 0.7rem", fontSize: "0.88rem", lineHeight: 1.6,
+  fontFamily: "inherit", resize: "vertical",
+};
+
 const DANGER_BTN = { color: "var(--danger)", borderColor: "color-mix(in srgb, var(--danger) 55%, transparent)" };
 
 function Pill({ on, children }) {
   return (
     <span style={{
-      fontFamily: MONO, fontSize: "0.65rem", letterSpacing: "0.08em",
+      fontFamily: MONO, fontSize: "0.65rem", letterSpacing: "0.08em", whiteSpace: "nowrap",
       textTransform: "uppercase", padding: "0.22rem 0.5rem", borderRadius: 5,
       color: on ? "#0b2b23" : "var(--text-dim)",
       background: on ? "var(--accent)" : "var(--surface-2)",
@@ -289,15 +306,10 @@ function Pill({ on, children }) {
   );
 }
 
-/** A {sk,en} pair of inputs. One field, two languages, always side by side. */
+/** A {sk,en} pair of inputs. One field, two languages, side by side (stacked on a phone). */
 function BiField({ label, value, onChange, rows = 3, mono = false }) {
   const v = value || {};
-  const common = {
-    width: "100%", background: "var(--bg)", color: "var(--text)",
-    border: "1px solid var(--border-soft)", borderRadius: 7,
-    padding: "0.6rem 0.7rem", fontSize: "0.88rem", lineHeight: 1.6,
-    fontFamily: mono ? MONO : "inherit", resize: "vertical",
-  };
+  const common = { ...inputStyle, fontFamily: mono ? MONO : "inherit" };
   return (
     <div style={{ marginBottom: "1.1rem" }}>
       {label ? <div style={fieldLabel}>{label}</div> : null}
@@ -308,9 +320,9 @@ function BiField({ label, value, onChange, rows = 3, mono = false }) {
               {lc.toUpperCase()}
             </div>
             {rows === 1
-              ? <input style={common} value={v[lc] || ""}
+              ? <input style={common} value={v[lc] || ""} aria-label={`${label || ""} ${lc.toUpperCase()}`}
                        onChange={(e) => onChange({ ...v, [lc]: e.target.value })} />
-              : <textarea style={common} rows={rows} value={v[lc] || ""}
+              : <textarea style={common} rows={rows} value={v[lc] || ""} aria-label={`${label || ""} ${lc.toUpperCase()}`}
                           onChange={(e) => onChange({ ...v, [lc]: e.target.value })} />}
           </div>
         ))}
@@ -465,7 +477,7 @@ function SectionCard({ t, section, publishedCount, dialogs }) {
           {!shown ? t.secOffBody : empty ? t.secOnEmpty : t.secOnBody}
         </div>
         <div style={{ fontSize: "0.7rem", color: "var(--text-faint)", marginTop: "0.4rem" }}>
-          {row.updatedAt && `${t.secChanged} ${String(row.updatedAt).slice(0, 16).replace("T", " ")} UTC · `}{t.secDelay}
+          {row.updatedAt && `${t.secChanged} ${formatStamp(row.updatedAt)} · `}{t.secDelay}
         </div>
       </div>
       <button type="button" disabled={busy}
@@ -570,50 +582,51 @@ function ArticleList({ t, dialogs, section, onEdit }) {
       <div style={{ display: "grid", gap: "0.7rem" }}>
         {!articles.length && <div style={{ color: "var(--text-dim)" }}>{t.empty}</div>}
         {articles.length > 0 && !shown.length && <div style={{ color: "var(--text-dim)" }}>{t.noMatch}</div>}
-        {shown.map((a) => (
-          <div key={a.id} style={{ ...box, display: "flex", gap: "1rem", alignItems: "flex-start", flexWrap: "wrap" }}>
-            <div style={{ flex: "1 1 320px", minWidth: 0 }}>
-              <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", marginBottom: "0.4rem", flexWrap: "wrap" }}>
-                <Pill on={a.published}>{a.published ? t.published : t.draft}</Pill>
-                {/* The steps no system can take (lib/articleSeo MANUAL_STEPS) —
-                    counted here so an article is not left half-promoted. */}
-                {a.published && openManualSteps(a) > 0 && (
-                  <span style={{
-                    fontSize: "0.66rem", padding: "0.12rem 0.45rem", borderRadius: 999,
-                    border: "1px solid color-mix(in srgb, var(--warning) 50%, transparent)", color: "var(--warning)",
-                  }}>{openManualSteps(a)} {t.manualSteps}</span>
+        {shown.map((a) => {
+          const open = openManualSteps(a);
+          const missingSteps = MANUAL_STEPS.filter((s) => !s.optional && !a.promoChecklist?.[s.key]).map((s) => s.sk);
+          return (
+            <div key={a.id} style={{ ...box, display: "flex", gap: "1rem", alignItems: "flex-start", flexWrap: "wrap" }}>
+              <div style={{ flex: "1 1 320px", minWidth: 0 }}>
+                <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", marginBottom: "0.4rem", flexWrap: "wrap" }}>
+                  <Pill on={a.published && !sectionHidden}>{a.published ? t.published : t.draft}</Pill>
+                  {/* The steps no system can take (lib/articleSeo MANUAL_STEPS) —
+                      counted here so an article is not left half-promoted. */}
+                  {open > 0 && (
+                    <span title={`${t.manualStepsTip} ${missingSteps.join(" · ")}`} style={{
+                      fontSize: "0.66rem", padding: "0.12rem 0.45rem", borderRadius: 999, cursor: "help",
+                      border: "1px solid color-mix(in srgb, var(--warning) 50%, transparent)", color: "var(--warning)",
+                    }}>{open} {t.manualSteps}</span>
+                  )}
+                  <span style={{ fontSize: "0.74rem", color: "var(--text-faint)" }}>{formatDay(a.date)}</span>
+                </div>
+                <button type="button" className="rd-title-btn" onClick={() => onEdit(a.slug)}>
+                  {a.title?.sk || a.title?.en || a.slug}
+                </button>
+                <div style={{ fontSize: "0.8rem", color: "var(--text-dim)", lineHeight: 1.55 }}>
+                  {(a.perex?.sk || a.perex?.en || "").slice(0, 180)}
+                </div>
+                <div style={{ fontSize: "0.68rem", color: "var(--text-faint)", marginTop: "0.5rem" }}>
+                  <span style={{ fontFamily: MONO }}>/analyzy/{a.slug}</span>
+                  {a.updatedAt && ` · ${t.lastEdit} ${formatStamp(a.updatedAt)}`}
+                </div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", flexShrink: 0, minWidth: 150 }}>
+                <button className="rd-btn rd-btn--sm" onClick={() => onEdit(a.slug)}>{t.edit}</button>
+                <button className={"rd-btn rd-btn--sm" + (a.published ? "" : " rd-btn--primary")}
+                        disabled={busy === a.id} onClick={() => toggle(a)}>
+                  {busy === a.id ? "…" : (a.published ? t.unpublish : t.publish)}
+                </button>
+                {a.published && !sectionHidden && (
+                  <a className="rd-btn rd-btn--sm" href={`${SITE_BASE}/analyzy/${a.slug}`}
+                     target="_blank" rel="noreferrer">{t.view} ↗</a>
                 )}
-                <span style={{ fontFamily: MONO, fontSize: "0.7rem", color: "var(--text-faint)" }}>{a.date}</span>
-              </div>
-              <button type="button" onClick={() => onEdit(a.slug)} style={{
-                all: "unset", cursor: "pointer", display: "block",
-                fontWeight: 600, color: "var(--text)", marginBottom: "0.3rem",
-              }}>
-                {a.title?.sk || a.title?.en || a.slug}
-              </button>
-              <div style={{ fontSize: "0.8rem", color: "var(--text-dim)", lineHeight: 1.55 }}>
-                {(a.perex?.sk || a.perex?.en || "").slice(0, 180)}
-              </div>
-              <div style={{ fontFamily: MONO, fontSize: "0.66rem", color: "var(--text-faint)", marginTop: "0.5rem" }}>
-                /analyzy/{a.slug}
-                {a.updatedAt && ` · ${t.lastEdit} ${String(a.updatedAt).slice(0, 16).replace("T", " ")}`}
+                <button className="rd-btn rd-btn--sm rd-btn--ghost" disabled={busy === a.id}
+                        style={{ color: "var(--danger)" }} onClick={() => remove(a)}>{t.deleteArticle}</button>
               </div>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", flexShrink: 0, minWidth: 150 }}>
-              <button className="rd-btn rd-btn--sm" onClick={() => onEdit(a.slug)}>{t.edit}</button>
-              <button className={"rd-btn rd-btn--sm" + (a.published ? "" : " rd-btn--primary")}
-                      disabled={busy === a.id} onClick={() => toggle(a)}>
-                {busy === a.id ? "…" : (a.published ? t.unpublish : t.publish)}
-              </button>
-              {a.published && !sectionHidden && (
-                <a className="rd-btn rd-btn--sm rd-btn--ghost" href={`${SITE_BASE}/analyzy/${a.slug}`}
-                   target="_blank" rel="noreferrer">{t.view} ↗</a>
-              )}
-              <button className="rd-btn rd-btn--sm rd-btn--ghost" disabled={busy === a.id}
-                      style={{ color: "var(--danger)" }} onClick={() => remove(a)}>{t.deleteArticle}</button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {creating && (
@@ -656,6 +669,203 @@ function ArticlePreview({ draft, published, t }) {
   );
 }
 
+/* ───────────────────────────── block editors ───────────────────────────── */
+
+const smallBtn = "rd-btn rd-btn--sm rd-btn--ghost";
+
+/** One chart file: its picture, or a plain warning when the address holds none.
+ *  A missing path on the site answers with the app's page, which is not an
+ *  image — so the browser's own error is the test. Keyed by src by the caller,
+ *  so a corrected path is judged afresh. */
+function ChartThumb({ src, label, t }) {
+  const [bad, setBad] = useState(false);
+  return (
+    <div style={{ minWidth: 0 }}>
+      <div style={{ fontSize: "0.65rem", color: "var(--text-faint)", marginBottom: "0.3rem" }}>{label}</div>
+      {!src ? (
+        <div style={{ fontSize: "0.75rem", color: "var(--text-faint)" }}>— {t.imgNone}</div>
+      ) : bad ? (
+        <div className="rd-alert rd-alert--warn" role="alert" style={{ fontSize: "0.75rem" }}>⚠ {t.imgMissing}</div>
+      ) : (
+        <img src={src} alt="" loading="lazy" onError={() => setBad(true)} style={{
+          width: "100%", maxWidth: 380, borderRadius: 8, background: "#fff",
+          display: "block", border: "1px solid var(--border-soft)",
+        }} />
+      )}
+    </div>
+  );
+}
+
+function FigureEditor({ b, t, onChange }) {
+  return (
+    <>
+      <div className="rd-form" style={{ gap: "0.8rem", marginBottom: "0.9rem" }}>
+        <ChartThumb key={`sk:${b.src}`} src={b.src} label="SK" t={t} />
+        <ChartThumb key={`en:${b.srcEn}`} src={b.srcEn} label="EN" t={t} />
+      </div>
+      <div className="rd-form" style={{ gap: "0.55rem", marginBottom: "1.1rem" }}>
+        {[["src", t.imgPath], ["srcEn", t.imgPathEn]].map(([field, label]) => (
+          <div key={field}>
+            <div style={{ fontSize: "0.65rem", color: "var(--text-faint)", marginBottom: "0.25rem" }}>{label}</div>
+            <input value={b[field] || ""} placeholder="/analyzy/…svg" aria-label={label} spellCheck={false}
+                   onChange={(e) => onChange(field === "src"
+                     // A new chart: what the generator recorded about the
+                     // OLD one (its phone drawing, its sizes) no longer
+                     // applies — keeping srcM would show phones a different chart.
+                     ? { src: e.target.value, srcM: undefined, w: undefined, h: undefined, wM: undefined, hM: undefined }
+                     : { [field]: e.target.value }, field)}
+                   style={{ ...inputStyle, padding: "0.55rem 0.7rem", fontSize: "0.82rem", fontFamily: MONO }} />
+          </div>
+        ))}
+      </div>
+      <BiField label={t.caption} rows={2} value={b.caption} onChange={(v) => onChange({ caption: v }, "caption")} />
+      <BiField label={t.alt} rows={1} value={b.alt} onChange={(v) => onChange({ alt: v }, "alt")} />
+    </>
+  );
+}
+
+/**
+ * A table as a grid: a header row per language, one input per cell, rows and
+ * columns added, moved and deleted with buttons. It used to be one textarea of
+ * "a | b | c" lines — and a cell that held both languages ({sk, en}, a decimal
+ * mark that differs) was flattened to its Slovak side the moment anyone typed.
+ * Every edit here goes through lib/articlesAdmin, which keeps the shape the
+ * public page draws.
+ */
+function TableEditor({ b, t, onChange }) {
+  const tb = normalizeTable(b);
+  const n = tableWidth(tb);
+  const cols = [...Array(n).keys()];
+  const cellStyle = (c) => ({
+    ...inputStyle, padding: "0.4rem 0.5rem", fontSize: "0.82rem", lineHeight: 1.4,
+    minWidth: c === 0 ? 150 : 90, fontVariantNumeric: "tabular-nums",
+  });
+  const iconBtn = { padding: "0 0.4rem", minWidth: 0 };
+  return (
+    <div style={{ marginBottom: "1rem" }}>
+      <div style={{ overflowX: "auto", border: "1px solid var(--border-soft)", borderRadius: 8, padding: "0.4rem" }}>
+        <table style={{ borderCollapse: "separate", borderSpacing: "4px", width: "100%" }}>
+          <thead>
+            <tr>
+              <th />
+              {cols.map((c) => (
+                <th key={c} style={{ textAlign: "left", fontWeight: 400 }}>
+                  <button type="button" className={smallBtn} title={t.delCol} aria-label={`${t.delCol} ${c + 1}`}
+                          style={{ ...iconBtn, color: "var(--text-faint)" }} disabled={n <= 1}
+                          onClick={() => onChange(removeColumn(tb, c), null)}>✕</button>
+                </th>
+              ))}
+              <th />
+            </tr>
+            {["sk", "en"].map((lc) => (
+              <tr key={lc}>
+                <td style={{ fontSize: "0.62rem", color: "var(--text-faint)", whiteSpace: "nowrap", paddingRight: "0.3rem" }}>
+                  {lc === "sk" ? t.headSk : t.headEn}
+                </td>
+                {cols.map((c) => (
+                  <td key={c}>
+                    <input value={tb.head[lc][c] ?? ""} aria-label={`${lc === "sk" ? t.headSk : t.headEn} ${c + 1}`}
+                           onChange={(e) => onChange(setHeadCell(tb, lc, c, e.target.value), `head:${lc}:${c}`)}
+                           style={{ ...cellStyle(c), fontWeight: 600 }} />
+                  </td>
+                ))}
+                <td />
+              </tr>
+            ))}
+          </thead>
+          <tbody>
+            {tb.rows.map((r, ri) => (
+              <tr key={ri}>
+                <td style={{ whiteSpace: "nowrap" }}>
+                  <button type="button" className={smallBtn} title={t.rowUp} aria-label={`${t.rowUp} ${ri + 1}`} style={iconBtn}
+                          disabled={ri === 0} onClick={() => onChange(moveRow(tb, ri, -1), null)}>↑</button>
+                  <button type="button" className={smallBtn} title={t.rowDown} aria-label={`${t.rowDown} ${ri + 1}`} style={iconBtn}
+                          disabled={ri === tb.rows.length - 1} onClick={() => onChange(moveRow(tb, ri, 1), null)}>↓</button>
+                </td>
+                {r.map((cell, ci) => (
+                  <td key={ci}>
+                    {cell && typeof cell === "object" ? (
+                      // A cell that differs by language keeps both sides.
+                      <div style={{ display: "grid", gap: 3 }}>
+                        {["sk", "en"].map((lc) => (
+                          <input key={lc} value={cell[lc] ?? ""} placeholder={lc.toUpperCase()} aria-label={`${ri + 1}:${ci + 1} ${lc}`}
+                                 onChange={(e) => onChange(setCell(tb, ri, ci, e.target.value, lc), `cell:${ri}:${ci}:${lc}`)}
+                                 style={cellStyle(ci)} />
+                        ))}
+                      </div>
+                    ) : (
+                      <input value={cell ?? ""} aria-label={`${ri + 1}:${ci + 1}`}
+                             onChange={(e) => onChange(setCell(tb, ri, ci, e.target.value), `cell:${ri}:${ci}`)}
+                             style={cellStyle(ci)} />
+                    )}
+                  </td>
+                ))}
+                <td>
+                  <button type="button" className={smallBtn} title={t.delRow} aria-label={`${t.delRow} ${ri + 1}`}
+                          style={{ ...iconBtn, color: "var(--danger)" }}
+                          onClick={() => onChange(removeRow(tb, ri), null)}>✕</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.5rem" }}>
+        <button type="button" className={smallBtn} onClick={() => onChange(addRow(tb), null)}>{t.addRow}</button>
+        <button type="button" className={smallBtn} onClick={() => onChange(addColumn(tb), null)}>{t.addCol}</button>
+      </div>
+    </div>
+  );
+}
+
+function BulletsEditor({ b, t, onChange }) {
+  const items = b.items || [];
+  const set = (next, key) => onChange({ items: next }, key);
+  const move = (k, d) => {
+    const j = k + d;
+    if (j < 0 || j >= items.length) return;
+    const next = items.slice();
+    [next[k], next[j]] = [next[j], next[k]];
+    set(next, null);
+  };
+  return (
+    <>
+      {items.map((it, k) => (
+        <div key={k} style={{ display: "flex", gap: "0.3rem", alignItems: "flex-start" }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <BiField label={`• ${k + 1}`} rows={2} value={it}
+                     onChange={(v) => set(items.map((x, y) => (y === k ? v : x)), `item:${k}`)} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: "1.5rem" }}>
+            <button type="button" className={smallBtn} title={t.itemUp} aria-label={`${t.itemUp} ${k + 1}`}
+                    disabled={k === 0} onClick={() => move(k, -1)}>↑</button>
+            <button type="button" className={smallBtn} title={t.itemDown} aria-label={`${t.itemDown} ${k + 1}`}
+                    disabled={k === items.length - 1} onClick={() => move(k, 1)}>↓</button>
+            <button type="button" className={smallBtn} title={t.delItem} aria-label={`${t.delItem} ${k + 1}`}
+                    style={{ color: "var(--danger)" }} onClick={() => set(items.filter((_, y) => y !== k), null)}>✕</button>
+          </div>
+        </div>
+      ))}
+      <button type="button" className={smallBtn} onClick={() => set([...items, { sk: "", en: "" }], null)}>
+        {t.addItem}
+      </button>
+    </>
+  );
+}
+
+/** The row of block kinds a click inserts — under a block, or at the end. */
+function AddBar({ t, types, label, onAdd }) {
+  const name = { lead: t.lead, h2: t.h2, p: t.p, figure: t.figure, table: t.table, bullets: t.bullets };
+  return (
+    <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap", alignItems: "center" }}>
+      <span style={{ fontSize: "0.72rem", color: "var(--text-dim)", marginRight: "0.2rem" }}>{label}</span>
+      {types.map((type) => (
+        <button key={type} type="button" className={smallBtn} onClick={() => onAdd(type)}>+ {name[type]}</button>
+      ))}
+    </div>
+  );
+}
+
 /* ───────────────────────────── the editor ───────────────────────────── */
 
 function ArticleEditor({ slug, t, dialogs, sectionHidden, onBack, onChanged }) {
@@ -666,6 +876,8 @@ function ArticleEditor({ slug, t, dialogs, sectionHidden, onBack, onChanged }) {
   const [err, setErr] = useState(null);
   const [busyPub, setBusyPub] = useState(false);
   const [view, setView] = useState("edit");      // edit | preview
+  const [collapsed, setCollapsed] = useState(() => new Set());   // block keys
+  const [inserting, setInserting] = useState(null);              // block key whose "insert below" is open
   // `published` is a live fact about the row, not editable content, so it is NOT
   // in the history stack: undo after publishing would otherwise show KONCEPT
   // while the database said published.
@@ -689,8 +901,10 @@ function ArticleEditor({ slug, t, dialogs, sectionHidden, onBack, onChanged }) {
     setChecklist(article.promoChecklist || {});
   }, [article]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  const setDraft = useCallback((updater) => {
-    hist.push(typeof updater === "function" ? updater(hist.value) : updater);
+  /** Record an edit. `key` names the field being typed in: a burst of typing in
+   *  one field is one undo step. Structural edits pass none. */
+  const setDraft = useCallback((updater, key = null) => {
+    hist.push(typeof updater === "function" ? updater(hist.value) : updater, key);
   }, [hist]);
 
   const dirty = useMemo(
@@ -717,9 +931,11 @@ function ArticleEditor({ slug, t, dialogs, sectionHidden, onBack, onChanged }) {
     return out;
   }, [draft, t]);
 
-  const save = useCallback(async () => {
-    if (!dirty || state === "saving") return;
-    if (problems.length) { setErr(problems[0]); return; }
+  /** Saves; resolves true when the database has the draft. */
+  const save = useCallback(async ({ quiet = false } = {}) => {
+    if (!dirty) return true;
+    if (state === "saving") return false;
+    if (problems.length) { setErr(problems[0]); return false; }
     setState("saving"); setErr(null); setConflict(false);
     try {
       const next = await saveArticle(
@@ -727,10 +943,12 @@ function ArticleEditor({ slug, t, dialogs, sectionHidden, onBack, onChanged }) {
       setSaved(JSON.parse(JSON.stringify(draft)));
       setVersion(next);
       onChanged?.();
-      notify("ok", published ? t.tSavedLive : t.tSaved);
+      if (!quiet) notify("ok", published ? t.tSavedLive : t.tSaved);
+      return true;
     } catch (e) {
       if (e.code === "CONFLICT") { setConflict(true); setErr(t.conflict); }
       else setErr(e.message);
+      return false;
     } finally { setState("idle"); }
   }, [dirty, state, problems, draft, version, onChanged, notify, published, t]);
 
@@ -750,33 +968,41 @@ function ArticleEditor({ slug, t, dialogs, sectionHidden, onBack, onChanged }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [hist, save]);
 
-  // Losing an edit to a stray click is the one unrecoverable thing here.
+  // Losing an edit to a stray click is the one unrecoverable thing here: closing
+  // the tab asks (beforeunload), and so does any in-app navigation (leaveGuard —
+  // the platform sidebar and the browser's Back).
   useEffect(() => {
     if (!dirty) return undefined;
     const warn = (e) => { e.preventDefault(); e.returnValue = ""; };
     window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [dirty]);
+    const off = setLeaveGuard(() => confirm({ title: t.qLeaveT, body: t.qLeaveB, okLabel: t.leave, danger: true }));
+    return () => { window.removeEventListener("beforeunload", warn); off(); };
+  }, [dirty, confirm, t]);
 
   async function leave() {
     if (dirty && !(await confirm({ title: t.qLeaveT, body: t.qLeaveB, okLabel: t.leave, danger: true }))) return;
     onBack();
   }
 
-  function setBlock(i, patch) {
+  function setBlock(i, patch, key = null) {
     setDraft((d) => {
       const blocks = d.blocks.slice();
       blocks[i] = { ...blocks[i], ...patch };
       return { ...d, blocks };
-    });
+    }, key ? `${draft.blocks[i]._k}:${key}` : null);
   }
 
-  function addBlock(type) {
-    setDraft((d) => ({ ...d, blocks: [...d.blocks, ...withKeys([emptyBlock(type)])] }));
+  function addBlockAt(index, type) {
+    const [made] = withKeys([emptyBlock(type)]);
+    setDraft((d) => ({ ...d, blocks: insertBlockAt(d.blocks, index, made) }));
+    setInserting(null);
+    // Open the new block and bring it into view, so the click visibly did something.
+    setTimeout(() => document.getElementById(`blk-${made._k}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
   }
 
   async function removeBlock(i) {
-    const what = blockLabel(draft.blocks[i]);
+    const b = draft.blocks[i];
+    const what = blockLabel(b) + (blockSnippet(b, 60) ? ` „${blockSnippet(b, 60)}"` : "");
     if (!(await confirm({ title: t.qRemoveBlockT, body: t.qRemoveBlockB(what), okLabel: t.removeBlock, danger: true }))) return;
     setDraft((d) => ({ ...d, blocks: d.blocks.filter((_, x) => x !== i) }));
   }
@@ -791,6 +1017,10 @@ function ArticleEditor({ slug, t, dialogs, sectionHidden, onBack, onChanged }) {
     });
   }
 
+  function toggleCollapsed(k) {
+    setCollapsed((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
+  }
+
   async function revert() {
     if (!(await confirm({ title: t.qRevertT, body: t.qRevertB, okLabel: t.revert, danger: true }))) return;
     hist.reset(JSON.parse(JSON.stringify(saved)));
@@ -800,6 +1030,13 @@ function ArticleEditor({ slug, t, dialogs, sectionHidden, onBack, onChanged }) {
   async function togglePublished() {
     const next = !published;
     if (!next && !(await confirm({ title: t.qUnpublishT, body: t.qUnpublishB, okLabel: t.unpublish }))) return;
+    // Publishing with unsaved edits would put the LAST SAVED version on the site
+    // while the screen showed this one. Save first, or do not publish.
+    if (next && dirty) {
+      if (problems.length) { setErr(problems[0]); return; }
+      if (!(await confirm({ title: t.qSavePubT, body: t.qSavePubB, okLabel: t.saveAndPublish }))) return;
+      if (!(await save({ quiet: true }))) return;
+    }
     setBusyPub(true); setErr(null);
     try {
       // Same refusal as the list's button: the charts must already be on the site.
@@ -834,71 +1071,65 @@ function ArticleEditor({ slug, t, dialogs, sectionHidden, onBack, onChanged }) {
   }
 
   function blockLabel(b) {
-    return ({ lead: t.lead, h2: t.h2, p: t.p, figure: t.figure, table: t.table, bullets: t.bAddBullets }[b?.type] || b?.type);
+    return ({ lead: t.lead, h2: t.h2, p: t.p, figure: t.figure, table: t.table, bullets: t.bullets }[b?.type] || b?.type);
   }
 
   if (loading || !draft) return <div style={{ color: "var(--text-dim)" }}>{t.loading}</div>;
 
+  const hasLead = draft.blocks.some((b) => b.type === "lead");
+  const addable = hasLead ? ADDABLE : ["lead", ...ADDABLE];
+  const allCollapsed = draft.blocks.length > 0 && draft.blocks.every((b) => collapsed.has(b._k));
+  const shownTitle = draft.title?.sk?.trim() || draft.title?.en?.trim() || draft.slug;
+
   return (
     <div>
-      <div style={{
-        position: "sticky", top: 0, zIndex: 5, background: "var(--bg)",
-        paddingBottom: "0.8rem", marginBottom: "1.2rem",
-        borderBottom: "1px solid var(--border-soft)",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap" }}>
+      <div className="rd-editor-bar">
+        {/* Row 1 — which article, what is true about it, and Save. */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.7rem", flexWrap: "wrap" }}>
           <button className="rd-btn rd-btn--sm rd-btn--ghost" onClick={leave}>{t.back}</button>
-
-          {/* Publish state and its control together — the badge says what is true,
-              the button next to it is what changes it. */}
-          <Pill on={published}>{published ? t.published : t.draft}</Pill>
-          <button className={"rd-btn rd-btn--sm" + (published ? "" : " rd-btn--primary")}
-                  disabled={busyPub} onClick={togglePublished}>
-            {busyPub ? "…" : (published ? t.unpublish : t.publish)}
-          </button>
-          {published && !sectionHidden && (
-            <a className="rd-btn rd-btn--sm rd-btn--ghost"
-               href={`${SITE_BASE}/analyzy/${draft.slug}`} target="_blank" rel="noreferrer">
-              {t.view} ↗
-            </a>
+          <div style={{ flex: "1 1 260px", minWidth: 0 }}>
+            <div title={shownTitle} style={{
+              fontWeight: 650, color: "var(--text)", fontSize: "0.95rem",
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }}>{shownTitle}</div>
+            <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", flexWrap: "wrap", marginTop: "0.15rem" }}>
+              <span style={{ fontFamily: MONO, fontSize: "0.66rem", color: "var(--text-faint)" }}>/analyzy/{draft.slug}</span>
+              <span style={{ fontSize: "0.7rem", color: published ? (sectionHidden ? "var(--accent-2)" : "var(--accent)") : "var(--text-faint)" }}>
+                {published ? (sectionHidden ? "◐ " + t.liveHidden : "● " + t.liveNow) : "○ " + t.draftNow}
+              </span>
+            </div>
+          </div>
+          {dirty && (
+            <span style={{ fontSize: "0.74rem", color: "var(--accent-2)", whiteSpace: "nowrap" }}>● {t.unsaved}</span>
           )}
-
-          <span style={{ width: 1, height: 20, background: "var(--border-soft)", margin: "0 0.2rem" }} />
-
-          {/* Undo / redo. The browser's own undo only covers the focused field,
-              so a deleted block or a cleared title had no way back. */}
-          <button className="rd-btn rd-btn--sm rd-btn--ghost" onClick={hist.undo}
-                  disabled={!hist.canUndo} title="⌘Z">↶ {t.undo}</button>
-          <button className="rd-btn rd-btn--sm rd-btn--ghost" onClick={hist.redo}
-                  disabled={!hist.canRedo} title="⇧⌘Z">↷ {t.redo}</button>
-          <button className="rd-btn rd-btn--sm rd-btn--ghost" disabled={!dirty} onClick={revert}>
-            {t.revert}
-          </button>
-          <span style={{ fontFamily: MONO, fontSize: "0.62rem", color: "var(--text-faint)" }}>
-            {hist.depth}/{HISTORY_LIMIT} {t.steps}
-          </span>
-
-          <div style={{ flex: 1 }} />
           <button className="rd-btn rd-btn--sm rd-btn--primary" title="⌘S"
                   disabled={!dirty || state === "saving" || problems.length > 0}
-                  onClick={save}>
-            {state === "saving" ? t.saving : (dirty ? t.save : t.noChanges)}
+                  onClick={() => save()}>
+            {state === "saving" ? t.saving : (dirty ? t.save : `✓ ${t.noChanges}`)}
           </button>
         </div>
 
-        <div style={{ display: "flex", gap: "0.7rem", alignItems: "center", marginTop: "0.6rem", flexWrap: "wrap" }}>
-          <div className="rd-tabs" role="tablist" style={{ borderBottom: "none" }}>
+        {/* Row 2 — what you are looking at, and what you can do to it. */}
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginTop: "0.6rem", flexWrap: "wrap" }}>
+          <div className="rd-tabs" role="tablist" style={{ borderBottom: "none", marginRight: "auto" }}>
             {[["edit", t.tabEdit], ["preview", t.tabPreview]].map(([k, label]) => (
               <button key={k} type="button" role="tab" className="rd-tab" aria-selected={view === k}
                       onClick={() => setView(k)}>{label}</button>
             ))}
           </div>
-          <span style={{ fontFamily: MONO, fontSize: "0.68rem", color: "var(--text-faint)" }}>
-            /analyzy/{draft.slug}
-          </span>
-          <span style={{ fontSize: "0.72rem", color: published ? (sectionHidden ? "var(--accent-2)" : "var(--accent)") : "var(--text-faint)" }}>
-            {published ? (sectionHidden ? "◐ " + t.liveHidden : "● " + t.liveNow) : "○ " + t.draftNow}
-          </span>
+          <button className="rd-btn rd-btn--sm" onClick={hist.undo} disabled={!hist.canUndo} title="⌘Z">↶ {t.undo}</button>
+          <button className="rd-btn rd-btn--sm" onClick={hist.redo} disabled={!hist.canRedo} title="⇧⌘Z">↷ {t.redo}</button>
+          <button className="rd-btn rd-btn--sm rd-btn--ghost" disabled={!dirty} onClick={revert}>{t.revert}</button>
+          <span style={{ width: 1, height: 20, background: "var(--border-soft)", margin: "0 0.15rem" }} />
+          {published && !sectionHidden && (
+            <a className="rd-btn rd-btn--sm" href={`${SITE_BASE}/analyzy/${draft.slug}`} target="_blank" rel="noreferrer">
+              {t.view} ↗
+            </a>
+          )}
+          <button className={"rd-btn rd-btn--sm" + (published ? "" : " rd-btn--primary")}
+                  disabled={busyPub || state === "saving"} onClick={togglePublished}>
+            {busyPub ? "…" : (published ? t.unpublish : t.publish)}
+          </button>
         </div>
 
         {/* A required field left blank is how the title was lost the first time:
@@ -924,169 +1155,101 @@ function ArticleEditor({ slug, t, dialogs, sectionHidden, onBack, onChanged }) {
           <div className="rd-form" style={{ gap: "0.55rem", marginBottom: "1.1rem" }}>
             <div>
               <div style={fieldLabel}>{t.date}</div>
-              <input type="date" value={draft.date || ""}
-                     onChange={(e) => setDraft((d) => ({ ...d, date: e.target.value }))}
-                     style={{
-                       width: "100%", background: "var(--bg)", color: "var(--text)",
-                       border: "1px solid var(--border-soft)", borderRadius: 7,
-                       padding: "0.6rem 0.7rem", fontSize: "0.88rem", fontFamily: MONO,
-                     }} />
+              <input type="date" value={draft.date || ""} aria-label={t.date}
+                     onChange={(e) => setDraft((d) => ({ ...d, date: e.target.value }), "date")}
+                     style={{ ...inputStyle, fontFamily: MONO }} />
             </div>
             <div>
               <div style={fieldLabel}>{t.ogImage}</div>
-              <input value={draft.ogImage || ""}
-                     onChange={(e) => setDraft((d) => ({ ...d, ogImage: e.target.value }))}
+              <input value={draft.ogImage || ""} aria-label={t.ogImage} spellCheck={false}
+                     onChange={(e) => setDraft((d) => ({ ...d, ogImage: e.target.value }), "ogImage")}
                      placeholder="/analyzy/og-2026-09.png"
-                     style={{
-                       width: "100%", background: "var(--bg)", color: "var(--text)",
-                       border: "1px solid var(--border-soft)", borderRadius: 7,
-                       padding: "0.6rem 0.7rem", fontSize: "0.88rem", fontFamily: MONO,
-                     }} />
+                     style={{ ...inputStyle, fontFamily: MONO }} />
             </div>
           </div>
 
           <BiField label={t.title} rows={2} value={draft.title}
-                   onChange={(v) => setDraft((d) => ({ ...d, title: v }))} />
+                   onChange={(v) => setDraft((d) => ({ ...d, title: v }), "title")} />
           <BiField label={t.perex} rows={3} value={draft.perex}
-                   onChange={(v) => setDraft((d) => ({ ...d, perex: v }))} />
+                   onChange={(v) => setDraft((d) => ({ ...d, perex: v }), "perex")} />
 
-          <div style={{ ...fieldLabel, margin: "2rem 0 0.8rem", paddingTop: "1rem", borderTop: "1px solid var(--border-soft)" }}>
-            {t.blocks} · {draft.blocks.length}
+          <div style={{
+            display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap",
+            margin: "2rem 0 0.8rem", paddingTop: "1rem", borderTop: "1px solid var(--border-soft)",
+          }}>
+            <div style={{ ...fieldLabel, margin: 0, flex: 1 }}>{t.blocks} · {draft.blocks.length}</div>
+            {draft.blocks.length > 0 && (
+              <button type="button" className={smallBtn}
+                      onClick={() => setCollapsed(allCollapsed ? new Set() : new Set(draft.blocks.map((b) => b._k)))}>
+                {allCollapsed ? t.expandAll : t.collapseAll}
+              </button>
+            )}
           </div>
 
-          {draft.blocks.map((b, i) => (
-            <div key={b._k || i} style={{ ...box, marginBottom: "0.9rem" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.6rem" }}>
-                <div style={{
-                  fontFamily: MONO, fontSize: "0.62rem", letterSpacing: "0.09em",
-                  textTransform: "uppercase", color: "var(--text-faint)", flex: 1,
-                }}>
-                  {i + 1}. {blockLabel(b)}
+          {draft.blocks.map((b, i) => {
+            const isCollapsed = collapsed.has(b._k);
+            return (
+              <div key={b._k || i} id={`blk-${b._k}`} style={{ ...box, marginBottom: "0.9rem", padding: isCollapsed ? "0.55rem 0.9rem" : box.padding }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginBottom: isCollapsed ? 0 : "0.6rem", flexWrap: "wrap" }}>
+                  <button type="button" className={smallBtn} aria-expanded={!isCollapsed}
+                          title={isCollapsed ? t.expand : t.collapse} style={{ padding: "0 0.4rem" }}
+                          onClick={() => toggleCollapsed(b._k)}>{isCollapsed ? "▸" : "▾"}</button>
+                  <div style={{ flex: "1 1 200px", minWidth: 0, display: "flex", gap: "0.5rem", alignItems: "baseline" }}>
+                    <span style={{
+                      fontFamily: MONO, fontSize: "0.62rem", letterSpacing: "0.09em", whiteSpace: "nowrap",
+                      textTransform: "uppercase", color: "var(--text-faint)",
+                    }}>{i + 1}. {blockLabel(b)}</span>
+                    {isCollapsed && (
+                      <span style={{ fontSize: "0.8rem", color: "var(--text-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {blockSnippet(b)}
+                      </span>
+                    )}
+                  </div>
+                  <button type="button" className={smallBtn} aria-expanded={inserting === b._k}
+                          onClick={() => setInserting(inserting === b._k ? null : b._k)}>+ {t.insertBelow}</button>
+                  <button type="button" className={smallBtn} title={t.up} aria-label={t.up}
+                          disabled={i === 0} onClick={() => moveBlock(i, -1)}>↑</button>
+                  <button type="button" className={smallBtn} title={t.down} aria-label={t.down}
+                          disabled={i === draft.blocks.length - 1} onClick={() => moveBlock(i, 1)}>↓</button>
+                  <button type="button" className={smallBtn} style={{ color: "var(--danger)" }}
+                          onClick={() => removeBlock(i)}>✕ {t.removeBlock}</button>
                 </div>
-                <button className="rd-btn rd-btn--sm rd-btn--ghost" title={t.up} aria-label={t.up}
-                        disabled={i === 0} onClick={() => moveBlock(i, -1)}>↑</button>
-                <button className="rd-btn rd-btn--sm rd-btn--ghost" title={t.down} aria-label={t.down}
-                        disabled={i === draft.blocks.length - 1} onClick={() => moveBlock(i, 1)}>↓</button>
-                <button className="rd-btn rd-btn--sm rd-btn--ghost" title={t.removeBlock}
-                        style={{ color: "var(--danger)" }} onClick={() => removeBlock(i)}>✕ {t.removeBlock}</button>
+
+                {!isCollapsed && (b.type === "lead" || b.type === "p" || b.type === "h2") && (
+                  <BiField label="" rows={b.type === "h2" ? 1 : 5} value={b.text}
+                           onChange={(v) => setBlock(i, { text: v }, "text")} />
+                )}
+                {!isCollapsed && b.type === "bullets" && (
+                  <BulletsEditor b={b} t={t} onChange={(patch, key) => setBlock(i, patch, key)} />
+                )}
+                {!isCollapsed && b.type === "figure" && (
+                  <FigureEditor b={b} t={t} onChange={(patch, key) => setBlock(i, patch, key)} />
+                )}
+                {!isCollapsed && b.type === "table" && (
+                  <>
+                    <TableEditor b={b} t={t} onChange={(next, key) => setBlock(i, { head: next.head, rows: next.rows }, key)} />
+                    <BiField label={t.tableCaption} rows={2} value={b.caption}
+                             onChange={(v) => setBlock(i, { caption: v }, "caption")} />
+                  </>
+                )}
+
+                {inserting === b._k && (
+                  <div style={{ marginTop: "0.7rem", paddingTop: "0.6rem", borderTop: "1px dashed var(--border-soft)" }}>
+                    <AddBar t={t} types={ADDABLE} label={t.insertHere} onAdd={(type) => addBlockAt(i + 1, type)} />
+                  </div>
+                )}
               </div>
+            );
+          })}
 
-              {(b.type === "lead" || b.type === "p" || b.type === "h2") && (
-                <BiField label="" rows={b.type === "h2" ? 1 : 5} value={b.text}
-                         onChange={(v) => setBlock(i, { text: v })} />
-              )}
-
-              {b.type === "bullets" && (
-                <>
-                  {(b.items || []).map((it, k) => (
-                    <div key={k} style={{ display: "flex", gap: "0.4rem", alignItems: "flex-start" }}>
-                      <div style={{ flex: 1 }}>
-                        <BiField label={`• ${k + 1}`} rows={2} value={it}
-                                 onChange={(v) => setBlock(i, {
-                                   items: (b.items || []).map((x, y) => (y === k ? v : x)),
-                                 })} />
-                      </div>
-                      <button className="rd-btn rd-btn--sm rd-btn--ghost" title={t.removeBlock} aria-label={t.removeBlock}
-                              style={{ marginTop: "1.4rem" }}
-                              onClick={() => setBlock(i, { items: (b.items || []).filter((_, y) => y !== k) })}>✕</button>
-                    </div>
-                  ))}
-                  <button className="rd-btn rd-btn--sm rd-btn--ghost"
-                          onClick={() => setBlock(i, { items: [...(b.items || []), { sk: "", en: "" }] })}>
-                    + {t.bAddBullets}
-                  </button>
-                </>
-              )}
-
-              {(b.type === "figure" || b.type === "table") && (
-                <>
-                  {b.src ? (
-                    <div style={{ marginBottom: "0.8rem" }}>
-                      <img src={b.src} alt="" style={{
-                        width: "100%", maxWidth: 420, borderRadius: 8, background: "#fff",
-                        display: "block", border: "1px solid var(--border-soft)",
-                      }} />
-                    </div>
-                  ) : null}
-                  {b.type === "figure" && (
-                    <div className="rd-form" style={{ gap: "0.55rem", marginBottom: "1.1rem" }}>
-                      {[["src", t.imgPath], ["srcEn", t.imgPathEn]].map(([field, label]) => (
-                        <div key={field}>
-                          <div style={{ fontSize: "0.65rem", color: "var(--text-faint)", marginBottom: "0.25rem" }}>
-                            {label}
-                          </div>
-                          <input value={b[field] || ""} placeholder="/analyzy/…svg"
-                                 onChange={(e) => setBlock(i, field === "src"
-                                   // A new chart: what the generator recorded about the
-                                   // OLD one (its phone drawing, its sizes) no longer
-                                   // applies — keeping srcM would show phones a different chart.
-                                   ? { src: e.target.value, srcM: undefined, w: undefined, h: undefined, wM: undefined, hM: undefined }
-                                   : { [field]: e.target.value })}
-                                 style={{
-                                   width: "100%", background: "var(--bg)", color: "var(--text)",
-                                   border: "1px solid var(--border-soft)", borderRadius: 7,
-                                   padding: "0.55rem 0.7rem", fontSize: "0.82rem", fontFamily: MONO,
-                                 }} />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {b.type === "table" && (
-                    <>
-                      {/* A table's contents had no editor at all, so "+ Tabuľka"
-                          could only ever produce an empty table. Pipes and newlines
-                          keep it typeable without a grid widget. */}
-                      <BiField label={t.tableHead} rows={1}
-                               value={{ sk: (b.head?.sk || []).join(" | "), en: (b.head?.en || []).join(" | ") }}
-                               onChange={(v) => setBlock(i, {
-                                 head: { sk: splitCells(v.sk), en: splitCells(v.en) },
-                               })} />
-                      <div style={{ marginBottom: "1.1rem" }}>
-                        <div style={fieldLabel}>{t.tableRows}</div>
-                        {/* A cell may be a {sk, en} pair — the decimal mark differs
-                            by language, so a generated table carries both. Render the
-                            Slovak side here; editing a generated table by hand would
-                            flatten it, which is why tables come from the generator. */}
-                        <textarea rows={5} value={(b.rows || []).map(
-                          (r) => r.map((c) => (c && typeof c === "object" ? (c.sk ?? "") : c)).join(" | ")
-                        ).join("\n")}
-                                  onChange={(e) => setBlock(i, {
-                                    rows: e.target.value.split("\n").filter((l) => l.trim()).map(splitCells),
-                                  })}
-                                  style={{
-                                    width: "100%", background: "var(--bg)", color: "var(--text)",
-                                    border: "1px solid var(--border-soft)", borderRadius: 7,
-                                    padding: "0.6rem 0.7rem", fontSize: "0.85rem", fontFamily: MONO,
-                                    lineHeight: 1.6, resize: "vertical",
-                                  }} />
-                      </div>
-                    </>
-                  )}
-                  <BiField label={t.caption} rows={2} value={b.caption}
-                           onChange={(v) => setBlock(i, { caption: v })} />
-                  {b.type === "figure" && (
-                    <BiField label={t.alt} rows={1} value={b.alt}
-                             onChange={(v) => setBlock(i, { alt: v })} />
-                  )}
-                </>
-              )}
-            </div>
-          ))}
-
-          <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", alignItems: "center", marginTop: "0.4rem" }}>
-            <span style={{ fontFamily: MONO, fontSize: "0.66rem", color: "var(--text-dim)" }}>
-              {t.addBlock}:
-            </span>
-            {ADDABLE.map((type) => (
-              <button key={type} className="rd-btn rd-btn--sm rd-btn--ghost" onClick={() => addBlock(type)}>
-                + {{ h2: t.bAddH2, p: t.bAddP, figure: t.bAddFigure, table: t.bAddTable, bullets: t.bAddBullets }[type]}
-              </button>
-            ))}
+          <div style={{ ...box, padding: "0.7rem 0.9rem", borderStyle: "dashed" }}>
+            <AddBar t={t} types={addable} label={`${t.addBlock}:`}
+                    onAdd={(type) => addBlockAt(type === "lead" ? 0 : draft.blocks.length, type)} />
           </div>
 
           <div style={{ marginTop: "2rem", paddingTop: "1rem", borderTop: "1px solid var(--border-soft)" }}>
             <BiField label={t.method} rows={6} value={draft.method}
-                     onChange={(v) => setDraft((d) => ({ ...d, method: v }))} />
+                     onChange={(v) => setDraft((d) => ({ ...d, method: v }), "method")} />
           </div>
 
           {/* What Google and LinkedIn will show, whether the live page has caught
@@ -1095,7 +1258,7 @@ function ArticleEditor({ slug, t, dialogs, sectionHidden, onBack, onChanged }) {
             draft={{ ...draft, promoChecklist: checklist }}
             published={published}
             updatedAt={version}
-            onSeoTitle={(v) => setDraft((d) => ({ ...d, seoTitle: v }))}
+            onSeoTitle={(v) => setDraft((d) => ({ ...d, seoTitle: v }), "seoTitle")}
             onChecklist={setChecklist}
           />
 
@@ -1121,7 +1284,7 @@ export default function ArticlesAdmin({ lang = "sk" }) {
   const section = useSiteSection("analyzy");
 
   return (
-    <div style={{ padding: "1.5rem 1.75rem 4rem", maxWidth: 1000 }}>
+    <div style={{ padding: "1.5rem 1.75rem 4rem", maxWidth: 1040 }}>
       <div style={{
         fontFamily: MONO, fontSize: "0.68rem", letterSpacing: "0.1em",
         textTransform: "uppercase", color: "var(--accent)", marginBottom: "0.4rem",

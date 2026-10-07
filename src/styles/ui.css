@@ -583,6 +583,26 @@ input[type="checkbox"], input[type="radio"] { width: 15px; height: 15px; cursor:
 .rd-article-preview .rd-analysis { min-height: 0 !important; }
 .rd-article-preview .rd-analysis > div { padding: 2.4rem clamp(1rem, 4vw, 2rem) 3rem !important; }
 
+/* An article's title in admin → Analýzy's list opens the editor: a button that
+   reads as a title, and still shows where the keyboard is. */
+.rd-title-btn {
+  display: block; width: 100%; text-align: left; padding: 0; margin: 0 0 0.3rem;
+  border: none; background: none; cursor: pointer;
+  font: inherit; font-weight: 600; color: var(--text); line-height: 1.4;
+}
+.rd-title-btn:hover { color: var(--accent-ink); }
+.rd-title-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+
+/* The article editor's header (title, status, Save, undo, publish) stays in view
+   while a long article scrolls — on a desktop. On a phone two wrapped rows of it
+   would cover a quarter of the screen, so there it scrolls away with the page. */
+.rd-editor-bar {
+  position: sticky; top: 0; z-index: 5; background: var(--bg);
+  padding: 0.3rem 0 0.7rem; margin-bottom: 1.2rem;
+  border-bottom: 1px solid var(--border-soft);
+}
+@media (max-width: 640px) { .rd-editor-bar { position: static; } }
+
 /* ── WORKBENCH: a table beside the field panel ───────────────────────────────
    Used by the Unit database and Sales. It lives here rather than inline because
    the important half is a MEDIA QUERY, and an inline style cannot hold one — the

@@ -56,6 +56,7 @@ import { accent as green, accentInk, dim, text as textLight, border, surface as 
 import { useThemeMode, applyTheme, getTheme } from "../lib/theme-mode";
 import { fieldBlock } from "../lib/controls";
 import ArticlesAdmin from "./ArticlesAdmin";
+import { shouldAskBeforeLeaving, mayLeave } from "../lib/leaveGuard";
 const SIDEBAR_W = 240;
 
 // ─── Icons — inline SVG, same weight as HowItWorks ──────────────
@@ -242,7 +243,10 @@ export default function PlatformShell({ page, projectId, lang = "en", setLang, s
   }
   if (!auth.user) return null;  // redirecting
 
-  const navigate = (p) => {
+  const navigate = async (p) => {
+    // A page with unsaved work (the article editor) asks before it is left —
+    // a sidebar click used to drop the edits without a word (lib/leaveGuard).
+    if (shouldAskBeforeLeaving() && !(await mayLeave())) return;
     // Rewrite shared-component navigation targets so clicks inside the
     // platform shell stay inside /app/* instead of bouncing out to the
     // marketing site. LiveDashboard / LiveProjectDetail / etc are used

@@ -64,6 +64,7 @@ import { startPageEngagement, stopPageEngagement } from "./lib/engagement";
 // critical bundle. Rendered inside a <Suspense> below.
 const PlatformShell = lazy(() => import("./pages/Platform"));
 import { track } from "./lib/track";
+import { shouldAskBeforeLeaving, mayLeave, allowNextLeave } from "./lib/leaveGuard";
 
 // The analyses link is in the menu only while the section exists
 // (lib/analysesSection: at least one article published). The three lists are
@@ -2278,9 +2279,23 @@ export default function App() {
     };
   }, [current]);
 
+  // Where the visitor is now — so a Back press can be undone while a page with
+  // unsaved work asks whether to leave (lib/leaveGuard).
+  const hereRef = useRef(null);
+  useEffect(() => {
+    hereRef.current = { url: window.location.pathname + window.location.search + window.location.hash, state: window.history.state };
+  });
+
   // Listen to browser back/forward — sync state with URL
   useEffect(() => {
     const onPop = () => {
+      // Unsaved work in an editor: step forward again, ask, and only then go
+      // back for real. Back used to drop the edits without a word.
+      if (shouldAskBeforeLeaving() && hereRef.current) {
+        window.history.pushState(hereRef.current.state, "", hereRef.current.url);
+        mayLeave().then((ok) => { if (ok) { allowNextLeave(); window.history.back(); } });
+        return;
+      }
       setCurrent(pageAt(window.location.pathname));
       // Back to a /sk/… address is back to Slovak (the address says so); back to
       // any other address shows the pick.
