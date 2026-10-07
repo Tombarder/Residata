@@ -206,6 +206,8 @@ export function summarize(data, { lang = "en", now = new Date(), pageName = (k) 
     if (bits.length) out.push(cap(bits.join(t("; ", "; "))) + ".");
   }
   const acts = [];
+  const si = Number(k.sign_ins) || 0;
+  if (si) acts.push(lang === "sk" ? `${si} ${si === 1 ? "prihlásenie" : si < 5 ? "prihlásenia" : "prihlásení"}` : `${si} sign-in${si === 1 ? "" : "s"}`);
   if (Number(k.project_views)) acts.push(t(`${k.project_views}× detail projektu`, `${k.project_views} project views`));
   if (Number(k.exports)) acts.push(t(`${k.exports}× stiahnutie dát`, `${k.exports} downloads`));
   if (Number(k.ai_questions)) acts.push(t(`${k.ai_questions} otázok AI asistentovi`, `${k.ai_questions} AI questions`));

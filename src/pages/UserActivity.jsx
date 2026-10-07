@@ -122,6 +122,7 @@ export default function UserActivity({ userId, profile, lang = "sk", onClose }) 
           </div>
         )}
 
+        {(!data || data.person) && (<>
         {/* the whole picture in words */}
         <p className="rd-ua__summary" aria-busy={loading || undefined}>
           {loading && !data ? t("Načítavam…", "Loading…") : summarize(data, { lang, now, pageName: (p) => pageTitle(p, lang) })}
@@ -141,8 +142,15 @@ export default function UserActivity({ userId, profile, lang = "sk", onClose }) 
           <Kpi loading={!data} label={t("Stiahnuté dáta", "Downloads")} value={num(k.exports)} sub={data && deltaLine(k.exports, kp.exports, lang).text} />
           <Kpi loading={!data} label={t("Otázky AI", "AI questions")} value={num(k.ai_questions)} sub={data && deltaLine(k.ai_questions, kp.ai_questions, lang).text} />
         </div>
+        </>)}
 
-        {data && (
+        {data && !data.person && (
+          <div className="rd-alert rd-alert--warn" style={{ marginTop: "0.9rem" }}>
+            {t("Tento účet už neexistuje — bol vymazaný.", "This account no longer exists — it was deleted.")}
+          </div>
+        )}
+
+        {data?.person && (
           <>
             <div className="rd-tabs" role="tablist" style={{ marginTop: "1.1rem" }}>
               {[
@@ -279,7 +287,9 @@ function DailyChart({ daily, lang }) {
           ? <span key={d.d} style={{ left: `${((i + 0.5) / n) * 100}%` }}>{fmtD(d.d)}</span> : null))}
       </div>
       <div className="rd-ua__legend">
-        <span><i className="rd-ua__sw rd-ua__sw--bar" />{byMin ? t(`minúty práce (max ${fmtMinutes(maxMin, lang)})`, `active minutes (max ${fmtMinutes(maxMin, lang)})`) : t(`akcie (max ${maxEv})`, `actions (max ${maxEv})`)}</span>
+        {(maxMin > 0 || maxEv > 0)
+          ? <span><i className="rd-ua__sw rd-ua__sw--bar" />{byMin ? t(`minúty práce (max ${fmtMinutes(maxMin, lang)})`, `active minutes (max ${fmtMinutes(maxMin, lang)})`) : t(`akcie (max ${maxEv})`, `actions (max ${maxEv})`)}</span>
+          : <span>{t("Žiadne stránky ani kliky v tomto období.", "No pages or clicks in this period.")}</span>}
         <span><i className="rd-ua__sw rd-ua__sw--dot" />{t("prihlásenie", "sign-in")}</span>
         <span><i className="rd-ua__sw rd-ua__sw--ring" />{t("otázka AI", "AI question")}</span>
       </div>

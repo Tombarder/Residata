@@ -109,7 +109,7 @@ function Section({ title, children }) {
 
 export function PrivacyPage({ lang }) {
   const isSK = lang === "sk";
-  const lastUpdated = isSK ? "Posledná aktualizácia: 3. september 2026" : "Last updated: 3 September 2026";
+  const lastUpdated = isSK ? "Posledná aktualizácia: 7. október 2026" : "Last updated: 7 October 2026";
 
   useDocumentTitle(
     isSK ? "Ochrana osobných údajov · Residata" : "Privacy Policy · Residata",
@@ -272,6 +272,7 @@ export function PrivacyPage({ lang }) {
             <li><strong>Údaje účtu</strong> — uchovávame ich, kým máte aktívny účet. Po žiadosti o zmazanie účtu sa údaje vymažú do 30 dní.</li>
             <li><strong>Záznamy o používaní</strong> — agregované a anonymizované údaje sa uchovávajú časovo neobmedzene; údaje viazané na konkrétneho používateľa sa vymažú do 90 dní od zrušenia účtu.</li>
             <li><strong>Otázky pre AI asistenta</strong> — uchovávame ich pre potreby zlepšovania a kontroly kvality, najviac však 12 mesiacov.</li>
+            <li><strong>Záznam prihlásení</strong> (čas, typ prehliadača, IP adresa) — kvôli bezpečnosti účtu (napr. odhaleniu cudzieho prihlásenia), najviac 13 mesiacov; so zmazaním účtu sa vymaže okamžite.</li>
             <li><strong>Účtovné záznamy</strong> — faktúry a súvisiace daňové doklady sa uchovávajú 10 rokov podľa slovenského zákona o účtovníctve.</li>
           </ul>
         ) : (
@@ -279,6 +280,7 @@ export function PrivacyPage({ lang }) {
             <li><strong>Account data</strong> — retained while you have an active account. After an account deletion request, data is removed within 30 days.</li>
             <li><strong>Usage records</strong> — aggregated and anonymized data is retained indefinitely; user-linked records are deleted within 90 days of account closure.</li>
             <li><strong>AI assistant queries</strong> — retained for product improvement and quality control, maximum 12 months.</li>
+            <li><strong>Sign-in records</strong> (time, browser type, IP address) — kept for account security (e.g. spotting a sign-in that is not yours), maximum 13 months; erased immediately when the account is deleted.</li>
             <li><strong>Accounting records</strong> — invoices and related tax documents are retained for 10 years under Slovak accounting law.</li>
           </ul>
         )}
