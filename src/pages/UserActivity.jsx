@@ -17,6 +17,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Modal from "../components/Modal";
 import Kpi from "../components/Kpi";
+import { UserPayments } from "./AdminPayments";
 import { supabaseData } from "../lib/supabase";
 import { getFreshAccessToken, authErrorMessage } from "../lib/sessionGuard";
 import { localeTag } from "../lib/locale";
@@ -35,10 +36,10 @@ const fmtDateTime = (ts, lang) => (ts ? new Date(ts).toLocaleString(localeTag(la
 const fmtTime = (ts, lang) => (ts ? new Date(ts).toLocaleTimeString(localeTag(lang), { hour: "2-digit", minute: "2-digit", timeZone: TZ }) : "");
 const num = (n) => (Number(n) || 0).toLocaleString("en-US").replace(/,/g, " ");
 
-export default function UserActivity({ userId, profile, lang = "sk", onClose }) {
+export default function UserActivity({ userId, profile, lang = "sk", onClose, initialTab = "overview" }) {
   const t = L(lang);
   const [days, setDays] = useState(30);
-  const [tab, setTab] = useState("overview");
+  const [tab, setTab] = useState(initialTab);
   const [nonce, setNonce] = useState(0);            // "Retry" asks again
   const [openedAt] = useState(() => Date.now());    // the clock until the server's arrives
   // What came back, and for which question: loading = the answer on screen is not for
@@ -158,6 +159,8 @@ export default function UserActivity({ userId, profile, lang = "sk", onClose }) 
                 ["visits", t("Návštevy", "Visits"), visits.length],
                 ["data", t("Stiahnuté a AI", "Downloads & AI"), exportsN + questionsN],
                 ["account", t("Účet", "Account")],
+                // subscription, invoices and payments from Stripe (Boss 2026-10-07)
+                ["payments", t("Platby", "Payments")],
               ].map(([key, name, n]) => (
                 <button key={key} type="button" role="tab" className="rd-tab" aria-selected={tab === key} onClick={() => setTab(key)}>
                   {name}{n != null && <span className="rd-tab__n">{n}</span>}
@@ -169,6 +172,7 @@ export default function UserActivity({ userId, profile, lang = "sk", onClose }) 
               {tab === "visits" && <Visits visits={visits} lang={lang} consent={consent} />}
               {tab === "data" && <DownloadsAndAi data={data} lang={lang} />}
               {tab === "account" && <Account data={data} lang={lang} now={now} />}
+              {tab === "payments" && <UserPayments userId={userId} lang={lang} />}
             </div>
           </>
         )}

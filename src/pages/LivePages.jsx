@@ -20,6 +20,7 @@ import UpgradePrompt from "../components/UpgradePrompt";
 import Picker from "../components/Picker";
 import PageHero from "../components/PageHero";
 import AdminUsers, { UserStats, SignupEvents } from "./AdminUsers";
+import RevenuePanel from "./AdminRevenue";
 import { useAdminClock } from "../lib/useAdminClock";
 import InfoTip from "../components/InfoTip";
 import { useSpecifics, SpecificsMark, SpecificsPanel, UnitPriceMarks } from "../lib/projectSpecifics";
@@ -3302,7 +3303,7 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
   const [tab, setTab] = useState(() => {
     try {
       const want = new URLSearchParams(window.location.search).get("tab");
-      return ["overview", "users", "activity", "domains", "ai_chat"].includes(want) ? want : "overview";
+      return ["overview", "users", "revenue", "activity", "domains", "ai_chat"].includes(want) ? want : "overview";
     } catch { return "overview"; }
   });
   // One clock for the strip and the table (lib/useAdminClock.js).
@@ -3391,6 +3392,7 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
         <TabBtn active={tab === "users"} onClick={() => setTab("users")}>
           {lang === "sk" ? "Užívatelia" : "Users"}
         </TabBtn>
+        <TabBtn active={tab === "revenue"} onClick={() => setTab("revenue")}>{lang === "sk" ? "Tržby" : "Revenue"}</TabBtn>
         <TabBtn active={tab === "activity"} onClick={() => setTab("activity")}>{lang === "sk" ? "Aktivita" : "Activity"}</TabBtn>
         <TabBtn active={tab === "domains"} onClick={() => setTab("domains")}>{lang === "sk" ? "Prémiové domény" : "Premium domains"}</TabBtn>
         <TabBtn active={tab === "ai_chat"} onClick={() => setTab("ai_chat")}>{lang === "sk" ? "AI chat logy" : "AI chat logs"}</TabBtn>
@@ -3416,6 +3418,7 @@ export function LiveAdmin({ setCurrent, lang = "en" }) {
       )}
 
       {tab === "overview" && <OverviewPanel activity={activity} users={users} lang={lang} />}
+      {tab === "revenue" && <RevenuePanel users={users} lang={lang} />}
       {tab === "activity" && <ActivityPanel activity={activity} users={users} />}
       {tab === "domains" && (
         <PremiumDomainsPanel

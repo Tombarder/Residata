@@ -20,6 +20,7 @@ import { isTrustedRequest } from "./_lib/origin.js";
 import { rejectIfNotCron } from "./_lib/cronAuth.js";
 import { FALLBACK_MONTHLY_CENTS } from "../src/lib/pricingDefaults.js";
 import { invoiceSellerFooter } from "../src/lib/company.js";
+import { invoiceFacts, invoiceKind, nextChargeCents, businessSummary, invoiceRow, subscriptionRow } from "../src/lib/billingStats.js";
 
 export const config = { api: { bodyParser: false } };
 
@@ -403,7 +404,7 @@ async function bankDetailsFromSecrets(admin) {
  * webhook — Stripe would retry it and re-apply the subscription. A missing
  * email is a support request; a retried webhook is a data problem.
  */
-async function sendInvoiceEmail(admin, inv) {
+async function sendInvoiceEmail(admin, inv, stripe = null) {
   const to = inv.customer_email || null;
   if (!to) return;
   // Only real, payable invoices. A zero-amount one (a fully discounted period,
@@ -417,44 +418,43 @@ async function sendInvoiceEmail(admin, inv) {
   // returns here. Two invoices for one payment is what a finance department
   // escalates.
   const customerId = typeof inv.customer === "string" ? inv.customer : inv.customer?.id;
-  const { error: claimErr } = await admin.from("invoice_emails_sent").insert({
-    invoice_id: inv.id,
-    customer_id: customerId || null,
-    sent_to: to,
-    amount_cents: inv.amount_paid,
-    currency: inv.currency || "eur",
-  });
-  if (claimErr) {
-    // 23505 = unique violation = already sent. Anything else is a real problem,
-    // and we would rather skip one email than risk sending it twice.
-    if (claimErr.code !== "23505") throw new Error(`invoice_emails_sent: ${claimErr.message}`);
-    return;
-  }
+  if (!(await claimMail(admin, inv.id, { customerId, to, amount: inv.amount_paid, currency: inv.currency }))) return;
 
   // The customer's own language. The key is `language` — `lang` is what the
   // browser uses in localStorage, and reading that name here would have quietly
   // emailed every English-speaking customer in Slovak.
   let lang = "sk";
+  let name = null;
   if (customerId) {
     const { data } = await admin
       .from("user_profiles")
-      .select("ui_prefs")
+      .select("ui_prefs, full_name")
       .eq("stripe_customer_id", customerId)
       .maybeSingle();
     const pref = data?.ui_prefs?.language;
     if (pref === "en" || pref === "sk") lang = pref;
+    name = data?.full_name || null;
   }
 
-  const { invoicePaidHtml, sendEmail } = await import("./_lib/emails.js");
+  // FIRST PAYMENT = THE WELCOME (Boss 2026-10-07: "no email about getting to premium
+  // tier … should be nice informative and positive"). One e-mail, not two: the
+  // celebration carries the invoice; a renewal gets the invoice alone. The PDF is
+  // attached — an accountant files an attachment, not a link — and when Stripe's
+  // PDF cannot be fetched the e-mail still goes, with the download button.
+  const facts = await paymentFacts(stripe, inv);
+  const pdf = await fetchInvoicePdf(inv.invoice_pdf);
+  const p = { ...facts, name: name ? String(name).split(" ")[0] : null, pdfAttached: Boolean(pdf) };
+  const { customerPaymentHtml, customerPaymentSubject, sendEmail } = await import("./_lib/emails.js");
   // No `conversational` flag: an invoice is machine mail, so it goes from
   // noreply@ per api/_lib/senders.js, which names invoices explicitly.
   try {
     await sendEmail({
       to,
-      subject: `${lang === "sk" ? "Faktúra" : "Invoice"} ${inv.number || ""} · Residata`.replace(/\s+/g, " ").trim(),
-      html: invoicePaidHtml(inv, "https://residata.eu", lang),
+      subject: customerPaymentSubject(p, lang),
+      html: customerPaymentHtml(p, "https://residata.eu", lang),
       gmailUser: process.env.GMAIL_FROM,
       gmailPassword: process.env.GMAIL_APP_PASSWORD,
+      attachments: pdf ? [{ filename: `${lang === "sk" ? "Faktura" : "Invoice"}-${inv.number || inv.id}.pdf`, content: pdf, contentType: "application/pdf" }] : undefined,
     });
   } catch (e) {
     // RELEASE THE CLAIM. The row above exists to stop a redelivered webhook
@@ -463,13 +463,254 @@ async function sendInvoiceEmail(admin, inv) {
     // and returns, and the customer never receives the invoice the Terms
     // promise them. A duplicate is embarrassing; silence is a tax document
     // they never got and cannot book.
-    await admin.from("invoice_emails_sent").delete().eq("invoice_id", inv.id);
+    await releaseMail(admin, inv.id);
     throw e;
   }
 
   // Record which language actually went out — the claim above was written
   // before we knew it, and support answering "what did they receive?" wants it.
   await admin.from("invoice_emails_sent").update({ lang }).eq("invoice_id", inv.id);
+}
+
+// ─── payment e-mails to the owner (Boss 2026-10-07) ──────────────────────
+// "wanna get notified if someone pays (both on residata and on kamhalco same way i
+// get when there is new customer)". Every payment, every failed payment and every
+// cancellation → one e-mail to ADMIN_EMAIL, never two: the send is claimed in
+// invoice_emails_sent first, under its own key ("owner-paid:<invoice>",
+// "owner-failed:<invoice>", "owner-cancel:<subscription>:<end>", "owner-ended:<subscription>",
+// "failed:<invoice>" for the customer's card reminder). That table is "one row per
+// e-mail about an invoice that actually went out"; reusing it needs no new table.
+
+/** Claim one e-mail; false = somebody already sent it. Throws on a real DB error. */
+async function claimMail(admin, key, { customerId = null, to, amount = null, currency = "eur", lang = "sk" } = {}) {
+  const { error } = await admin.from("invoice_emails_sent").insert({
+    invoice_id: key, customer_id: customerId || null, sent_to: to,
+    amount_cents: amount, currency: currency || "eur", lang,
+  });
+  if (!error) return true;
+  if (error.code === "23505") return false;     // unique violation = already sent
+  throw new Error(`invoice_emails_sent: ${error.message}`);
+}
+const releaseMail = (admin, key) => admin.from("invoice_emails_sent").delete().eq("invoice_id", key);
+
+const stripeDashUrl = (path) =>
+  `https://dashboard.stripe.com/${/^(sk|rk)_test_/.test(process.env.STRIPE_SECRET_KEY || "") ? "test/" : ""}${path}`;
+
+/** Stripe's invoice PDF (a signed public URL), or null. Never throws. */
+async function fetchInvoicePdf(url) {
+  if (!url) return null;
+  try {
+    const r = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(8000) });
+    if (!r.ok) return null;
+    const buf = Buffer.from(await r.arrayBuffer());
+    return buf.length < 6 * 1024 * 1024 && buf.subarray(0, 4).toString() === "%PDF" ? buf : null;
+  } catch (e) {
+    console.warn("[stripe] invoice PDF not fetched:", e?.message || e);
+    return null;
+  }
+}
+
+/**
+ * The facts every payment e-mail shows. The next charge needs the coupon's
+ * duration (a 98 % test coupon is "forever", a launch discount may be "once"), and
+ * the webhook's invoice carries only discount ids — so it is looked up; when the
+ * lookup fails the e-mail shows the date without an amount instead of a guess.
+ */
+async function paymentFacts(stripe, inv) {
+  const f = invoiceFacts(inv);
+  let discounts = (inv.discounts || []).filter((d) => d && typeof d === "object");
+  if (!discounts.length && f.discount && stripe && inv.id) {
+    try {
+      const full = await stripe.invoices.retrieve(inv.id, { expand: ["discounts.source.coupon"] });
+      discounts = (full?.discounts || []).filter((d) => d && typeof d === "object");
+    } catch (e) {
+      console.warn("[stripe] invoice discounts not loaded:", e?.message || e);
+    }
+  }
+  return {
+    kind: f.kind,
+    amount: Number(inv.amount_paid ?? inv.amount_due ?? 0),
+    discount: f.totalDiscount,
+    listPrice: f.listPrice,
+    currency: inv.currency || "eur",
+    number: inv.number || null,
+    periodStart: f.periodStart,
+    periodEnd: f.periodEnd,
+    nextAmount: nextChargeCents(f, discounts),
+    hostedUrl: inv.hosted_invoice_url || null,
+    pdfUrl: inv.invoice_pdf || null,
+    stripeUrl: inv.id ? stripeDashUrl(`invoices/${inv.id}`) : null,
+    attempts: Number(inv.attempt_count || 0),
+  };
+}
+
+/** The person behind a Stripe customer (or a subscription's metadata), with billing identity. */
+async function customerPerson(admin, { customerId = null, userId = null } = {}) {
+  const cols = "id, email, full_name, company, position, phone, created_at, tier, paid_started_at, paid_until, "
+    + "stripe_customer_id, stripe_subscription_id, billing_company_name, billing_company_id, billing_vat_id, billing_address";
+  let user = null;
+  if (userId) ({ data: user } = await admin.from("user_profiles").select(cols).eq("id", userId).maybeSingle());
+  if (!user && customerId) ({ data: user } = await admin.from("user_profiles").select(cols).eq("stripe_customer_id", customerId).maybeSingle());
+  if (!user) return { user: null, billing: null };
+  const a = user.billing_address || {};
+  const address = [a.line1, a.line2, [a.postal_code, a.city].filter(Boolean).join(" "), a.country].filter(Boolean).join(", ");
+  const billing = (user.billing_company_name || user.billing_vat_id || address)
+    ? { name: user.billing_company_name, companyId: user.billing_company_id, vat: user.billing_vat_id, address } : null;
+  return { user, billing };
+}
+
+/** Paying customers, MRR and revenue, straight from Stripe. Null when Stripe cannot be read. */
+async function businessNow(stripe) {
+  try {
+    const subs = [];
+    for await (const x of stripe.subscriptions.list({ status: "all", limit: 100, expand: ["data.discounts"] })) {
+      subs.push(x); if (subs.length >= 1000) break;
+    }
+    const invoices = [];
+    for await (const x of stripe.invoices.list({ limit: 100 })) {
+      invoices.push(x); if (invoices.length >= 2000) break;
+    }
+    return { summary: businessSummary(subs, invoices), subs, invoices };
+  } catch (e) {
+    console.warn("[stripe] business numbers unavailable:", e?.message || e);
+    return null;
+  }
+}
+
+async function mailOwner(admin, key, { subject, html, customerId, amount, currency }) {
+  const to = process.env.ADMIN_EMAIL || "tkamhal@gmail.com";
+  if (!(await claimMail(admin, key, { customerId, to, amount, currency, lang: "en" }))) return false;
+  const { sendEmail } = await import("./_lib/emails.js");
+  try {
+    await sendEmail({ to, subject, html, gmailUser: process.env.GMAIL_FROM, gmailPassword: process.env.GMAIL_APP_PASSWORD });
+    return true;
+  } catch (e) {
+    await releaseMail(admin, key);      // a failed send must not block the retry
+    throw e;
+  }
+}
+
+async function notifyOwnerPayment(admin, stripe, inv) {
+  // a 100 %-discounted first invoice is still a new customer worth knowing about
+  if (!(inv.amount_paid > 0) && invoiceKind(inv) !== "new") return;
+  const customerId = typeof inv.customer === "string" ? inv.customer : inv.customer?.id;
+  const userId = inv.parent?.subscription_details?.metadata?.supabase_user_id || null;
+  const [facts, who, biz] = await Promise.all([paymentFacts(stripe, inv), customerPerson(admin, { customerId, userId }), businessNow(stripe)]);
+  const p = { ...facts, user: who.user || { email: inv.customer_email, full_name: inv.customer_name }, billing: who.billing, business: biz?.summary || null };
+  const { ownerPaymentHtml, ownerPaymentSubject } = await import("./_lib/emails.js");
+  await mailOwner(admin, `owner-paid:${inv.id}`, {
+    subject: ownerPaymentSubject(p), html: ownerPaymentHtml(p, "https://residata.eu"),
+    customerId, amount: inv.amount_paid, currency: inv.currency,
+  });
+}
+
+async function notifyPaymentFailed(admin, stripe, inv) {
+  const customerId = typeof inv.customer === "string" ? inv.customer : inv.customer?.id;
+  const userId = inv.parent?.subscription_details?.metadata?.supabase_user_id || null;
+  const [facts, who] = await Promise.all([paymentFacts(stripe, inv), customerPerson(admin, { customerId, userId })]);
+  const p = { ...facts, amount: Number(inv.amount_due || 0), user: who.user || { email: inv.customer_email, full_name: inv.customer_name }, billing: who.billing };
+  const em = await import("./_lib/emails.js");
+  await mailOwner(admin, `owner-failed:${inv.id}`, {
+    subject: em.ownerPaymentFailedSubject(p), html: em.ownerPaymentFailedHtml(p, "https://residata.eu"),
+    customerId, amount: inv.amount_due, currency: inv.currency,
+  }).catch((e) => console.warn("[stripe] owner failed-payment e-mail not sent:", e?.message || e));
+  // the customer: check your card — once per invoice (Stripe retries several times)
+  const to = inv.customer_email || who.user?.email;
+  if (!to) return;
+  if (!(await claimMail(admin, `failed:${inv.id}`, { customerId, to, amount: inv.amount_due, currency: inv.currency }))) return;
+  let lang = "sk";
+  if (customerId) {
+    const { data } = await admin.from("user_profiles").select("ui_prefs").eq("stripe_customer_id", customerId).maybeSingle();
+    if (data?.ui_prefs?.language === "en") lang = "en";
+  }
+  try {
+    await em.sendEmail({ to, subject: em.customerPaymentFailedSubject(lang),
+      html: em.customerPaymentFailedHtml({ ...p, name: who.user?.full_name ? String(who.user.full_name).split(" ")[0] : null }, "https://residata.eu", lang),
+      gmailUser: process.env.GMAIL_FROM, gmailPassword: process.env.GMAIL_APP_PASSWORD });
+  } catch (e) {
+    await releaseMail(admin, `failed:${inv.id}`);
+    throw e;
+  }
+}
+
+/** Customer cancelled (Premium runs to the end) or the subscription ended → Boss hears once. */
+async function notifyOwnerCancel(admin, stripe, sub, { deleted = false } = {}) {
+  const endsAt = sub.cancel_at || (sub.cancel_at_period_end
+    ? (sub.items?.data?.[0]?.current_period_end ?? sub.current_period_end ?? null) : null);
+  if (!deleted && !endsAt) return;
+  const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
+  const [who, biz] = await Promise.all([customerPerson(admin, { customerId, userId: sub.metadata?.supabase_user_id }), businessNow(stripe)]);
+  const c = { ended: deleted, endsAt, user: who.user, billing: who.billing, business: biz?.summary || null };
+  const { ownerCancelHtml, ownerCancelSubject } = await import("./_lib/emails.js");
+  await mailOwner(admin, deleted ? `owner-ended:${sub.id}` : `owner-cancel:${sub.id}:${endsAt}`, {
+    subject: ownerCancelSubject(c), html: ownerCancelHtml(c, "https://residata.eu"), customerId,
+  });
+}
+
+// ─── admin billing (Boss 2026-10-07: "see all the info about the customers in the
+// admin, their invoices, payments") ─────────────────────────────────────────
+// POST { user_id? } with an admin's Bearer token.
+//   · no user_id → the business: KPIs, every payment with its invoice, every subscription
+//   · user_id    → that person's Stripe customer: subscriptions, invoices, billing identity
+// Read from Stripe on each call (Stripe is the truth for money), joined to our
+// profiles by customer id. An action here and not a new file: the Hobby plan
+// allows 12 functions and api/ is at 12 (vercelFunctionBudget.test.mjs).
+async function handleAdminBilling(req, res) {
+  if (!isTrustedRequest(req)) return res.status(403).json({ error: "untrusted origin" });
+  const admin = getSupabaseAdmin();
+  const { profile, error, status } = await getUserFromRequest(req, admin);
+  if (error) return res.status(status).json({ error });
+  if (profile?.tier !== "admin") return res.status(403).json({ error: "admin only" });
+  let body = req.body;
+  if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = {}; } }
+  const userId = String(body?.user_id || "").trim();
+  const stripe = getStripe();
+  const mode = stripeMode().mode;
+  const nowSec = Date.now() / 1000;
+
+  if (userId) {
+    const { user, billing } = await customerPerson(admin, { userId });
+    if (!user) return res.status(404).json({ error: "user not found" });
+    const cid = user.stripe_customer_id;
+    let subscriptions = [], invoices = [];
+    if (cid) {
+      try {
+        const [s, i] = await Promise.all([
+          stripe.subscriptions.list({ customer: cid, status: "all", limit: 20, expand: ["data.discounts"] }),
+          stripe.invoices.list({ customer: cid, limit: 50 }),
+        ]);
+        subscriptions = (s?.data || []).map((x) => subscriptionRow(x, nowSec));
+        invoices = (i?.data || []).map(invoiceRow);
+      } catch (e) {
+        if (e?.code !== "resource_missing") return res.status(502).json({ error: "stripe_unreachable", detail: String(e?.message || e).slice(0, 200) });
+      }
+    }
+    const paid = invoices.filter((x) => x.status === "paid");
+    return res.status(200).json({
+      ok: true, mode, billing,
+      customer: cid ? { id: cid, url: stripeDashUrl(`customers/${cid}`) } : null,
+      totals: { paid: paid.reduce((s, x) => s + x.amount, 0), payments: paid.length,
+                first: paid.length ? Math.min(...paid.map((x) => x.paidAt || x.created)) : null },
+      subscriptions, invoices,
+    });
+  }
+
+  const biz = await businessNow(stripe);
+  if (!biz) return res.status(502).json({ error: "stripe_unreachable" });
+  const cids = [...new Set([...biz.invoices.map((i) => (typeof i.customer === "string" ? i.customer : i.customer?.id)),
+    ...biz.subs.map((x) => (typeof x.customer === "string" ? x.customer : x.customer?.id))].filter(Boolean))];
+  let people = {};
+  if (cids.length) {
+    const { data } = await admin.from("user_profiles").select("id, email, full_name, company, stripe_customer_id").in("stripe_customer_id", cids);
+    people = Object.fromEntries((data || []).map((u) => [u.stripe_customer_id, { id: u.id, email: u.email, name: u.full_name, company: u.company }]));
+  }
+  const withPerson = (r) => ({ ...r, person: people[r.customerId] || null });
+  return res.status(200).json({
+    ok: true, mode,
+    summary: biz.summary,
+    payments: biz.invoices.filter((i) => i.status !== "draft").map(invoiceRow).map(withPerson),
+    subscriptions: biz.subs.map((x) => subscriptionRow(x, nowSec)).map(withPerson),
+  });
 }
 
 // ─── portal ──────────────────────────────────────────────────────────────
@@ -751,6 +992,13 @@ async function handleReconcile(req, res) {
     }
   }
 
+  // Our webhook endpoint must carry every event a branch of handleWebhook reacts to —
+  // a branch whose event is not subscribed never runs (invoice.payment_failed, added
+  // 2026-10-07). It can never fail the reconcile it rides on.
+  let webhook = null;
+  try { webhook = await ensureWebhookEvents(stripe); }
+  catch (e) { console.warn("[stripe reconcile] webhook events not checked:", e?.message || e); }
+
   // Loud in the log when something did not apply — a reconcile that quietly
   // fails is the same blind spot it was built to remove.
   if (failed) console.error(`[stripe reconcile] ${failed} of ${scanned} failed`, problems);
@@ -776,8 +1024,33 @@ async function handleReconcile(req, res) {
   }
 
   return res.status(failed ? 500 : 200).json({
-    ok: failed === 0, scanned, applied, skipped, failed, truncated, problems,
+    ok: failed === 0, scanned, applied, skipped, failed, truncated, problems, webhook,
   });
+}
+
+// Every event handleWebhook has a branch for. The nightly reconcile ADDS any of them
+// missing from OUR endpoint (residata.eu) — it never removes an event and never
+// touches another endpoint (the KamhalCo one lives in another account anyway).
+export const WEBHOOK_EVENTS = [
+  "checkout.session.completed", "customer.updated",
+  "customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted",
+  "invoice.paid", "invoice.payment_succeeded", "invoice.payment_failed",
+];
+const OUR_WEBHOOK = /^https:\/\/(www\.)?residata\.eu\/api\/(webhooks\/stripe|stripe\?action=webhook)\b/;
+
+async function ensureWebhookEvents(stripe) {
+  const added = [];
+  for await (const w of stripe.webhookEndpoints.list({ limit: 100 })) {
+    if (w.status !== "enabled" || !OUR_WEBHOOK.test(String(w.url || ""))) continue;
+    const have = w.enabled_events || [];
+    if (have.includes("*")) continue;
+    const missing = WEBHOOK_EVENTS.filter((e) => !have.includes(e));
+    if (!missing.length) continue;
+    await stripe.webhookEndpoints.update(w.id, { enabled_events: [...have, ...missing] });
+    console.log(`[stripe reconcile] webhook ${w.id}: added ${missing.join(", ")}`);
+    added.push({ id: w.id, added: missing });
+  }
+  return { added };
 }
 
 async function handleWebhook(req, res) {
@@ -840,6 +1113,19 @@ async function handleWebhook(req, res) {
         await applySubscription(admin, stripe, event.data.object, {
           deleted: event.type === "customer.subscription.deleted",
         });
+        // Boss hears when someone cancels (Premium runs to the end) or stops paying —
+        // after the access change, and never able to fail the webhook.
+        if (event.type !== "customer.subscription.created") {
+          await notifyOwnerCancel(admin, stripe, event.data.object, { deleted: event.type === "customer.subscription.deleted" })
+            .catch((e) => console.warn("[stripe] owner cancel e-mail not sent:", e?.message || e));
+        }
+        break;
+      }
+      // A renewal that could not be charged: Boss and the customer hear once per invoice.
+      // Access is untouched here — the subscription events carry past_due (grace).
+      case "invoice.payment_failed": {
+        await notifyPaymentFailed(admin, stripe, event.data.object)
+          .catch((e) => console.warn("[stripe] failed-payment e-mails not sent:", e?.message || e));
         break;
       }
       case "invoice.paid":
@@ -865,8 +1151,11 @@ async function handleWebhook(req, res) {
         // invoice.payment_succeeded for the same invoice, and both arriving here
         // would send the customer two copies.
         if (event.type === "invoice.paid") {
-          await sendInvoiceEmail(admin, event.data.object)
+          await sendInvoiceEmail(admin, event.data.object, stripe)
             .catch((e) => console.warn("[stripe] invoice email not sent:", e?.message || e));
+          // …and Boss hears about the money (Boss 2026-10-07), once per invoice
+          await notifyOwnerPayment(admin, stripe, event.data.object)
+            .catch((e) => console.warn("[stripe] owner payment e-mail not sent:", e?.message || e));
         }
         break;
       }
@@ -926,6 +1215,7 @@ const METHODS = {
   webhook: ["POST"],              // Stripe POSTs its events
   reconcile: ["GET", "POST"],     // Vercel cron GETs; POST stays for a manual run with the secret
   mode: ["GET"],                  // public: "live" | "test" | "missing", no secret in it
+  "admin-billing": ["POST"],      // admin → Revenue and a person's payments (admin token)
 };
 
 export default async function handler(req, res) {
@@ -944,6 +1234,7 @@ export default async function handler(req, res) {
     if (action === "webhook") return await handleWebhook(req, res);
     if (action === "reconcile") return await handleReconcile(req, res);
     if (action === "mode") return await handleMode(req, res);
+    if (action === "admin-billing") return await handleAdminBilling(req, res);
     return res.status(400).json({ error: "unknown action" });
   } catch (e) {
     console.error("[stripe] crash", e);
