@@ -80,8 +80,9 @@ async function main() {
 
   const rows = readJson(path.join(ROOT, "scripts", ".articles.json"), null);
   if (!rows) {
-    if (STRICT) die("scripts/.articles.json missing — the published articles could not be read, "
-      + "so this build would publish every article without its page. Keeping the previous deployment.");
+    if (STRICT) die("scripts/.articles.json missing — the published articles or the section switch "
+      + "(public.site_sections) could not be read, so this build cannot know which article pages to "
+      + "write. Keeping the previous deployment. The reason is the [gen-static] line above.");
     console.warn("[prerender] no scripts/.articles.json (local build without database access) — skipping.");
     return;
   }
