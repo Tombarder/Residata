@@ -142,7 +142,22 @@ function legalFooterHtml(lang = "sk") {
  * is already approved, so the button answered "Already approved" every time.
  * Premium is given in admin → Users, which is where the button now goes.
  */
-export function adminDigestHtml(user, webUrl) {
+/**
+ * Boss's note that someone signed up (api/webhooks/admin-notify.js) — one per
+ * account, the moment the sign-up form is finished. Boss 2026-10-07: "i want to
+ * receive an email every time a new user registers". It says who it is (name,
+ * company, role, contacts), what they got (Free, or the 7-day trial they asked for),
+ * in which language, whether colleagues are already here, and links straight to
+ * the person's activity page in admin.
+ *
+ * `extra`: { lang, trialRunning, trialIntent, colleagues: [email], accountNo }
+ */
+export function adminDigestSubject(user) {
+  const who = [user.full_name, user.company && `(${user.company})`].filter(Boolean).join(" ");
+  return `[Residata] New sign-up: ${who ? `${who} — ` : ""}${user.email}`;
+}
+
+export function adminDigestHtml(user, webUrl, extra = {}) {
   const badge = isPersonalEmail(user.email)
     ? `<span style="${S.badgeWarn}">⚠ personal</span>`
     : `<span style="${S.badgeOk}">✓ business</span>`;
@@ -156,22 +171,73 @@ export function adminDigestHtml(user, webUrl) {
   if (li) rows.push(row("LinkedIn", `<a href="${escHtml(li)}" style="color:${GREEN};text-decoration:none">${escHtml(li)}</a>`));
   if (user.phone)     rows.push(row("Phone", escHtml(user.phone)));
   if (user.created_at) rows.push(row("Registered", escHtml(fmtStamp(user.created_at))));
+  if (extra.lang)     rows.push(row("Language", extra.lang === "en" ? "English" : "Slovak"));
+  rows.push(row("Plan", extra.trialRunning
+    ? `<strong style="color:${GREEN}">7-day Premium trial</strong> running until ${escHtml(fmtStamp(user.trial_until))}`
+    : extra.trialIntent
+    ? `<strong style="color:${GREEN}">7-day Premium trial</strong> requested at sign-up — starts with the welcome e-mail`
+    : "Free — market overview + one project of their choice"));
+  const mates = (extra.colleagues || []).filter((e) => e && e !== user.email);
+  if (mates.length) rows.push(row("Colleagues here", `${mates.length}: ${mates.slice(0, 5).map(escHtml).join(", ")}${mates.length > 5 ? " …" : ""}`));
+  if (extra.accountNo) rows.push(row("Account no.", `#${Number(extra.accountNo)}`));
 
+  const personUrl = `${webUrl}/app/admin?tab=users&user=${encodeURIComponent(user.id)}`;
   const inner = `
     <div style="${S.eyebrow}">New sign-up · FYI</div>
-    <h1 style="${S.h1}">Someone just signed up</h1>
-    <p style="${S.p}">Approved automatically with a <strong style="color:${GREEN}">free</strong> account — nothing to do. To give them Premium, open them in admin → Users.</p>
+    <h1 style="${S.h1}">${user.full_name ? `${escHtml(user.full_name)} just signed up` : "Someone just signed up"}</h1>
+    <p style="${S.p}">Approved automatically — nothing to do. To give Premium, open the person in admin → Users; their activity page shows what they do from today on.</p>
     <div style="${S.userBox}">
       <div style="${S.emailLine}">${escHtml(user.email)}${badge}</div>
       ${rows.join("")}
     </div>
-    <a href="${webUrl}/app/admin?tab=users" style="${S.btnGreen}">Open admin → Users</a>`;
+    <a href="${personUrl}" style="${S.btnGreen}">Open their activity</a>
+    <a href="${webUrl}/app/admin?tab=users" style="${S.btnOutline}">All users</a>`;
 
   return shell({
     title: "New Residata signup",
-    preheader: `New signup: ${user.email}`,
+    preheader: `New sign-up: ${[user.full_name, user.company].filter(Boolean).join(", ") || user.email}`,
     inner,
-    footer: "Residata · real-time FYI · sign-ups are approved automatically as free",
+    footer: "Residata · real-time FYI · one e-mail per new account",
+    lang: "en",
+  });
+}
+
+/**
+ * The other half of "every time a new user registers": a person who confirmed the
+ * e-mail code and then left the profile form. Without this Boss never heard of them —
+ * the note above waits for the finished form. Sent once, about an hour later
+ * (pg_cron notify-unfinished-signups → admin-notify kind "unfinished").
+ */
+export function adminUnfinishedSubject(user) {
+  return `[Residata] Sign-up not finished: ${user.email}`;
+}
+
+export function adminUnfinishedHtml(user, webUrl, extra = {}) {
+  const badge = isPersonalEmail(user.email)
+    ? `<span style="${S.badgeWarn}">⚠ personal</span>`
+    : `<span style="${S.badgeOk}">✓ business</span>`;
+  const row = (label, value) => `<div style="${S.row}"><span style="${S.rowLabel}">${label}</span><span style="color:${TEXT_HI}">${value}</span></div>`;
+  const rows = [];
+  if (user.created_at) rows.push(row("Code confirmed", escHtml(fmtStamp(extra.confirmedAt || user.created_at))));
+  if (extra.lang) rows.push(row("Language", extra.lang === "en" ? "English" : "Slovak"));
+  if (extra.trialIntent) rows.push(row("Wanted", "the 7-day Premium trial"));
+  const mates = (extra.colleagues || []).filter((e) => e && e !== user.email);
+  if (mates.length) rows.push(row("Colleagues here", `${mates.length}: ${mates.slice(0, 5).map(escHtml).join(", ")}`));
+  const inner = `
+    <div style="${S.eyebrow}">Sign-up not finished · FYI</div>
+    <h1 style="${S.h1}">Someone started signing up and stopped</h1>
+    <p style="${S.p}">They confirmed their e-mail but did not fill in the short profile form, so they have no access yet. If you know them, a personal nudge usually helps — or create the account for them in admin → Users.</p>
+    <div style="${S.userBox}">
+      <div style="${S.emailLine}">${escHtml(user.email)}${badge}</div>
+      ${rows.join("")}
+    </div>
+    <a href="mailto:${escHtml(user.email)}" style="${S.btnGreen}">Write to them</a>
+    <a href="${webUrl}/app/admin?tab=users&user=${encodeURIComponent(user.id)}" style="${S.btnOutline}">Open in admin</a>`;
+  return shell({
+    title: "Residata sign-up not finished",
+    preheader: `Sign-up not finished: ${user.email}`,
+    inner,
+    footer: "Residata · real-time FYI · sent once per person",
     lang: "en",
   });
 }

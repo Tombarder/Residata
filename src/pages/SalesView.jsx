@@ -803,7 +803,7 @@ export default function SalesView({ lang = "sk" }) {
                 with the totals above it. With one scope there is nothing to explain. */}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-            <CsvGate lang={lang}><button className="rd-btn rd-btn--primary rd-btn--sm" onClick={exportCsv} disabled={csvBusy || !detRows.length}>⬇ {csvBusy ? t("sťahujem…", "preparing…") : "CSV"}</button></CsvGate>
+            <CsvGate lang={lang} what="sales"><button className="rd-btn rd-btn--primary rd-btn--sm" onClick={exportCsv} disabled={csvBusy || !detRows.length}>⬇ {csvBusy ? t("sťahujem…", "preparing…") : "CSV"}</button></CsvGate>
           </div>
         </div>
 

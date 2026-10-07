@@ -13,6 +13,7 @@
 
 import { getFreshAccessToken } from "./sessionGuard";
 import { forceTokenRefresh } from "./authToken";
+import { track } from "./track";
 
 const authHeaders = (token) => ({ "Content-Type": "application/json", Authorization: `Bearer ${token}` });
 
@@ -62,12 +63,21 @@ async function openStripe(path) {
   else window.location.href = url; // popup blocked → same tab, so it never hangs
 }
 
+// Each start, refusal and portal visit is recorded (admin → a person's activity):
+// "pressed Subscribe twice and never paid" is the most useful line on that page.
 export async function startCheckout() {
-  await openStripe("/api/stripe?action=checkout");
+  track("checkout_started");
+  try {
+    await openStripe("/api/stripe?action=checkout");
+  } catch (e) {
+    track("checkout_refused", { code: e?.code || e?.message || null });
+    throw e;
+  }
 }
 
 // Open the self-serve billing portal (manage card / cancel / invoices).
 export async function openBillingPortal() {
+  track("billing_portal_opened");
   await openStripe("/api/stripe?action=portal");
 }
 

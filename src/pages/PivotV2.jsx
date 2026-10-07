@@ -3614,7 +3614,7 @@ function AnalysisToolbar({ valueMode, setValueMode, dataBars, setDataBars, onExp
       <button style={btnPill(dataBars)} onClick={() => setDataBars(x => !x)}>{lang === "sk" ? "▮ stĺpčeky" : "▮ bars"}</button>
 
       <span style={{ marginLeft: "auto" }} />
-      <CsvGate lang={lang} label={lang === "sk" ? "Kopírovať" : "Copy"}>
+      <CsvGate lang={lang} what="pivot_table" kind="copy" label={lang === "sk" ? "Kopírovať" : "Copy"}>
       <button
         style={{
           ...btnBase,
@@ -3632,7 +3632,7 @@ function AnalysisToolbar({ valueMode, setValueMode, dataBars, setDataBars, onExp
           : (lang === "sk" ? "⧉ Kopírovať pre Excel" : "⧉ Copy for Excel")}
       </button>
       </CsvGate>
-      <CsvGate lang={lang}>
+      <CsvGate lang={lang} what="pivot_table">
       <button style={{ ...btnBase, color: accentInk, borderColor: `color-mix(in srgb, var(--accent) 33%, transparent)` }}
               onClick={onExportCSV}>
         ⬇ CSV
@@ -6010,7 +6010,7 @@ function DrillDownModal({ title, records, count, loading, onClose, lang }) {
           <span style={{ color: dim, fontFamily: mono, fontSize: "0.72rem", marginLeft: "auto" }}>
             {(count ?? records.length).toLocaleString("en-US").replace(/,/g, " ")}
           </span>
-          <CsvGate lang={lang}>
+          <CsvGate lang={lang} what="pivot_records">
           <button onClick={downloadCSV} style={{
             background: "transparent", border: `1px solid color-mix(in srgb, var(--accent) 33%, transparent)`, color: accentInk,
             borderRadius: 4, padding: "0.3rem 0.6rem", cursor: "pointer",

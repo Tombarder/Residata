@@ -513,7 +513,7 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
             )}
 
             <span style={{ marginLeft: "auto" }} />
-            <CsvGate lang={lang}>
+            <CsvGate lang={lang} what="units">
             <button onClick={exportCsv} disabled={csvBusy || !cols.length}
               title={t("Stiahnuť vyfiltrované byty ako CSV", "Download the filtered units as CSV")}
               style={{ ...sel, cursor: csvBusy ? "wait" : (cols.length ? "pointer" : "default"),

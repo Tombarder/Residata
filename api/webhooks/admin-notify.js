@@ -1,20 +1,28 @@
-// Vercel serverless endpoint: admin-notify
+// Vercel serverless endpoint: admin-notify — Boss hears about every new account.
 //
-// FREEMIUM MODEL — no admin gate:
-// Fires from the AFTER-INSERT/UPDATE trigger on user_profiles when a new
-// signup completes their profile. By the time this endpoint runs, the
-// BEFORE-UPDATE trigger has already auto-approved them (tier='free',
-// approved_at=now()). So this email is purely FYI — "new free signup,
-// here's who they are, optionally bump to paid if you know them".
+// Boss 2026-10-07: "i want to receive an email every time a new user registers".
+// Two kinds, each sent ONCE per person and stamped on the profile so a retry never
+// sends it twice:
 //
-// This endpoint:
-//   1. Validates shared secret
-//   2. Loads user profile (service role — bypasses RLS)
-//   3. Skips if already notified (idempotency)
-//   4. Sends FYI email via Gmail SMTP
-//   5. Marks admin_notified_at = now()
+//   kind "completed" (default) — the sign-up form is finished. Fired by the
+//     AFTER INSERT/UPDATE trigger on user_profiles (notify_on_profile_complete, via
+//     pg_net) a second after the profile is saved; the nightly safety net
+//     (novostavby notify_auth_events.py) re-calls it for any profile still
+//     unstamped. Stamp: admin_notified_at. By then the BEFORE trigger has approved
+//     the account (Free), so the e-mail is FYI.
+//   kind "unfinished" — the person confirmed the e-mail code and left the profile
+//     form. Called by pg_cron (notify-unfinished-signups, every 15 min, for accounts
+//     confirmed over an hour ago) and by the same nightly safety net. Stamp:
+//     unfinished_notified_at. Skipped once the profile is finished: then the
+//     "completed" e-mail is the one that says it.
+//
+// An account an admin created never reaches either: create-user stamps both.
 
-import { adminDigestHtml, sendEmail } from "../_lib/emails.js";
+import { adminDigestHtml, adminDigestSubject, adminUnfinishedHtml, adminUnfinishedSubject, sendEmail } from "../_lib/emails.js";
+import { isPersonalEmail } from "../../src/lib/emailValidation.js";
+import { trialRefusal, trialIntentValid } from "../../src/lib/trialRules.js";
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function handler(req, res) {
   // ─── Method + secret check ───
@@ -31,11 +39,15 @@ export default async function handler(req, res) {
   }
 
   // ─── Parse body (Vercel gives us JSON automatically if content-type matches) ───
-  const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
+  let body;
+  try { body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {}); }
+  catch { return res.status(400).json({ error: "invalid json" }); }
   const userId = body.user_id || body.record?.id;
-  if (!userId) {
-    return res.status(400).json({ error: "missing user_id" });
+  if (!userId || !UUID.test(String(userId))) {
+    return res.status(400).json({ error: "missing or invalid user_id" });
   }
+  const kind = body.kind === "unfinished" ? "unfinished" : "completed";
+  const stampField = kind === "unfinished" ? "unfinished_notified_at" : "admin_notified_at";
 
   // ─── Env ───
   const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -48,12 +60,10 @@ export default async function handler(req, res) {
   if (!SUPABASE_URL || !SUPABASE_SECRET_KEY || (!process.env.SMTP_PASS && !GMAIL_APP_PASSWORD)) {
     return res.status(500).json({ error: "server misconfigured: missing required env" });
   }
+  const auth = { apikey: SUPABASE_SECRET_KEY, Authorization: `Bearer ${SUPABASE_SECRET_KEY}` };
 
   // ─── Fetch user ───
-  const userResp = await fetch(
-    `${SUPABASE_URL}/rest/v1/user_profiles?id=eq.${userId}&select=*`,
-    { headers: { apikey: SUPABASE_SECRET_KEY, Authorization: `Bearer ${SUPABASE_SECRET_KEY}` } }
-  );
+  const userResp = await fetch(`${SUPABASE_URL}/rest/v1/user_profiles?id=eq.${userId}&select=*`, { headers: auth });
   if (!userResp.ok) {
     return res.status(500).json({ error: `supabase fetch failed: ${userResp.status}` });
   }
@@ -63,25 +73,74 @@ export default async function handler(req, res) {
   }
   const user = users[0];
 
-  // ─── Re-check conditions (idempotency only; no tier gate in freemium) ───
-  if (!user.profile_completed) {
+  // ─── Re-check conditions (idempotency) ───
+  if (kind === "completed" && !user.profile_completed) {
     return res.status(200).json({ skipped: "profile not completed yet" });
   }
-  if (user.admin_notified_at) {
-    return res.status(200).json({ skipped: "admin already notified", at: user.admin_notified_at });
+  if (kind === "unfinished" && user.profile_completed) {
+    return res.status(200).json({ skipped: "profile completed — the sign-up e-mail covers it" });
+  }
+  if (user[stampField]) {
+    return res.status(200).json({ skipped: "admin already notified", kind, at: user[stampField] });
   }
 
-  // ─── Send email (FYI about new free signup) ───
+  // ─── What else Boss wants to know: language, trial, confirmed, colleagues, count ───
+  // None of it may stop the e-mail: each lookup falls back to "unknown".
+  let meta = {};
+  let confirmedAt = null;
+  try {
+    const au = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`, { headers: auth });
+    if (au.ok) {
+      const j = await au.json();
+      const u = j?.user || j || {};
+      meta = u.user_metadata || {};
+      confirmedAt = u.email_confirmed_at || u.confirmed_at || null;
+    }
+  } catch { /* unknown */ }
+  if (kind === "unfinished" && !confirmedAt) {
+    // asked for a code and never typed it: not a sign-up yet (and often a typo or a bot)
+    return res.status(200).json({ skipped: "e-mail not confirmed" });
+  }
+
+  let colleagues = [];
+  const domain = String(user.email || "").split("@")[1] || "";
+  if (domain && !isPersonalEmail(user.email)) {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/user_profiles?email_domain=eq.${encodeURIComponent(domain)}&id=neq.${userId}&select=email&order=created_at.asc&limit=20`, { headers: auth });
+      if (r.ok) colleagues = (await r.json()).map((x) => x.email).filter(Boolean);
+    } catch { /* none known */ }
+  }
+
+  let accountNo = null;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/user_profiles?select=id&created_at=lte.${encodeURIComponent(user.created_at)}`,
+      { headers: { ...auth, Prefer: "count=exact", Range: "0-0" } });
+    const total = Number(String(r.headers.get("content-range") || "").split("/")[1]);
+    if (Number.isFinite(total) && total > 0) accountNo = total;
+  } catch { /* unknown */ }
+
+  const extra = {
+    lang: meta.lang === "en" ? "en" : meta.lang ? "sk" : null,
+    // welcome-user starts a requested trial in parallel with this call: whichever
+    // order they run in, the e-mail says what is true
+    trialRunning: Boolean(user.trial_until && new Date(user.trial_until).getTime() > Date.now()),
+    trialIntent: trialIntentValid(meta.trial_intent_at) && !trialRefusal(user),
+    colleagues,
+    accountNo,
+    confirmedAt,
+  };
+
+  // ─── Send ───
   try {
     await sendEmail({
       to: ADMIN_EMAIL,
-      subject: `[Residata] New sign-up: ${user.email}`,
-      html: adminDigestHtml(user, WEB_URL),
+      subject: kind === "unfinished" ? adminUnfinishedSubject(user) : adminDigestSubject(user),
+      html: kind === "unfinished" ? adminUnfinishedHtml(user, WEB_URL, extra) : adminDigestHtml(user, WEB_URL, extra),
       gmailUser: GMAIL_FROM,
       gmailPassword: GMAIL_APP_PASSWORD,
     });
   } catch (e) {
-    // Email failed — don't mark notified so cron safety-net retries later
+    // Email failed — don't mark notified so the safety net retries later
     console.error("admin-notify SMTP failed:", e);
     return res.status(500).json({ error: "smtp failed", detail: String(e.message || e) });
   }
@@ -91,20 +150,15 @@ export default async function handler(req, res) {
     `${SUPABASE_URL}/rest/v1/user_profiles?id=eq.${userId}`,
     {
       method: "PATCH",
-      headers: {
-        apikey: SUPABASE_SECRET_KEY,
-        Authorization: `Bearer ${SUPABASE_SECRET_KEY}`,
-        "Content-Type": "application/json",
-        Prefer: "return=minimal",
-      },
-      body: JSON.stringify({ admin_notified_at: new Date().toISOString() }),
+      headers: { ...auth, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ [stampField]: new Date().toISOString() }),
     }
   );
   if (!patchResp.ok) {
-    // Email sent but mark failed — worst case duplicate email on cron fallback
+    // Email sent but mark failed — worst case one duplicate from the safety net
     console.error("admin-notify mark failed:", patchResp.status, await patchResp.text());
     return res.status(500).json({ sent: true, markFailed: true, status: patchResp.status });
   }
 
-  return res.status(200).json({ ok: true, sentTo: ADMIN_EMAIL, user: user.email });
+  return res.status(200).json({ ok: true, kind, sentTo: ADMIN_EMAIL, user: user.email });
 }

@@ -13,6 +13,7 @@ import { supabaseData } from "../lib/supabase";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
 import Picker from "../components/Picker";
 import Kpi from "../components/Kpi";
+import UserActivity from "./UserActivity";
 import InfoTip from "../components/InfoTip";
 import { SortableTh, useTableSort } from "../components/SortableTable";
 import { accent as green, accentInk, dim, text, border, surface as bg, surfaceDark as bg2 } from "../lib/theme";
@@ -128,6 +129,7 @@ export default function UsageDashboard({ lang = "en" }) {
   const [err, setErr] = useState(null);
 
   const [selUser, setSelUser] = useState(null);   // { user_id, email }
+  const [activityUserId, setActivityUserId] = useState(null);   // the full picture (UserActivity.jsx)
   const [timeline, setTimeline] = useState([]);
   const [tlLoading, setTlLoading] = useState(false);
   const [tlErr, setTlErr] = useState(null);
@@ -361,8 +363,10 @@ export default function UsageDashboard({ lang = "en" }) {
 
       {/* Drill-down drawer */}
       {selUser && (
-        <UserTimeline user={selUser} rows={timeline} loading={tlLoading} err={tlErr} lang={lang} onClose={() => setSelUser(null)} />
+        <UserTimeline user={selUser} rows={timeline} loading={tlLoading} err={tlErr} lang={lang} onClose={() => setSelUser(null)}
+          onOpenActivity={() => { setActivityUserId(selUser.user_id); setSelUser(null); }} />
       )}
+      {activityUserId && <UserActivity userId={activityUserId} lang={lang} onClose={() => setActivityUserId(null)} />}
     </div>
   );
 }
@@ -388,7 +392,7 @@ function Empty({ lang }) {
 }
 
 // Per-user activity timeline, grouped by session (newest first).
-function UserTimeline({ user, rows, loading, err, lang, onClose }) {
+function UserTimeline({ user, rows, loading, err, lang, onClose, onOpenActivity }) {
   const L = (sk, en) => (lang === "sk" ? sk : en);
 
   // Close on Escape + lock the page scroll behind the drawer.
@@ -420,6 +424,10 @@ function UserTimeline({ user, rows, loading, err, lang, onClose }) {
           <div>
             <div style={{ fontFamily: mono, fontSize: "0.66rem", color: dim, textTransform: "uppercase", letterSpacing: "0.08em" }}>{L("Denník aktivity", "Activity timeline")}</div>
             <div style={{ fontFamily: mono, fontSize: "0.95rem", fontWeight: 700, marginTop: "0.25rem", wordBreak: "break-all" }}>{user.email || user.user_id}</div>
+            {/* the raw list stays (full history, Boss 2026-07-17); the readable picture is one click away */}
+            <button type="button" className="rd-btn rd-btn--sm rd-btn--primary" onClick={onOpenActivity} style={{ marginTop: "0.55rem" }}>
+              {L("Celý prehľad aktivity →", "Full activity picture →")}
+            </button>
           </div>
           <button onClick={onClose} aria-label={L("Zavrieť", "Close")} title={L("Zavrieť", "Close")} style={{ background: "transparent", border: `1px solid ${border}`, color: dim, borderRadius: 8, cursor: "pointer", fontFamily: mono, fontSize: "0.9rem", padding: "0.2rem 0.6rem" }}>✕</button>
         </div>

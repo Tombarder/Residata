@@ -24,6 +24,9 @@ import Picker from "../components/Picker";
 import DateField from "../components/DateField";
 import Modal from "../components/Modal";
 import Kpi from "../components/Kpi";
+import UserActivity from "./UserActivity";
+import { supabaseData } from "../lib/supabase";
+import { relDays } from "../lib/userActivity";
 import { useTableSort, SortableTh } from "../components/SortableTable";
 import { getFreshAccessToken, authErrorMessage } from "../lib/sessionGuard";
 import { isPersonalEmail } from "../lib/emailValidation";
@@ -84,6 +87,40 @@ export default function AdminUsers({ users, setUsers, selfId, lang = "sk", premi
   const [busyId, setBusyId] = useState(null);
   const [flashId, setFlashId] = useState(null);
   const toastTimer = useRef(null);
+
+  // One person's activity (UserActivity.jsx). ?user=<id> opens it — the "new sign-up"
+  // e-mail links straight to the person; the address follows the open panel so it
+  // can be copied and the browser's Back closes nothing unexpected.
+  const [activityId, setActivityId] = useState(() => {
+    try {
+      const id = new URLSearchParams(window.location.search).get("user");
+      return /^[0-9a-f-]{36}$/i.test(id || "") ? id : null;
+    } catch { return null; }
+  });
+  const openActivity = (id) => {
+    setActivityId(id);
+    try {
+      const p = new URLSearchParams(window.location.search);
+      if (id) { p.set("tab", "users"); p.set("user", id); } else p.delete("user");
+      const qs = p.toString();
+      window.history.replaceState(window.history.state, "", window.location.pathname + (qs ? `?${qs}` : ""));
+    } catch { /* the panel works without the address */ }
+  };
+
+  // The "Activity" column: last seen + active days of the last 30, for everyone at once.
+  // null = not known (still loading, or the read failed) — never shown as "nothing yet"
+  const [glance, setGlance] = useState(null);
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      try {
+        await getFreshAccessToken();
+        const { data, error } = await supabaseData.rpc("admin_users_activity_glance");
+        if (!error && live) setGlance(Object.fromEntries((data || []).map((r) => [r.user_id, r])));
+      } catch { /* the column shows a dash; the table stays */ }
+    })();
+    return () => { live = false; };
+  }, [users?.length]);
 
   const say = (kind, text) => {
     clearTimeout(toastTimer.current);
@@ -213,7 +250,8 @@ export default function AdminUsers({ users, setUsers, selfId, lang = "sk", premi
     from:     { kind: "date", get: (u) => u.paid_started_at },
     to:       { kind: "date", get: (u) => (u.tier === "paid" && !u.paid_until ? "2999-12-31" : u.paid_until) },
     created:  { kind: "date", get: (u) => u.created_at },
-  }), []);
+    active:   { kind: "date", get: (u) => glance?.[u.id]?.last_active_at },
+  }), [glance]);
   const { sort, onHeaderClick, sortArrow, sortRows } = useTableSort(sortCols, { key: "created", dir: "desc" }, lang);
 
   const q = search.trim().toLowerCase();
@@ -288,6 +326,7 @@ export default function AdminUsers({ users, setUsers, selfId, lang = "sk", premi
                   <SortableTh style={th} sortKey="type"     current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t("Typ účtu", "Account type")}</SortableTh>
                   <SortableTh style={th} sortKey="from"     current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t("Premium od", "Premium from")}</SortableTh>
                   <SortableTh style={th} sortKey="to"       current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t("Premium do", "Premium to")}</SortableTh>
+                  <SortableTh style={th} sortKey="active"   current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t("Aktivita", "Activity")}</SortableTh>
                   <SortableTh style={th} sortKey="created"  current={sort} onClick={onHeaderClick} arrow={sortArrow}>{t("Vytvorený", "Created")}</SortableTh>
                   <th style={th}>{t("Poznámka", "Note")}</th>
                   <th style={{ ...th, textAlign: "right" }}><span className="sr-only">{t("Akcie", "Actions")}</span></th>
@@ -295,7 +334,7 @@ export default function AdminUsers({ users, setUsers, selfId, lang = "sk", premi
               </thead>
               <tbody>
                 {visible.length === 0 ? (
-                  <tr><td className="rd-td--empty" colSpan={11}>
+                  <tr><td className="rd-td--empty" colSpan={12}>
                     {q ? t(`Nikto nevyhovuje „${search}“.`, `No users match "${search}".`) : t("V tomto filtri nikto nie je.", "Nobody in this filter.")}
                   </td></tr>
                 ) : visible.map((u) => (
@@ -312,6 +351,8 @@ export default function AdminUsers({ users, setUsers, selfId, lang = "sk", premi
                     onDate={(field, day) => saveDate(u, field, day)}
                     onEdit={() => setForm({ mode: "edit", user: u })}
                     onDelete={() => askDelete(u)}
+                    glance={glance ? (glance[u.id] || {}) : null}
+                    onActivity={() => openActivity(u.id)}
                   />
                 ))}
               </tbody>
@@ -351,6 +392,15 @@ export default function AdminUsers({ users, setUsers, selfId, lang = "sk", premi
         />
       )}
 
+      {activityId && (
+        <UserActivity
+          userId={activityId}
+          profile={(users || []).find((x) => x.id === activityId)}
+          lang={lang}
+          onClose={() => openActivity(null)}
+        />
+      )}
+
       <ConfirmDialog
         state={confirm}
         lang={lang}
@@ -370,7 +420,7 @@ export default function AdminUsers({ users, setUsers, selfId, lang = "sk", premi
 
 // ───────────────────────────────────────────────────────────────────────────
 
-function UserRow({ u, lang, now, isSelf, busy, flashing, premiumDomain, onType, onDate, onEdit, onDelete }) {
+function UserRow({ u, lang, now, isSelf, busy, flashing, premiumDomain, onType, onDate, onEdit, onDelete, glance, onActivity }) {
   const t = L(lang);
   const personal = isPersonalEmail(u.email || "");
   const status = accountStatus(u, now);
@@ -412,12 +462,27 @@ function UserRow({ u, lang, now, isSelf, busy, flashing, premiumDomain, onType, 
       </td>
       <td><DateCell u={u} field="paid_started_at" editable={editable} lang={lang} onSave={onDate} today={dayKey(now)} /></td>
       <td><DateCell u={u} field="paid_until" editable={editable} lang={lang} onSave={onDate} status={status} today={dayKey(now)} /></td>
+      <td>
+        <button type="button" className="rd-ua-open" onClick={onActivity}
+          title={t("Otvoriť aktivitu: čo robí, kedy, ako a koľko", "Open activity: what they do, when, how and how much")}>
+          {!glance ? <span className="rd-ua-open__when" style={{ color: "var(--text-faint)" }}>{t("otvoriť", "open")}</span> : glance.last_active_at ? (
+            <>
+              <span className="rd-ua-open__when">{relDays(new Date(glance.last_active_at), new Date(now), lang)}</span>
+              <span className="rd-ua-open__days">{glance.active_days_30} {t("d / 30", "d / 30")}</span>
+            </>
+          ) : <span className="rd-ua-open__when" style={{ color: "var(--text-faint)" }}>{t("zatiaľ nič", "nothing yet")}</span>}
+        </button>
+      </td>
       <td style={{ color: "var(--text-dim)", fontFamily: "var(--font-mono)", fontSize: "0.74rem" }}>{fmtDay(u.created_at, lang)}</td>
       <td style={{ maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis" }} title={u.subscription_note || undefined}>
         {u.subscription_note ? u.subscription_note.replace(/\s*\n\s*/g, " · ") : <Dash />}
       </td>
       <td style={{ textAlign: "right" }}>
         <span style={{ display: "inline-flex", gap: "0.25rem" }}>
+          <button type="button" className="rd-btn rd-btn--sm rd-btn--ghost rd-icon-btn" onClick={onActivity}
+            title={t("Aktivita", "Activity")} aria-label={`${t("Aktivita", "Activity")} ${u.email}`}>
+            <IconActivity />
+          </button>
           <button type="button" className="rd-btn rd-btn--sm rd-icon-btn" onClick={onEdit} disabled={busy}
             title={t("Upraviť", "Edit")} aria-label={`${t("Upraviť", "Edit")} ${u.email}`}>
             <IconPencil />
@@ -470,6 +535,7 @@ const Clip = ({ value, max, style }) => (
 );
 
 const svg = { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true };
+const IconActivity = () => <svg {...svg}><path d="M3 3v18h18" /><path d="M7 15l4-4 3 3 5-6" /></svg>;
 const IconPencil = () => <svg {...svg}><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>;
 const IconPhone = () => <svg {...svg}><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2Z" /></svg>;
 const IconLinkedIn = () => <svg {...svg}><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6Z" /><rect x="2" y="9" width="4" height="12" /><circle cx="4" cy="4" r="2" /></svg>;

@@ -13,7 +13,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { adminDigestHtml, approvedUserHtml, welcomeSubject, accountCreatedHtml, inviteSubject } from "../../api/_lib/emails.js";
+import { adminDigestHtml, adminDigestSubject, adminUnfinishedHtml, approvedUserHtml, welcomeSubject, accountCreatedHtml, inviteSubject } from "../../api/_lib/emails.js";
 
 const WEB = "https://residata.eu";
 const NOW = Date.parse("2026-10-06T12:00:00Z");
@@ -38,6 +38,15 @@ test("admin note: no dead one-click upgrade, one way to the admin panel", () => 
   assert.ok(!html.includes("approve-user"), "the approve-user link is back — it only acts on pending accounts");
   assert.ok(html.includes(`${WEB}/app/admin?tab=users`), "the button opens the Users tab");
   assert.ok(html.includes("2026-10-06 15:26"), "the sign-up time is Bratislava time");
+});
+
+test("admin notes: the newer fields are escaped too (colleagues, the unfinished note)", () => {
+  const html = adminDigestHtml(nasty, WEB, { colleagues: ['<b onmouseover=x>@firma.sk'] });
+  assert.ok(!html.includes("<b onmouseover"), "a colleague address rendered as markup");
+  assert.ok(html.includes(`${WEB}/app/admin?tab=users&user=u1`), "the main button opens the person");
+  const un = adminUnfinishedHtml({ ...nasty, email: 'x"><script>@firma.sk' }, WEB, {});
+  assert.ok(!un.includes("<script>"), "the unfinished note rendered an address as a script");
+  assert.match(adminDigestSubject({ email: "a@b.sk" }), /^\[Residata\] New sign-up: a@b\.sk$/);
 });
 
 test("welcome: Slovak by default, English when asked, name escaped", () => {

@@ -421,7 +421,7 @@ function ReportHeader({ projects, lang, scope, scopeLabel }) {
         </div>
         <div className="no-print" style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
           <SubscribeButton scope={scope} scopeLabel={scopeLabel} lang={lang} />
-          <CsvGate lang={lang}>
+          <CsvGate lang={lang} what="report_projects">
           <button onClick={() => downloadScopeCSV(projects, lang, specData)}
             style={{
               background: "transparent", color: accentInk, border: `1px solid color-mix(in srgb, var(--accent) 33%, transparent)`,
@@ -1499,7 +1499,7 @@ function CompetitiveProfile({ projects, scopeType, scopeValue, lang }) {
               : "A blank parking cell means the developer publishes no price — not that the "
               + "project has none. Every project has been reviewed by hand."}
         </div>
-        <CsvGate lang={lang}>
+        <CsvGate lang={lang} what="competitive_profile">
         <button className="rd-btn rd-btn--sm" onClick={csv} style={{ whiteSpace: "nowrap" }}>
           ⬇ CSV
         </button>
@@ -2093,7 +2093,7 @@ function ComparableTransactionsReport({ projects, lang }) {
           <Picker value={roomPick} onChange={setRoomPick} width={160} sk={lang === "sk"} ariaLabel={lang === "sk" ? "Izbovosť" : "Room count"}
             options={[{ value: "__all__", label: lang === "sk" ? "Všetky izbovosti" : "All room counts" }, ...[1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: `${n}${lang === "sk" ? "-izb." : "-room"}` }))]} />
           <span style={{ marginLeft: "auto" }}>
-          <CsvGate lang={lang}>
+          <CsvGate lang={lang} what="comparable_transactions">
           <button onClick={downloadCsv} style={{
             background: "transparent", color: accentInk,
             border: `1px solid color-mix(in srgb, var(--accent) 33%, transparent)`, borderRadius: 4, padding: "0.4rem 0.8rem",

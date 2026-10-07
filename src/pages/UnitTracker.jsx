@@ -1752,7 +1752,7 @@ function ExportRow({ pickedHistories, lang }) {
 
   return (
     <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1rem" }}>
-      <CsvGate lang={lang}>
+      <CsvGate lang={lang} what="unit_timeline" selfTracked>
       <button onClick={downloadCsv}
         style={{
           background: "transparent", color: accentInk, border: `1px solid color-mix(in srgb, var(--accent) 33%, transparent)`,

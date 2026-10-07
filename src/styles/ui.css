@@ -703,3 +703,110 @@ textarea.rd-field { height: auto; min-height: 4.2rem; padding-top: 0.5rem; paddi
 /* on a phone the toast spans the width — lift it over the floating feedback button */
 @media (max-width: 640px) { .rd-toast { bottom: 4.2rem; } }
 .rd-toast .rd-alert__x { margin-left: auto; border: none; background: none; color: var(--text-dim); cursor: pointer; font-size: 1rem; line-height: 1; padding: 0 0 0 0.4rem; }
+
+/* ══ §12  ONE PERSON'S ACTIVITY (pages/UserActivity.jsx) ═══════════════════ */
+
+.rd-ua { display: flex; flex-direction: column; }
+.rd-ua__who { display: flex; align-items: center; gap: 0.6rem 1rem; flex-wrap: wrap; }
+.rd-ua__id { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; margin-right: auto; }
+.rd-ua__email { font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-2); overflow-wrap: anywhere; }
+.rd-ua__org { font-size: 0.8rem; color: var(--text-dim); }
+.rd-ua__badges { display: flex; gap: 0.35rem; flex-wrap: wrap; align-items: center; }
+.rd-ua__summary {
+  margin: 0.9rem 0 0;
+  padding: 0.75rem 0.95rem;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 10px 10px 0;
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface-2));
+  color: var(--text);
+  font-size: 0.88rem;
+  line-height: 1.55;
+  min-height: 2.9rem;
+}
+/* seven numbers: one row on a wide screen, 4 + 3 below that, pairs on a phone —
+   never six and an orphan */
+.rd-ua__kpis {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.6rem;
+  margin-top: 0.9rem;
+  transition: opacity 0.15s var(--ease);
+}
+@media (max-width: 1020px) { .rd-ua__kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .rd-ua__kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.rd-ua__pane { padding-top: 0.9rem; }
+.rd-ua__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+.rd-ua__wide { grid-column: 1 / -1; }
+@media (max-width: 760px) { .rd-ua__grid { grid-template-columns: 1fr; } }
+
+/* daily bars */
+.rd-ua__chart { position: relative; }
+.rd-ua__chart svg { display: block; width: 100%; height: 150px; }
+.rd-ua__axis { position: relative; height: 1.1rem; margin-top: 0.15rem; }
+.rd-ua__axis span {
+  position: absolute; transform: translateX(-50%); white-space: nowrap;
+  font-family: var(--font-mono); font-size: 0.62rem; color: var(--text-faint);
+}
+.rd-ua__legend { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 0.35rem; font-size: 0.7rem; color: var(--text-dim); }
+.rd-ua__legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
+.rd-ua__sw { display: inline-block; width: 10px; height: 10px; flex-shrink: 0; }
+.rd-ua__sw--bar { border-radius: 2px; background: var(--accent); }
+.rd-ua__sw--dot { border-radius: 50%; background: var(--text-dim); width: 7px; height: 7px; }
+.rd-ua__sw--ring { border-radius: 50%; border: 1.6px solid var(--info); width: 8px; height: 8px; }
+
+/* weekday x hour */
+.rd-ua__heat { display: grid; grid-template-columns: 2rem repeat(24, minmax(0, 1fr)); gap: 2px; align-items: center; }
+.rd-ua__heat-h { font-family: var(--font-mono); font-size: 0.58rem; color: var(--text-faint); }
+.rd-ua__heat-d { font-family: var(--font-mono); font-size: 0.62rem; color: var(--text-dim); }
+.rd-ua__heat-c { aspect-ratio: 1; border-radius: 3px; background: var(--surface-3); min-height: 9px; }
+
+/* where the time goes */
+.rd-ua__rows { display: flex; flex-direction: column; gap: 0.55rem; }
+.rd-ua__barrow { display: grid; grid-template-columns: 1fr auto; column-gap: 0.6rem; font-size: 0.8rem; }
+.rd-ua__barrow .rd-bar { grid-column: 1 / -1; }
+.rd-ua__barname { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rd-ua__barval { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+
+/* plain lists */
+.rd-ua__list { display: flex; flex-direction: column; }
+.rd-ua__li {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 0.8rem;
+  padding: 0.42rem 0; font-size: 0.8rem;
+}
+.rd-ua__li + .rd-ua__li, .rd-ua__q + .rd-ua__q { border-top: 1px solid var(--border-soft); }
+.rd-ua__li-main { color: var(--text); min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
+.rd-ua__li-sub { font-size: 0.7rem; color: var(--text-dim); }
+.rd-ua__li-meta { font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-dim); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rd-ua__q { padding: 0.5rem 0; display: flex; flex-direction: column; gap: 0.2rem; }
+.rd-ua__q-text { font-size: 0.8rem; color: var(--text); line-height: 1.45; overflow-wrap: anywhere; }
+.rd-ua__devices { display: flex; gap: 0.35rem; flex-wrap: wrap; margin-top: 0.7rem; }
+
+/* facts */
+.rd-ua__facts { margin: 0; display: flex; flex-direction: column; }
+.rd-ua__facts > div { display: grid; grid-template-columns: minmax(130px, 40%) 1fr; gap: 0.8rem; padding: 0.38rem 0; font-size: 0.78rem; }
+.rd-ua__facts > div + div { border-top: 1px solid var(--border-soft); }
+.rd-ua__facts dt { color: var(--text-dim); }
+.rd-ua__facts dd { margin: 0; color: var(--text); overflow-wrap: anywhere; }
+
+/* visits */
+.rd-ua__visits { display: flex; flex-direction: column; gap: 0.55rem; }
+.rd-ua__visit { border: 1px solid var(--border); border-radius: 12px; padding: 0.65rem 0.85rem; background: var(--surface); display: flex; flex-direction: column; gap: 0.4rem; }
+.rd-ua__visit-head { display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; font-size: 0.8rem; color: var(--text-dim); }
+.rd-ua__visit-head strong { color: var(--text); font-weight: 600; }
+.rd-ua__visit-ua { margin-left: auto; font-size: 0.72rem; color: var(--text-faint); }
+.rd-ua__path { display: flex; flex-wrap: wrap; align-items: center; row-gap: 0.3rem; }
+.rd-ua__step {
+  display: inline-block; padding: 0.12rem 0.5rem; border-radius: 999px;
+  background: var(--surface-2); border: 1px solid var(--border-soft);
+  font-size: 0.72rem; color: var(--text-2);
+}
+.rd-ua__arrow { color: var(--text-faint); font-size: 0.72rem; margin: 0 0.3rem; }
+
+/* the "Activity" cell in the Users table (AdminUsers.jsx) */
+.rd-ua-open {
+  display: inline-flex; flex-direction: column; align-items: flex-start; gap: 0.05rem;
+  border: none; background: none; padding: 0.15rem 0; cursor: pointer; text-align: left; font-family: inherit;
+}
+.rd-ua-open__when { font-size: 0.76rem; color: var(--text); white-space: nowrap; }
+.rd-ua-open__days { font-family: var(--font-mono); font-size: 0.66rem; color: var(--text-dim); white-space: nowrap; }
+.rd-ua-open:hover .rd-ua-open__when { color: var(--accent-ink); text-decoration: underline; text-underline-offset: 3px; }
