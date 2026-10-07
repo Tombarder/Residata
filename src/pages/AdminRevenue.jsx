@@ -15,7 +15,7 @@ import { useEffect, useMemo, useState } from "react";
 import Kpi from "../components/Kpi";
 import UserActivity from "./UserActivity";
 import { StatusBadge, SubBadge, InvoiceLinks } from "./AdminPayments";
-import { L, money, day, period, KIND, loadAdminBilling } from "../lib/adminPayments";
+import { L, money, day, period, KIND, loadAdminBilling, payments as paymentsN } from "../lib/adminPayments";
 
 const FILTERS = [
   ["all", "Všetky", "All", () => true],
@@ -76,7 +76,7 @@ export default function RevenuePanel({ users = [], lang = "sk" }) {
           sub={data ? (s.cancelling ? `${s.cancelling} ${t("ruší", "cancelling")}` : t("nikto neruší", "nobody cancelling")) : null} subWarn={Boolean(s.cancelling)} />
         <Kpi loading={!data} label="ARPU" value={money(s.arpu, cur, lang)} sub={t("mesačne na platiaceho", "a month per payer")} />
         <Kpi loading={!data} label={t("Tento mesiac", "This month")} value={money(s.revenueMonth, cur, lang)} sub={data ? `${t("30 dní", "30 days")}: ${money(s.revenue30d, cur, lang)}` : null} />
-        <Kpi loading={!data} label={t("Spolu", "All time")} value={money(s.revenueTotal, cur, lang)} sub={data ? `${s.payments} ${t("platieb", "payments")}` : null} />
+        <Kpi loading={!data} label={t("Spolu", "All time")} value={money(s.revenueTotal, cur, lang)} sub={data ? paymentsN(s.payments, lang) : null} />
         <Kpi loading={!data} label={t("Nové za 30 dní", "New in 30 days")} value={s.new30d ?? "—"} sub={t("nové predplatné", "new subscriptions")} />
         <Kpi loading={!data} label={t("Neúspešné platby", "Failed payments")} value={s.failedOpen ?? "—"}
           sub={data ? (s.failedOpen ? t("Stripe ich skúša znova", "Stripe is retrying") : t("všetko prešlo", "all went through")) : null} subWarn={Boolean(s.failedOpen)} />

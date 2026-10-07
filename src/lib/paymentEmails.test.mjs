@@ -40,11 +40,20 @@ const copy = (o) => JSON.parse(JSON.stringify(o));
 const listOf = (data) => ({ then: (ok, bad) => Promise.resolve({ object: "list", data, has_more: false }).then(ok, bad),
   async *[Symbol.asyncIterator]() { yield* data; } });
 const discountObj = () => ({ id: "di_1", object: "discount", end: null, source: { type: "coupon", coupon: { id: "c1", duration: ST.coupon, percent_off: 98 } } });
+// Like Stripe: a discount is an id unless expanded, and its coupon an id unless expanded deeper.
+function expandLike(s, expand = []) {
+  const deep = expand.includes("data.discounts.source.coupon");
+  const shallow = deep || expand.includes("data.discounts");
+  s.discounts = (s.discounts || []).map((d) => (deep ? d
+    : shallow ? { ...d, source: { ...d.source, coupon: d.source.coupon.id } } : d.id));
+  return s;
+}
 class FakeStripe {
   constructor() {
     this.subscriptions = {
       retrieve: async (id) => copy(ST.subs.get(id)),
-      list: (p = {}) => listOf([...ST.subs.values()].filter((s) => !p.customer || s.customer === p.customer).map(copy)),
+      list: (p = {}) => listOf([...ST.subs.values()].filter((s) => !p.customer || s.customer === p.customer).map(copy)
+        .map((s) => expandLike(s, p.expand))),
     };
     this.invoices = {
       retrieve: async (id) => {

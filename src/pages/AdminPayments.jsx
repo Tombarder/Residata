@@ -10,7 +10,7 @@
  */
 import { useEffect, useState } from "react";
 import Kpi from "../components/Kpi";
-import { L, money, day, period, KIND, loadAdminBilling } from "../lib/adminPayments";
+import { L, money, day, period, KIND, loadAdminBilling, payments } from "../lib/adminPayments";
 
 export function StatusBadge({ inv, lang }) {
   const t = L(lang);
@@ -85,7 +85,7 @@ export function UserPayments({ userId, lang = "sk" }) {
     <div style={{ display: "grid", gap: "1rem" }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.7rem" }}>
         <Kpi label={t("Zaplatil spolu", "Paid in total")} value={money(data.totals?.paid || 0, lastPaid?.currency, lang)}
-          sub={`${data.totals?.payments || 0} ${t("platieb", "payments")}`} />
+          sub={payments(data.totals?.payments || 0, lang)} />
         <Kpi label={t("Predplatné", "Subscription")} value={live ? (live.status === "past_due" ? t("Platba zlyhala", "Payment failed") : (live.cancelAtPeriodEnd || live.cancelAt) ? t("Zrušené", "Cancelled") : t("Aktívne", "Active")) : t("Žiadne", "None")}
           sub={live ? money(live.monthly, lastPaid?.currency, lang) + t(" mesačne", " a month") : null} subWarn={live?.status === "past_due"} />
         <Kpi label={t("Ďalšia platba", "Next payment")} value={next ? day(next, lang) : "—"}

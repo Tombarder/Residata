@@ -116,8 +116,9 @@ export function subscriptionMonthlyCents(sub, nowSec = Date.now() / 1000) {
 
 /**
  * The business at a glance, from Stripe's subscriptions and invoices.
- * `subs` should carry expanded discounts (expand: ["data.discounts"]) for an
- * exact MRR; an unexpanded discount is treated as not applying (MRR at list price).
+ * `subs` must carry discounts WITH their coupons (expand: ["data.discounts.source.coupon"]);
+ * with only "data.discounts" the coupon is a bare id and the discount is treated as not
+ * applying — measured live 7 Oct 2026: MRR read 279,99 € for a 0,50 € subscription.
  */
 export function businessSummary(subs, invoices, now = Date.now()) {
   const nowSec = now / 1000;

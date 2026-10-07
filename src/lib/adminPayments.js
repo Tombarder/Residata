@@ -29,6 +29,13 @@ export function period(a, b, lang) {
   return `${short} – ${day(b, lang)}`;
 }
 
+/** "1 platba · 2 platby · 5 platieb" / "1 payment · 2 payments". */
+export function payments(n, lang) {
+  const k = Number(n) || 0;
+  if (lang !== "sk") return `${k} ${k === 1 ? "payment" : "payments"}`;
+  return `${k} ${k === 1 ? "platba" : k >= 2 && k <= 4 ? "platby" : "platieb"}`;
+}
+
 export const KIND = {
   new: ["Nové predplatné", "New subscription"],
   renewal: ["Obnova", "Renewal"],

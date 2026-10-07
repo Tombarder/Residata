@@ -563,7 +563,7 @@ async function customerPerson(admin, { customerId = null, userId = null } = {}) 
 async function businessNow(stripe) {
   try {
     const subs = [];
-    for await (const x of stripe.subscriptions.list({ status: "all", limit: 100, expand: ["data.discounts"] })) {
+    for await (const x of stripe.subscriptions.list({ status: "all", limit: 100, expand: ["data.discounts.source.coupon"] })) {
       subs.push(x); if (subs.length >= 1000) break;
     }
     const invoices = [];
@@ -676,7 +676,7 @@ async function handleAdminBilling(req, res) {
     if (cid) {
       try {
         const [s, i] = await Promise.all([
-          stripe.subscriptions.list({ customer: cid, status: "all", limit: 20, expand: ["data.discounts"] }),
+          stripe.subscriptions.list({ customer: cid, status: "all", limit: 20, expand: ["data.discounts.source.coupon"] }),
           stripe.invoices.list({ customer: cid, limit: 50 }),
         ]);
         subscriptions = (s?.data || []).map((x) => subscriptionRow(x, nowSec));
