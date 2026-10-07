@@ -1081,6 +1081,8 @@ function PlatformBilling({ lang, setCurrent }) {
         ? (lang === "sk" ? "Predplatné už máš — kartu a platby spravuješ cez „Spravovať platbu“." : "You already have a subscription — manage your card and payments with “Manage billing”.")
         : e?.code === "already_premium"
         ? (lang === "sk" ? "Premium už máš, bez dátumu konca — nie je čo platiť." : "You already have Premium with no end date — there is nothing to pay.")
+        : e?.code === "account_blocked"
+        ? (lang === "sk" ? "Tento účet nemá prístup, preto ho nemožno predplatiť. Napíš nám na info@residata.eu." : "This account has no access, so it cannot be subscribed. Write to us at info@residata.eu.")
         : (lang === "sk" ? "Nepodarilo sa spustiť platbu. Skús znova." : "Couldn't start checkout. Please try again."));
     } finally {
       setPayBusy(false);

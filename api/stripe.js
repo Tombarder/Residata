@@ -189,6 +189,12 @@ async function handleCheckout(req, res) {
   //   invoice after paid_until has passed, so a date check let the person
   //   "Resubscribe" — and when the retry succeeded they paid twice.
   //   Guard 1b: Premium with no end date, or admin — there is nothing to buy.
+  //   Guard 0: an account the admin blocked ("No access"). applySubscription
+  //   rightly refuses to hand it Premium back, so letting it pay would take the
+  //   money and give nothing — the screens hide the button, the server decides.
+  if (profile?.tier === "pending") {
+    return res.status(403).json({ error: "account_blocked", detail: "This account has no access. Write to info@residata.eu." });
+  }
   if (profile?.stripe_subscription_id) {
     let live = null;
     try { live = await stripe.subscriptions.retrieve(profile.stripe_subscription_id); }
@@ -570,7 +576,9 @@ async function handleSetPrice(req, res) {
 //     but MONOTONICALLY (never rewind on a duplicated / out-of-order event).
 //   · TERMINAL (canceled / unpaid / incomplete_expired, or subscription.deleted)
 //     → REVOKE: set paid_until = now and drop the subscription id. Stripe deletes
-//     at period end for cancel-at-period-end, so "now" ≈ the intended end.
+//     at period end for cancel-at-period-end, so "now" ≈ the intended end. Only
+//     when it is the subscription on file, no other one of the customer still
+//     pays, and only what it paid for (never-paid or a longer gift is left alone).
 //   · GRACE   (past_due / incomplete / paused / anything else) → leave paid_until
 //     UNCHANGED. Crucially we must NOT extend on past_due: a declined renewal
 //     advances current_period_end to the unpaid next period, and extending off
@@ -600,7 +608,35 @@ async function applySubscription(admin, stripe, sub, { deleted = false } = {}) {
   const periodEnd = periodEndUnix ? new Date(periodEndUnix * 1000).toISOString() : null;
 
   const { data: current } = await admin
-    .from("user_profiles").select("tier, paid_started_at, paid_until").eq("id", userId).maybeSingle();
+    .from("user_profiles").select("tier, paid_started_at, paid_until, stripe_subscription_id").eq("id", userId).maybeSingle();
+
+  // AN ENDING SUBSCRIPTION TAKES PREMIUM AWAY ONLY IF IT IS THE ONE PAYING FOR IT.
+  // Before, any ending subscription stamped paid_until = now. So cancelling a
+  // duplicate (the double-charge refund) cut off the customer the other one still
+  // paid for, and Stripe re-delivering a late "deleted" — it retries for 3 days —
+  // after the admin had moved a cancelled card payer to a gift wiped the gift.
+  // The profile records which subscription pays (every live event writes it, and
+  // an admin cancel or a gift clears it), so anything else ending changes nothing.
+  if (terminal) {
+    if (!current || current.stripe_subscription_id !== sub.id) {
+      console.warn(`[stripe webhook] ${sub.id} ended (${deleted ? "deleted" : status}); user ${userId}'s Premium is not paid by it (${current?.stripe_subscription_id || "no subscription on file"}) — access left as it is`);
+      return;
+    }
+    // Ending, but another subscription of the same customer still pays → that one
+    // carries the access on, instead of a gap until the next nightly reconcile.
+    if (customerId) {
+      try {
+        const { data: others = [] } = await stripe.subscriptions.list({ customer: customerId, status: "all", limit: 20 });
+        const other = others.find((s) => s.id !== sub.id && ["active", "trialing", "past_due"].includes(s.status));
+        if (other) {
+          console.warn(`[stripe webhook] ${sub.id} ended; ${other.id} of the same customer still pays — access follows it`);
+          return applySubscription(admin, stripe, other);
+        }
+      } catch (e) {
+        console.warn("[stripe webhook] could not look for another subscription:", e?.message || e);
+      }
+    }
+  }
 
   // An account the admin BLOCKED ("No access") is never handed Premium back by a
   // payment event or the nightly reconcile. Blocking a card payer cancels the
@@ -615,9 +651,18 @@ async function applySubscription(admin, stripe, sub, { deleted = false } = {}) {
   if (customerId) patch.stripe_customer_id = customerId;
 
   if (terminal) {
-    // Revoke as of now — the ONLY path that lowers paid_until.
-    patch.paid_until = new Date().toISOString();
-    patch.paid_pause_started = null;
+    // Revoke as of now — the ONLY path that lowers paid_until — but a subscription
+    // takes away only what it gave. One that never paid (incomplete_expired: the
+    // first payment never went through) gave nothing; and Premium that runs past
+    // this subscription's last paid period (an admin gift that was there before
+    // the card) was not this subscription's to end.
+    const neverPaid = status === "incomplete_expired";
+    const curMs = current?.paid_until ? new Date(current.paid_until).getTime() : 0;
+    const beyondThisSub = periodEndUnix != null && curMs > periodEndUnix * 1000 + 60_000;
+    if (!neverPaid && !beyondThisSub) {
+      patch.paid_until = new Date().toISOString();
+      patch.paid_pause_started = null;
+    }
   } else if (paidNow && periodEnd) {
     // Extend only forward — a stale/duplicate event can never rewind access.
     const curMs = current?.paid_until ? new Date(current.paid_until).getTime() : 0;

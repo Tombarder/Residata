@@ -9,7 +9,7 @@
     "build": "vite build",
     "postbuild": "node scripts/prerender.mjs",
     "lint": "eslint .",
-    "test": "node --test \"src/**/*.test.mjs\"",
+    "test": "node --test --experimental-test-module-mocks \"src/**/*.test.mjs\"",
     "preview": "vite preview"
   },
   "dependencies": {
