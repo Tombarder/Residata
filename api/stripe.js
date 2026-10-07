@@ -673,9 +673,14 @@ async function applySubscription(admin, stripe, sub, { deleted = false } = {}) {
     // on, reset when the person comes back after it had ended — otherwise a
     // January gift followed by an October subscription read "Premium since
     // 1 January", ten months that never happened.
-    const running = current?.paid_until
-      ? new Date(current.paid_until).getTime() > Date.now()
-      : current?.tier === "paid";                     // no end date = Premium with no end
+    // A renewal of the subscription already on file is the SAME stretch, even
+    // though its webhook always lands just after the old period ended (Stripe
+    // rolls the period over first) — without this, "Premium from" jumped to the
+    // renewal date every month.
+    const running = current?.stripe_subscription_id === sub.id
+      || (current?.paid_until
+        ? new Date(current.paid_until).getTime() > Date.now()
+        : current?.tier === "paid");                  // no end date = Premium with no end
     if (!current?.paid_started_at || !running) patch.paid_started_at = new Date().toISOString();
   }
   // GRACE (past_due / incomplete / paused): touch neither paid_until nor tier.

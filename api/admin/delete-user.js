@@ -35,7 +35,14 @@ export const maxDuration = 20;
 const CARD_DONE = ["canceled", "incomplete_expired", "unpaid"];
 
 /** Personal rows the auth.users cascade leaves behind. Each step is attempted;
- *  failures are returned so the audit log names what may remain. */
+ *  failures are returned so the audit log names what may remain.
+ *
+ *  🔴 It runs BEFORE auth.admin.deleteUser on purpose — do not move it after.
+ *  ai_chat_log and user_activity reference auth.users ON DELETE SET NULL, so once
+ *  the account is gone their rows no longer carry the user_id this finds them by,
+ *  and the questions a person asked would outlive the person's deletion request.
+ *  The cost of the order: if the final delete fails, the data is already erased
+ *  and the person is told to try again — which finishes what they asked for. */
 async function erasePersonalRecords(sb, userId, email) {
   const failed = [];
   const step = async (name, fn) => {

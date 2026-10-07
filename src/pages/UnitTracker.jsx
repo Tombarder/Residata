@@ -43,6 +43,7 @@ import Picker from "../components/Picker";
 import { useProjects, useUnitSummaries, useUnitHistories, useUnitSearch, useProjectUnitsSeries, useArchiveMonths, useUnitListing } from "../lib/useData";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
 import { useCapabilities } from "../lib/useCapabilities";
+import CsvGate from "../components/CsvGate";
 import { track } from "../lib/track";
 import { localeTag, formatDimNumber } from "../lib/locale";
 import { moneyFromEur, moneySymbol, formatMoney, formatPerM2 as formatPerM2Money } from "../lib/money";
@@ -1751,6 +1752,7 @@ function ExportRow({ pickedHistories, lang }) {
 
   return (
     <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1rem" }}>
+      <CsvGate lang={lang}>
       <button onClick={downloadCsv}
         style={{
           background: "transparent", color: accentInk, border: `1px solid color-mix(in srgb, var(--accent) 33%, transparent)`,
@@ -1760,6 +1762,7 @@ function ExportRow({ pickedHistories, lang }) {
       >
         ⬇ CSV ({pickedHistories.reduce((a, h) => a + h.rows.length, 0)} {lang === "sk" ? "riadkov" : "rows"})
       </button>
+      </CsvGate>
     </div>
   );
 }

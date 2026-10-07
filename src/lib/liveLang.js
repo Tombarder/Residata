@@ -85,8 +85,8 @@ export const liveT = {
 
     // Analytics
     analytics_gate_title: "Sign in for analytics",
-    analytics_gate_body: "Analytics and trends are part of the paid account.",
-    analytics_paid_title: "Analytics is a paid feature",
+    analytics_gate_body: "Analytics and trends are part of Premium.",
+    analytics_paid_title: "Analytics is a Premium feature",
     analytics_paid_body: "Price trends over time, district heat maps, top developers, absorption rate, monthly PDF reports — all in Premium.",
     analytics_see_pricing: "See pricing",
     analytics_label: "Analytics",
@@ -232,7 +232,7 @@ export const liveT = {
     saving: "Ukladám…",
 
     analytics_gate_title: "Prihlás sa pre analytiku",
-    analytics_gate_body: "Analytika a trendy sú súčasťou paid účtu.",
+    analytics_gate_body: "Analytika a trendy sú súčasťou Premium.",
     analytics_paid_title: "Analytika je v Premium",
     analytics_paid_body: "Cenové trendy v čase, heat mapy okresov, rebríček developerov, rýchlosť predaja, mesačné PDF reporty — všetko v Premium.",
     analytics_see_pricing: "Zobraziť cenník",

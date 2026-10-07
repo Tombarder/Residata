@@ -12,9 +12,10 @@
  * verbatim ("Database error saving new user", "Failed to fetch") to a Slovak
  * visitor at the very moment they were signing up.
  */
-import { personalEmailMessage } from "./emailValidation.js";
+import { personalEmailMessage, validateBusinessEmail } from "./emailValidation.js";
 
-export function loginErrorMessage(error, lang = "en") {
+/** `address`: the e-mail the code was asked for — decides what a database refusal means. */
+export function loginErrorMessage(error, lang = "en", { address } = {}) {
   if (!error) return null;
   const sk = lang === "sk";
   const code = String(error.code || "");
@@ -34,8 +35,12 @@ export function loginErrorMessage(error, lang = "en") {
   // The database refusing a NEW account: its business-e-mail gate (a trigger on
   // auth.users) surfaces through Supabase as "Database error saving new user".
   // The form asks the same gate first, so this is only reached when the two
-  // answers raced — but if it is, it says the rule, not the plumbing.
-  if (/saving new user|signup_requires_business_email|Signups not allowed/i.test(msg)) {
+  // answers raced — but if it is, it says the rule, not the plumbing. Supabase
+  // says the SAME words for ANY failing trigger, though, so for a work address
+  // it is not the rule at all: that person gets the plain "try again / write to
+  // us" below instead of being told their work address is a personal mailbox.
+  if (/signup_requires_business_email/i.test(msg)
+      || (/saving new user/i.test(msg) && !(address && !validateBusinessEmail(address, lang)))) {
     return personalEmailMessage(lang);
   }
   if (/Failed to fetch|NetworkError|Load failed|network/i.test(msg)) {

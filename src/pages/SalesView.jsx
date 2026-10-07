@@ -15,6 +15,7 @@
 
    Built for the comparable-projects pricing workflow (e.g. Nitra). */
 import { useState, useMemo, useRef, useEffect } from "react";
+import CsvGate from "../components/CsvGate";
 import { useCurrency } from "../lib/useCurrency";
 import { moneyFromEur, moneySymbol, moneyToEur, formatMoney, formatPerM2 } from "../lib/money";
 import { formatDimNumber } from "../lib/locale";
@@ -802,7 +803,7 @@ export default function SalesView({ lang = "sk" }) {
                 with the totals above it. With one scope there is nothing to explain. */}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-            <button className="rd-btn rd-btn--primary rd-btn--sm" onClick={exportCsv} disabled={csvBusy || !detRows.length}>⬇ {csvBusy ? t("sťahujem…", "preparing…") : "CSV"}</button>
+            <CsvGate lang={lang}><button className="rd-btn rd-btn--primary rd-btn--sm" onClick={exportCsv} disabled={csvBusy || !detRows.length}>⬇ {csvBusy ? t("sťahujem…", "preparing…") : "CSV"}</button></CsvGate>
           </div>
         </div>
 

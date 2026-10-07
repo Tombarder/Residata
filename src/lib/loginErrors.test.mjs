@@ -15,7 +15,12 @@ test("the per-address wait says how long", () => {
 test("nothing technical reaches the screen, and no error means no message", () => {
   // The database's business-e-mail gate, as Supabase reports it.
   assert.match(loginErrorMessage({ message: "Database error saving new user" }, "sk"), /pracovný e-mail/);
-  assert.match(loginErrorMessage({ message: "Signups not allowed for otp" }, "en"), /work email/);
+  assert.match(loginErrorMessage({ message: "Database error saving new user" }, "sk", { address: "jan@gmail.com" }), /pracovný e-mail/);
+  // …but Supabase says the same words for ANY failing trigger: a work address is not told it is personal.
+  const work = loginErrorMessage({ message: "Database error saving new user" }, "sk", { address: "jan@firma.sk" });
+  assert.doesNotMatch(work, /pracovný e-mail/);
+  assert.match(work, /info@residata\.eu/);
+  assert.match(loginErrorMessage({ message: "signup_requires_business_email" }, "en", { address: "jan@firma.sk" }), /work email/);
   assert.match(loginErrorMessage({ message: "Failed to fetch" }, "sk"), /pripojenie/);
   const other = loginErrorMessage({ message: "unexpected_failure: some internal thing" }, "sk");
   assert.doesNotMatch(other, /unexpected_failure|internal/);

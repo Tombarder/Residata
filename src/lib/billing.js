@@ -71,10 +71,13 @@ export async function openBillingPortal() {
   await openStripe("/api/stripe?action=portal");
 }
 
-// The caller's card subscription as Stripe has it NOW — { status, ends_at } or
-// null (none, or it could not be read). ends_at is set when it was cancelled and
-// runs to that day: Stripe keeps such a subscription "active" until then, so
-// without asking, the page promised "Renews" for one that will not.
+// The caller's card subscription as Stripe has it NOW — { status, ends_at }, null
+// when there is none, or { status: "unknown" } when it could not be read (the
+// page must not offer "Resubscribe" on a guess: a live subscription plus a new one
+// is two charges). ends_at is set when it was cancelled and runs to that day:
+// Stripe keeps such a subscription "active" until then, so without asking, the
+// page promised "Renews" for one that will not.
+const UNKNOWN = Object.freeze({ status: "unknown", ends_at: null });
 export async function getCardSubscription() {
   try {
     const call = (token) => fetch("/api/stripe?action=subscription", { method: "POST", headers: authHeaders(token), body: "{}" });
@@ -83,10 +86,11 @@ export async function getCardSubscription() {
       const token = await forceTokenRefresh();
       if (token) r = await call(token);
     }
-    if (!r.ok) return null;
+    if (!r.ok) return UNKNOWN;
     const data = await r.json().catch(() => null);
-    return data?.subscription || null;
+    if (!data || !("subscription" in data)) return UNKNOWN;
+    return data.subscription || null;
   } catch {
-    return null;
+    return UNKNOWN;
   }
 }

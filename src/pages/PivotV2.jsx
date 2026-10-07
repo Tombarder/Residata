@@ -5,6 +5,7 @@ import { useAnalyticsRegistry, useProjects, useFlatsArchive, useFlatsCurrent, us
 import { archiveGrainDims, archiveReadingScope, normaliseArchiveGrain, periodFactors, scaleComponents, archiveRecordCells, weightedCount, weightedSum, specUsesCube, heldReadingDays } from "../lib/archiveReadings";
 import { useCountry, isAllCountries, countryName } from "../lib/useCountry";
 import { useCapabilities } from "../lib/useCapabilities";
+import CsvGate from "../components/CsvGate";
 import { useAuth } from "../lib/useAuth";
 import { useAccountPrefState } from "../lib/useAccountUiPref";
 import { PIVOT_KEY as PIVOT_PREF_KEY } from "../lib/accountPrefs";
@@ -3612,9 +3613,11 @@ function AnalysisToolbar({ valueMode, setValueMode, dataBars, setDataBars, onExp
 
       <button style={btnPill(dataBars)} onClick={() => setDataBars(x => !x)}>{lang === "sk" ? "▮ stĺpčeky" : "▮ bars"}</button>
 
+      <span style={{ marginLeft: "auto" }} />
+      <CsvGate lang={lang} label={lang === "sk" ? "Kopírovať" : "Copy"}>
       <button
         style={{
-          ...btnBase, marginLeft: "auto",
+          ...btnBase,
           color: copyState === "fail" ? "#ff6b6b" : accentInk,
           borderColor: copyState === "fail" ? "#ff6b6b" : `color-mix(in srgb, var(--accent) 33%, transparent)`,
           background: copyState === "ok" ? "color-mix(in srgb, var(--accent) 14%, transparent)" : "transparent",
@@ -3628,10 +3631,13 @@ function AnalysisToolbar({ valueMode, setValueMode, dataBars, setDataBars, onExp
           : copyState === "fail" ? (lang === "sk" ? "✕ nepodarilo sa" : "✕ copy failed")
           : (lang === "sk" ? "⧉ Kopírovať pre Excel" : "⧉ Copy for Excel")}
       </button>
+      </CsvGate>
+      <CsvGate lang={lang}>
       <button style={{ ...btnBase, color: accentInk, borderColor: `color-mix(in srgb, var(--accent) 33%, transparent)` }}
               onClick={onExportCSV}>
         ⬇ CSV
       </button>
+      </CsvGate>
     </div>
   );
 }
@@ -6004,11 +6010,13 @@ function DrillDownModal({ title, records, count, loading, onClose, lang }) {
           <span style={{ color: dim, fontFamily: mono, fontSize: "0.72rem", marginLeft: "auto" }}>
             {(count ?? records.length).toLocaleString("en-US").replace(/,/g, " ")}
           </span>
+          <CsvGate lang={lang}>
           <button onClick={downloadCSV} style={{
             background: "transparent", border: `1px solid color-mix(in srgb, var(--accent) 33%, transparent)`, color: accentInk,
             borderRadius: 4, padding: "0.3rem 0.6rem", cursor: "pointer",
             fontFamily: mono, fontSize: "0.7rem",
           }}>⬇ CSV</button>
+          </CsvGate>
           <button onClick={onClose} style={{
             background: "transparent", border: `1px solid ${border}`, color: dim,
             borderRadius: 4, padding: "0.3rem 0.6rem", cursor: "pointer",

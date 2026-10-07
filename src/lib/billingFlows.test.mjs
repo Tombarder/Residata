@@ -214,6 +214,13 @@ test("a new card payer gets Premium to the end of the month they paid for", asyn
   assert.ok(premium(U));
 });
 
+test("coming back after Premium had ended starts a new 'Premium from'", async () => {
+  person(U, { tier: "paid", paid_until: isoAt(NOW - 200 * DAY), paid_started_at: isoAt(NOW - 300 * DAY) });
+  sub("sub_5");
+  await checkoutCompleted("sub_5");
+  assert.ok(Date.parse(profile(U).paid_started_at) > NOW - 60 * 1000, "not the old start ten months back");
+});
+
 test("a forged webhook changes nothing", async () => {
   person(U);
   sub("sub_1");
@@ -235,10 +242,14 @@ test("a renewal moves the end forward; a failing renewal does not hand out a fre
   person(U);
   sub("sub_1", { periodEnd: NOW + 2 * DAY });
   await checkoutCompleted("sub_1");
-  // Renewal paid: Stripe advances the period, invoice.paid arrives (subscription under `parent`).
+  const since = profile(U).paid_started_at = isoAt(NOW - 40 * DAY);
+  // Renewal paid: Stripe advances the period FIRST, so the webhook lands after the
+  // stored end has passed; invoice.paid carries the subscription under `parent`.
+  profile(U).paid_until = isoAt(NOW - 60 * 1000);
   ST.subs.get("sub_1").items.data[0].current_period_end = unix(NOW + 32 * DAY);
   await webhook("invoice.paid", { id: "in_1", object: "invoice", parent: { subscription_details: { subscription: "sub_1" } } });
   assert.equal(profile(U).paid_until, isoAt(NOW + 32 * DAY));
+  assert.equal(profile(U).paid_started_at, since, "a renewal is the same stretch of Premium — 'Premium from' stays");
   // Next renewal fails: past_due with the NEXT (unpaid) period end — must not extend.
   Object.assign(ST.subs.get("sub_1"), { status: "past_due", items: { data: [{ current_period_end: unix(NOW + 62 * DAY) }] } });
   await webhook("customer.subscription.updated", ST.subs.get("sub_1"));

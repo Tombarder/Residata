@@ -45,6 +45,7 @@ import { soldSharePct, soldShareText } from "../lib/soldShare.js";
 import { supabaseData } from "../lib/supabase";
 import { getSignedInUser } from "../lib/authToken";
 import { useCapabilities } from "../lib/useCapabilities";
+import CsvGate from "../components/CsvGate";
 
 // ── Visual language (mirrors Platform.jsx) ───────────────────────
 const mono = "'JetBrains Mono', monospace";
@@ -2781,26 +2782,6 @@ function priceDistribution(flats, nBins) {
   }
   return bins;
 }
-/**
- * Downloading data (CSV) is for paying customers and admins only — the same
- * rule as the Exports page (useCapabilities "export_data"). Reports is open to a
- * 7-day trial, and its three CSV buttons handed a trial user the full set,
- * including every recorded sale with its price. A trial sees the button locked,
- * with the reason.
- */
-function CsvGate({ lang, children }) {
-  const { can } = useCapabilities();
-  if (can("export_data")) return children;
-  return (
-    <button type="button" disabled
-      title={lang === "sk" ? "Sťahovanie dát je pre platiacich (Premium) — počas trialu sa dá všetko prezerať." : "Downloading data is for paying subscribers (Premium) — during the trial you can browse everything."}
-      style={{ background: "transparent", color: "var(--text-faint)", border: `1px dashed ${border}`, borderRadius: 4,
-        padding: "0.45rem 0.8rem", fontSize: "0.78rem", fontFamily: "inherit", cursor: "not-allowed", whiteSpace: "nowrap" }}>
-      🔒 CSV · Premium
-    </button>
-  );
-}
-
 /* CSV download for the current scope — project-level. */
 function downloadScopeCSV(projects, lang, specData) {
   const headers = [

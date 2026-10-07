@@ -83,7 +83,12 @@ export default function LoginModal({ open, onClose, onSignedIn, lang = "en" }) {
     // and a "no" here is cleaner than a code request the database then refuses
     // with a raw "Database error saving new user".
     const allowed = await signupEmailAllowed(addr);
-    if (allowed !== true) {
+    // Could not ask (null) about a WORK address → send the code anyway: the
+    // database still refuses a sign-up it should, and a work address never
+    // needed the answer — one hiccup of this check used to stop every sign-in.
+    // A personal-looking address does need it (only the database knows whom the
+    // admin let in), so for that one "could not check" stays an error.
+    if (allowed === false || (allowed === null && localEmailError)) {
       setBusy(false);
       if (allowed === false) {
         setError(personalEmailMessage(lang));
@@ -97,7 +102,7 @@ export default function LoginModal({ open, onClose, onSignedIn, lang = "en" }) {
     const { error } = await signIn(addr, { lang, trialIntentAt: trialIntentAt() });
     setBusy(false);
     if (error) {
-      setError(loginErrorMessage(error, lang));
+      setError(loginErrorMessage(error, lang, { address: addr }));
       track("login_code_request_error", { message: String(error.message || error).slice(0, 200) });
     } else {
       setSent(true);
@@ -143,7 +148,7 @@ export default function LoginModal({ open, onClose, onSignedIn, lang = "en" }) {
     const { error } = await signIn(addr, { lang, trialIntentAt: trialIntentAt() });
     setBusyResend(false);
     if (error) {
-      setVerifyError(loginErrorMessage(error, lang));
+      setVerifyError(loginErrorMessage(error, lang, { address: addr }));
       track("login_code_resend_error", { message: String(error.message || error).slice(0, 200) });
       return;
     }
@@ -212,7 +217,7 @@ export default function LoginModal({ open, onClose, onSignedIn, lang = "en" }) {
                   // A personal address that IS let in (an admin made the account)
                   // must not read "work email required" under it.
                   : exempt ? (lang === "sk" ? "Na túto adresu ti pošleme kód." : "We'll send the code to this address.")
-                  : unknown ? (lang === "sk" ? "Adresu sa nepodarilo overiť — skús to znova." : "Couldn't check the address — try again.")
+                  : unknown && localEmailError ? (lang === "sk" ? "Adresu sa nepodarilo overiť — skús to znova." : "Couldn't check the address — try again.")
                   : t.login_biz_email_hint)}
               </div>
               {error && <div style={{ color: dangerInk, fontSize: "0.8rem", marginBottom: "0.75rem" }}>{error}</div>}

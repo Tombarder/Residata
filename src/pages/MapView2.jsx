@@ -19,6 +19,7 @@
  * MapLibre + React shell.
  */
 import { useEffect, useRef, useState, useMemo } from "react";
+import CsvGate from "../components/CsvGate";
 // maplibre-gl v6 je ESM-only a default export zrušil — musí to byť namespace import.
 import * as maplibregl from "maplibre-gl";
 // Tells MapLibre where its tile worker is. Without it the map paints only its
@@ -1137,7 +1138,7 @@ export default function MapView2({ lang = "en", setCurrent }) {
 
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "12px 0 6px" }}>
                     <span style={{ fontSize: "0.7rem", color: dim }}>{sk ? "Projekty" : "Projects"}{compFilter ? <span style={{ color: COMPLETION[compFilter].color }}> · {COMP_LABEL[compFilter]}</span> : ""} ({listProjects.length})</span>
-                    <button onClick={() => exportCsv(listProjects, coords)} style={{ background: "none", border: `1px solid ${border}`, color: dim, borderRadius: 6, padding: "3px 8px", fontSize: "0.66rem", cursor: "pointer" }} title={sk ? "Stiahnuť ako CSV" : "Download as CSV"}>⬇ CSV</button>
+                    <CsvGate lang={lang}><button onClick={() => exportCsv(listProjects, coords)} style={{ background: "none", border: `1px solid ${border}`, color: dim, borderRadius: 6, padding: "3px 8px", fontSize: "0.66rem", cursor: "pointer" }} title={sk ? "Stiahnuť ako CSV" : "Download as CSV"}>⬇ CSV</button></CsvGate>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
                     {listProjects.slice().sort((a, b) => ppm2Of(b) - ppm2Of(a)).slice(0, 60).map((p) => {

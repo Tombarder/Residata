@@ -4,6 +4,7 @@
    UI matches the Analytics/pivot design language (green accent, card panels, JetBrains-Mono
    labels, the POLIA-style field palette). */
 import { useState, useMemo, useEffect, useRef } from "react";
+import CsvGate from "../components/CsvGate";
 import Picker from "../components/Picker";
 import FieldPanel from "../components/FieldPanel";
 import { useCountry, isAllCountries } from "../lib/useCountry";
@@ -511,12 +512,15 @@ export default function UnitExplorer({ lang = "sk", setCurrent }) {
               </button>
             )}
 
+            <span style={{ marginLeft: "auto" }} />
+            <CsvGate lang={lang}>
             <button onClick={exportCsv} disabled={csvBusy || !cols.length}
               title={t("Stiahnuť vyfiltrované byty ako CSV", "Download the filtered units as CSV")}
-              style={{ ...sel, marginLeft: "auto", cursor: csvBusy ? "wait" : (cols.length ? "pointer" : "default"),
+              style={{ ...sel, cursor: csvBusy ? "wait" : (cols.length ? "pointer" : "default"),
                        color: dim, fontFamily: mono, fontSize: "0.72rem", opacity: cols.length ? 1 : 0.5 }}>
               ⬇ {csvBusy ? t("sťahujem…", "preparing…") : "CSV"}
             </button>
+            </CsvGate>
 
             <button onClick={showOnMap} disabled={mapBusy} title={t("Zobraziť vyfiltrované projekty na mape", "Show the filtered projects on the map")}
               style={{ ...sel, cursor: mapBusy ? "wait" : "pointer", color: "#04130d", background: green, borderColor: green, fontFamily: mono, fontSize: "0.72rem", fontWeight: 700 }}>

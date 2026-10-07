@@ -540,7 +540,7 @@ function Sidebar({ page, lastProjectsPage, lang, can, tier, email, onNavigate, o
 function tierName(tier, lang = "sk") {
   // "pending" is an account the admin set to No access — nothing is waiting for
   // an approval any more (sign-ups are approved the moment the profile is saved).
-  return ({ paid: "Premium", trial: "Trial", free: "Free", admin: "Admin",
+  return ({ paid: "Premium", trial: "Trial Premium", free: "Free", admin: "Admin",
             pending: lang === "sk" ? "Bez prístupu" : "No access" })[tier] || tier;
 }
 
@@ -1028,7 +1028,9 @@ function PlatformBilling({ lang, setCurrent }) {
   const isAdmin = baseTier === "admin";
   const premium = !isAdmin && paidActive;
   const onTrial = !isAdmin && !premium && trialActive;
-  const premiumEnded = !isAdmin && !premium && (paidPaused || (paidUntil != null && paidUntil <= Date.now()));
+  // …but not while a trial runs: an ended Premium plus a running trial read
+  // "Premium during the trial" and "Premium ended — your access is now Free" at once.
+  const premiumEnded = !isAdmin && !premium && !onTrial && (paidPaused || (paidUntil != null && paidUntil <= Date.now()));
   const isFree = !isAdmin && !premium;
 
   // fmtDate first (TDZ — const, not hoisted) so approvedAt can use it.
@@ -1048,14 +1050,19 @@ function PlatformBilling({ lang, setCurrent }) {
   // A card subscription as Stripe has it now: cancelled-but-running (ends_at)
   // or a renewal Stripe is still retrying (past_due) — neither is in our row.
   const subId = profile?.stripe_subscription_id || null;
-  const [cardStatus, setCardStatus] = useState(null);
+  // undefined = still asking Stripe · null = no subscription · { status: "unknown" } = could not ask.
+  const [cardStatus, setCardStatus] = useState(undefined);
   useEffect(() => {
-    if (!subId) return undefined;
+    if (!subId) { setCardStatus(null); return undefined; }
     let live = true;
     getCardSubscription().then((sub) => { if (live) setCardStatus(sub); });
     return () => { live = false; };
   }, [subId]);
+  const cardAsking = Boolean(subId) && cardStatus === undefined;
   const cardRetrying = Boolean(subId && cardStatus && ["past_due", "incomplete"].includes(cardStatus.status));
+  // Anything but over (or not known to be over) — a "Resubscribe" here would be a
+  // second subscription beside one Stripe may still charge.
+  const cardNotOver = Boolean(subId && cardStatus && !["canceled", "unpaid", "incomplete_expired"].includes(cardStatus.status));
 
   // Detect return from Stripe Checkout (?checkout=success|cancelled) and strip
   // the query params so a reload doesn't re-trigger the banner.
@@ -1140,7 +1147,7 @@ function PlatformBilling({ lang, setCurrent }) {
               show a TRIAL badge, not PAID, so it isn't misleading. */}
           <TierBadgeSmall tier={displayTier} lang={lang} />
           <span style={{ fontSize: "1.35rem", fontWeight: 700, color: textLight, letterSpacing: "-0.02em" }}>
-            {isAdmin ? "Admin" : premium ? "Premium" : onTrial ? (lang === "sk" ? "Free · trial Premium" : "Free · Premium trial") : "Free"}
+            {isAdmin ? "Admin" : premium ? "Premium" : onTrial ? "Trial Premium" : "Free"}
           </span>
           {onTrial && (
             <span style={{ fontSize: "0.75rem", color: accentInk, fontFamily: mono, background: "color-mix(in srgb, var(--accent) 12%, transparent)", border: `1px solid ${green}`, borderRadius: 100, padding: "2px 10px" }}>
@@ -1276,21 +1283,32 @@ function PlatformBilling({ lang, setCurrent }) {
       )}
 
       {/* Paid expired — show resubscribe CTA prominently. */}
-      {premiumEnded && cardRetrying && (
+      {premiumEnded && cardAsking && (
+        <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: "1.25rem 2rem", marginBottom: "1.25rem", color: dim, fontSize: "0.88rem" }}>
+          {lang === "sk" ? "Overujem stav predplatného…" : "Checking your subscription…"}
+        </div>
+      )}
+      {premiumEnded && cardNotOver && (
         <div style={{
           background: "linear-gradient(135deg, rgba(245,166,35,0.1), rgba(245,166,35,0.02))",
           border: "1px solid rgba(245,166,35,0.4)", borderRadius: 12, padding: "1.75rem 2rem", marginBottom: "1.25rem",
         }}>
           <div style={{ fontFamily: mono, fontSize: "0.65rem", color: orangeInk, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem", fontWeight: 700 }}>
-            ⚠ {lang === "sk" ? "Platba kartou sa nepodarila" : "Card payment failed"}
+            ⚠ {cardRetrying
+              ? (lang === "sk" ? "Platba kartou sa nepodarila" : "Card payment failed")
+              : (lang === "sk" ? "Predplatné kartou" : "Card subscription")}
           </div>
           <p style={{ color: "var(--text-2)", fontSize: "0.9rem", lineHeight: 1.6, margin: "0 0 1rem" }}>
-            {lang === "sk"
-              ? "Obnovenie predplatného neprešlo a Stripe platbu skúša znova. Aktualizuj kartu — po úspešnej platbe sa Premium vráti samo. Nové predplatné nezakladaj, platil by si dvakrát."
-              : "Your renewal did not go through and Stripe is retrying it. Update your card — Premium comes back by itself once the payment succeeds. Do not start a new subscription, you would pay twice."}
+            {cardRetrying
+              ? (lang === "sk"
+                ? "Obnovenie predplatného neprešlo a Stripe platbu skúša znova. Aktualizuj kartu — po úspešnej platbe sa Premium vráti samo. Nové predplatné nezakladaj, platil by si dvakrát."
+                : "Your renewal did not go through and Stripe is retrying it. Update your card — Premium comes back by itself once the payment succeeds. Do not start a new subscription, you would pay twice.")
+              : (lang === "sk"
+                ? "Stav tvojho predplatného sa práve nedá potvrdiť. Pozri ho cez „Spravovať platbu“ alebo nám napíš — nové predplatné nezakladaj, mohol by si platiť dvakrát."
+                : "Your subscription's status can't be confirmed right now. Check it under “Manage billing” or write to us — do not start a new subscription, you might pay twice.")}
           </p>
           <button type="button" onClick={handleManage} disabled={payBusy} className="btn-p" style={{ fontSize: "0.88rem" }}>
-            {payBusy ? "…" : (lang === "sk" ? "Aktualizovať kartu" : "Update card")}
+            {payBusy ? "…" : cardRetrying ? (lang === "sk" ? "Aktualizovať kartu" : "Update card") : (lang === "sk" ? "Spravovať platbu" : "Manage billing")}
           </button>
           {payErr && (
             <div style={{ marginTop: "0.6rem", fontSize: "0.82rem", color: dangerInk, fontFamily: mono }}>{payErr}</div>
@@ -1298,7 +1316,7 @@ function PlatformBilling({ lang, setCurrent }) {
         </div>
       )}
 
-      {premiumEnded && !cardRetrying && (
+      {premiumEnded && !cardAsking && !cardNotOver && (
         <div style={{
           background: "linear-gradient(135deg, rgba(245,166,35,0.1), rgba(245,166,35,0.02))",
           border: "1px solid rgba(245,166,35,0.4)", borderRadius: 12, padding: "1.75rem 2rem", marginBottom: "1.25rem",
@@ -1537,7 +1555,11 @@ function PlatformSettings({ lang }) {
       setDmsg({ type: "ok", text: lang === "sk" ? "Stiahnuté ✓" : "Downloaded ✓" });
       setTimeout(() => setDmsg(null), 2500);
     } catch (e) {
-      setDmsg({ type: "err", text: String(e.message || e) });
+      // A dropped connection throws "Failed to fetch" / "Load failed" — never shown raw.
+      track("data_export_error", { message: String(e?.message || e).slice(0, 200) });
+      setDmsg({ type: "err", text: lang === "sk"
+        ? "Export sa nepodaril — skontroluj pripojenie a skús znova, alebo napíš na info@residata.eu."
+        : "The export failed — check your connection and try again, or write to info@residata.eu." });
     }
   };
 
@@ -1548,7 +1570,7 @@ function PlatformSettings({ lang }) {
       // gotrue's lock, which is how a click becomes "nothing happened".
       let token;
       try { token = await getFreshAccessToken(); }
-      catch { throw new Error(lang === "sk" ? "Relácia vypršala — obnov stránku a prihlás sa." : "Session expired — reload and sign in."); }
+      catch { throw Object.assign(new Error(lang === "sk" ? "Relácia vypršala — obnov stránku a prihlás sa." : "Session expired — reload and sign in."), { shown: true }); }
       const res = await fetch("/api/admin/delete-user", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -1556,18 +1578,23 @@ function PlatformSettings({ lang }) {
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(j.error === "card_cancel_failed"
+        throw Object.assign(new Error(j.error === "card_cancel_failed"
           ? (lang === "sk" ? "Predplatné sa nepodarilo zrušiť, preto sme účet nezmazali. Skús to o chvíľu znova alebo napíš na info@residata.eu."
                            : "Your subscription could not be cancelled, so the account was not deleted. Try again shortly or write to info@residata.eu.")
           : (lang === "sk" ? "Účet sa nepodarilo zmazať. Skús to znova alebo napíš na info@residata.eu."
-                           : "The account could not be deleted. Try again or write to info@residata.eu."));
+                           : "The account could not be deleted. Try again or write to info@residata.eu.")), { shown: true });
       }
       track("account_deleted");
       // Account (auth user + profile) is gone — tear down the session + hard reload.
       if (signOut) await signOut(); else window.location.assign("/");
     } catch (e) {
       setDbusy(false);
-      setDmsg({ type: "err", text: String(e.message || e) });
+      // Our own sentences are shown; anything else (a dropped connection's
+      // "Failed to fetch") becomes the same plain sentence, raw text to tracking.
+      if (!e?.shown) track("account_delete_error", { message: String(e?.message || e).slice(0, 200) });
+      setDmsg({ type: "err", text: e?.shown ? e.message : (lang === "sk"
+        ? "Účet sa nepodarilo zmazať — skontroluj pripojenie a skús znova, alebo napíš na info@residata.eu."
+        : "The account could not be deleted — check your connection and try again, or write to info@residata.eu.") });
     }
   };
   const [form, setForm] = useState({
@@ -2414,7 +2441,7 @@ function PlatformExports({ lang, setCurrent }) {
       /* Trial / non-paying: can reach the page + pick a date, but export is real-paid only. */
       <div style={{ background: bg, border: `1px solid #f5a62355`, borderRadius: 12, padding: "1.5rem 1.75rem" }}>
         <div style={{ fontFamily: mono, fontSize: "0.65rem", color: orangeInk, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
-          {lang === "sk" ? "Len pre platený plán" : "Paid plan only"}
+          {lang === "sk" ? "Len pre Premium" : "Premium only"}
         </div>
         <h3 style={{ fontSize: "1.05rem", fontWeight: 600, color: textLight, margin: 0, marginBottom: "0.75rem" }}>
           {lang === "sk" ? "Export je pre reálne platiacich zákazníkov" : "Export is for paying customers"}
