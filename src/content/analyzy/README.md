@@ -154,14 +154,25 @@ Boss runs the analyses from here without a developer:
   publish or withdraw, open on the site, and **delete** — a published article is
   withdrawn and deleted in one confirmed step.
 - **The editor** — every text in both languages, blocks added (paragraph,
-  heading, chart, table, bullets), moved and **deleted, charts included**; undo
-  and redo (⌘Z / ⇧⌘Z) over the last 20 states; ⌘S saves; leaving with unsaved
-  edits asks first. **Náhľad** draws the draft — unsaved edits included — with
-  the public page's own component in the public page's colours, so what it shows
-  is what readers will get.
+  heading, chart, table, bullets) at the end or **directly below any block**,
+  moved, collapsed (one or all) and **deleted, charts included**; the opening
+  paragraph can be added back when an article has none. A table is edited as a grid (cells,
+  rows and columns added, moved and removed; the shape always stays
+  rectangular), bullets one per line with ↑ ↓ ✕, and a chart whose picture is
+  missing says so instead of showing a broken image. Undo and redo (⌘Z / ⇧⌘Z)
+  over the last 100 steps — a burst of typing in one field is one step; ⌘S
+  saves. The header shows whether there are unsaved edits and stays on screen
+  while scrolling (on a phone it scrolls away, to leave room for the text). Leaving with unsaved edits asks first — through the
+  sidebar, the browser's Back button, or closing the tab — and **Uložiť a
+  publikovať** saves before it publishes, so a publish never drops an edit.
+  Every time shown is Bratislava time. **Náhľad** draws the draft — unsaved
+  edits included — with the public page's own component in the public page's
+  colours, so what it shows is what readers will get.
 - Every question is the platform's dialog (`components/Modal`), never the
-  browser's alert/confirm/prompt. The list's rules (tabs, search, a new
-  article's address) are `src/lib/articlesAdmin.js`, tested.
+  browser's alert/confirm/prompt. The list's and the editor's rules (tabs,
+  search, a new article's address, the undo history, table edits, dates) are
+  `src/lib/articlesAdmin.js`; the leave question is `src/lib/leaveGuard.js`;
+  both tested.
 
 A new issue therefore needs nothing SEO-specific from a person beyond step 5.
 The template carries the rest: `<!--SEOTITLE …-->` and `<!--KEYWORDS …-->` at
