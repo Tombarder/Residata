@@ -3,6 +3,7 @@ import { supabase, supabaseData, isSupabaseReady } from "./supabase";
 import { createAuthStateHandler } from "./authStateHandler";
 import { getSignedInUser } from "./authToken";
 import { installErrorReporting } from "./errorReport";
+import { installConsentSync, syncConsentToAccount } from "./consentSync";
 
 // F-104: gate debug log behind import.meta.env.DEV so production builds
 // don't stream auth state (email, user_id, tier, profile_completed) into
@@ -285,6 +286,11 @@ export function AuthProvider({ children }) {
   const userId = value?.user?.id || null;
   useEffect(() => { userRef.current = userId; }, [userId]);
   useEffect(() => { installErrorReporting(() => userRef.current); }, []);
+
+  // The cookie choice belongs to the account too (lib/consentSync.js): on every
+  // sign-in, and whenever the banner saves one.
+  useEffect(() => installConsentSync(), []);
+  useEffect(() => { if (userId) syncConsentToAccount(); }, [userId]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

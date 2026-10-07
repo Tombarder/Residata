@@ -51,6 +51,22 @@ test("each gated page gates every download button it has, not just one", () => {
 
 test("the gate lets only export_data through", () => {
   const gate = readFileSync(join(SRC, "components/CsvGate.jsx"), "utf8");
-  assert.match(gate, /if \(can\("export_data"\)\) return children;/);
+  assert.match(gate, /if \(can\("export_data"\)\) \{/);
   assert.match(gate, /disabled/);
+});
+
+test("every gate says what it hands out, so admin sees each download (2026-10-07)", () => {
+  // admin -> a person's activity lists their downloads by `what`. A gate without it
+  // records "unknown", and a page that records the download itself says selfTracked
+  // so it is not counted twice.
+  const unnamed = [];
+  for (const p of files(SRC)) {
+    const rel = relative(SRC, p).split("\\").join("/");
+    for (const m of readFileSync(p, "utf8").matchAll(/<CsvGate\b[^>]*>/g)) {
+      if (!/\bwhat="[a-z_]+"/.test(m[0]) && !/\bselfTracked\b/.test(m[0])) unnamed.push(`${rel}: ${m[0]}`);
+    }
+  }
+  assert.deepEqual(unnamed, [], 'give the gate what="<data>" (or selfTracked when the page records the download)');
+  const gate = readFileSync(join(SRC, "components/CsvGate.jsx"), "utf8");
+  assert.match(gate, /track\(kind === "copy" \? "data_copied" : "csv_exported"/);
 });

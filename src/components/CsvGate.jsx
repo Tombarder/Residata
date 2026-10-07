@@ -1,4 +1,5 @@
 import { useCapabilities } from "../lib/useCapabilities";
+import { track } from "../lib/track";
 
 /**
  * Taking data OUT of Residata (a CSV download, "copy for Excel") is for paying
@@ -11,12 +12,23 @@ import { useCapabilities } from "../lib/useCapabilities";
  * user the files; src/lib/csvGate.test.mjs now fails on any download in src/ that is
  * not behind this gate or an explicit export_data check.
  *
- *   <CsvGate lang={lang}><button onClick={exportCsv}>⬇ CSV</button></CsvGate>
- *   <CsvGate lang={lang} label="Kopírovať"> … </CsvGate>
+ * It also RECORDS each use (2026-10-07): admin → a person's activity shows what they
+ * took home, from where. Before, only the Exports page and the unit timeline said so,
+ * and a customer living in the Pivot looked like a customer who never exports.
+ * `what` names the data (the test requires it); `kind="copy"` for a clipboard copy;
+ * `selfTracked` where the page already records the download with its row count.
+ *
+ *   <CsvGate lang={lang} what="units"><button onClick={exportCsv}>⬇ CSV</button></CsvGate>
+ *   <CsvGate lang={lang} what="pivot_table" kind="copy" label="Kopírovať"> … </CsvGate>
  */
-export default function CsvGate({ lang, label = "CSV", children }) {
+export default function CsvGate({ lang, label = "CSV", what, kind = "csv", selfTracked = false, children }) {
   const { can } = useCapabilities();
-  if (can("export_data")) return children;
+  if (can("export_data")) {
+    if (selfTracked) return children;
+    // A click on a disabled button never reaches here, so a refused click is not counted.
+    const record = () => { track(kind === "copy" ? "data_copied" : "csv_exported", { type: what || "unknown" }); };
+    return <span style={{ display: "contents" }} onClickCapture={record}>{children}</span>;
+  }
   return (
     <button type="button" disabled
       title={lang === "sk"

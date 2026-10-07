@@ -35,6 +35,7 @@ import { daysLeftText } from "../lib/dates";
 import { startCheckout, openBillingPortal, getCardSubscription } from "../lib/billing";
 import { pushRoute } from "../lib/routing";
 import { track } from "../lib/track";
+import { PAGE_TITLES } from "../lib/pageTitles";
 import { AI_DAILY_LIMITS } from "../lib/aiLimits";
 import { cleanText, cleanUrl, cleanPhone } from "../lib/sanitize";
 import {
@@ -576,32 +577,10 @@ function TierBadgeSmall({ tier, lang }) {
 // ─── TopBar ─────────────────────────────────────────────────────
 function TopBar({ page, lang, setLang, tier }) {
   const [themeMode, toggleThemeMode] = useThemeMode();
-  const titles = {
-    "App:Dashboard": { en: "Dashboard",       sk: "Dashboard"    },
-    "App:Projects":  { en: "Projects",        sk: "Projekty"     },
-    "App:Map":       { en: "Map view",        sk: "Mapa"         },
-    "App:Map2":      { en: "Market Radar",     sk: "Trhový radar" },
-    "App:Analytics":    { en: "Analytics",     sk: "Analytika"    },
-    "App:UnitTimeline": { en: "Unit timeline", sk: "Byt v čase"   },
-    "App:Explorer":     { en: "Unit Explorer", sk: "Prieskumník"  },
-    "App:Sales":        { en: "Sales",         sk: "Predaje"      },
-    "App:Reports":      { en: "Reports",       sk: "Reporty"      },
-    "App:Assistant": { en: "AI Assistant",    sk: "AI asistent"  },
-    "App:Exports":   { en: "Exports",         sk: "Exporty"      },
-    "App:Billing":   { en: "Plan & billing",  sk: "Predplatné"},
-    "App:Settings":  { en: "Settings",        sk: "Nastavenia"   },
-    "App:Admin":     { en: "Admin",           sk: "Admin"        },
-    "App:Locations": { en: "Locations",       sk: "Polohy"       },
-    "App:DataQA":    { en: "Data control",    sk: "Kontrola dát" },
-    "App:Feedback":  { en: "Feedback",        sk: "Spätná väzba" },
-    "App:Texts":     { en: "Website texts",   sk: "Texty na webe" },
-    "App:Usage":     { en: "Usage",           sk: "Používanie"    },
-    "App:Articles":  { en: "Analyses",        sk: "Analýzy"       },
-  };
   const isProjectDetail = typeof page === "string" && page.startsWith("App:ProjectDetail:");
   const title = isProjectDetail
     ? (lang === "sk" ? "Detail projektu" : "Project detail")
-    : (titles[page]?.[lang] || titles[page]?.en || "Residata");
+    : (PAGE_TITLES[page]?.[lang] || PAGE_TITLES[page]?.en || "Residata");
 
 
   return (
@@ -1079,7 +1058,7 @@ function PlatformBilling({ lang, setCurrent }) {
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     const c = p.get("checkout");
-    if (c === "success" || c === "cancelled") setCheckoutMsg(c);
+    if (c === "success" || c === "cancelled") { setCheckoutMsg(c); track("checkout_returned", { result: c }); }
     if (c) {
       p.delete("checkout"); p.delete("session_id");
       const q = p.toString();
