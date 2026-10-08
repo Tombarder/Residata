@@ -652,6 +652,7 @@ function kvTable(rows) {
   return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;margin:4px 0">${tr}</table>`;
 }
 
+
 const sectionLabel = (text) =>
   `<div style="${S.eyebrow};color:${TEXT_DIM};margin:24px 0 6px">${text}</div>`;
 
@@ -660,11 +661,6 @@ function bigAmount(amount, caption, color = GREEN) {
     + `<div style="font-size:13px;color:${TEXT_DIM};margin-top:4px">${caption}</div></div>`;
 }
 
-function checklist(items) {
-  return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:8px 0 6px">${items.filter(Boolean).map((i) =>
-    `<tr><td style="padding:5px 12px 5px 0;vertical-align:top;color:${GREEN};font-weight:800;font-size:15px">✓</td>`
-    + `<td style="padding:5px 0;color:${TEXT_MID};font-size:15px;line-height:1.5">${i}</td></tr>`).join("")}</table>`;
-}
 
 const link = (href, text) => `<a href="${escHtml(href)}" style="color:${GREEN};text-decoration:none">${text}</a>`;
 
@@ -688,7 +684,26 @@ const helloLine = (name, lang) => (name
   ? (lang === "sk" ? `Dobrý deň, ${escHtml(name)},` : `Hello ${escHtml(name)},`)
   : (lang === "sk" ? "Dobrý deň," : "Hello,"));
 
-/** Shared facts of a payment, in the customer's language. */
+// ── E-MAILS TO THE CUSTOMER about the subscription (rewritten 2026-10-08) ──────────────
+// Boss: "the e-mails and the texts in them? … look at what is normally written in these
+// e-mails and copy that". Normal = a payment confirmation as Stripe or an invoicing service
+// sends it: what was paid, when, the invoice number, the invoice attached, where the
+// subscription is managed, a sign-off. No feature list, no "thank you for your trust 🎉",
+// no telling the customer what to do with the invoice. faktury-mvp/platby.py sends the SAME
+// content in the same order for KamhalCo — only the product name differs.
+const P_STYLE = (extra = "") => `${S.p}${extra}`;
+const para = (html, small = false) => `<p style="${P_STYLE(small ? `;font-size:13px;color:${TEXT_DIM};margin-top:18px` : "")}">${html}</p>`;
+const strong = (html) => `<strong style="color:${TEXT_HI}">${html}</strong>`;
+const PRODUCT = "Residata Premium";
+const contactLine = (lang) => para(lang === "sk"
+  ? `Predplatné môžete kedykoľvek zmeniť alebo zrušiť v aplikácii v časti ${strong("Predplatné")}. Ak máte otázky, napíšte nám na ${link("mailto:info@residata.eu", "info@residata.eu")}.`
+  : `You can change or cancel your subscription at any time in the app under ${strong("Plan &amp; billing")}. If you have any questions, write to us at ${link("mailto:info@residata.eu", "info@residata.eu")}.`, true);
+const questionsLine = (lang) => para(lang === "sk"
+  ? `Ak máte otázky, napíšte nám na ${link("mailto:info@residata.eu", "info@residata.eu")}.`
+  : `If you have any questions, write to us at ${link("mailto:info@residata.eu", "info@residata.eu")}.`, true);
+const signOff = (lang) => para(lang === "sk" ? "S pozdravom<br>Residata" : "Best regards,<br>Residata");
+
+/** The facts of a payment, in the customer's language — the same rows as KamhalCo's receipt. */
 function paymentRows(p, lang) {
   const sk = lang === "sk";
   const t = (a, b) => (sk ? a : b);
@@ -698,13 +713,14 @@ function paymentRows(p, lang) {
     ? fmtDaySec(p.periodEnd, lang) + (p.nextAmount != null ? ` · ${fmtMoney(p.nextAmount, p.currency, lang)}` : "")
     : null;
   const disc = p.discount
-    ? ` <span style="color:${TEXT_DIM}">(${t("zľava", "discount")} ${fmtMoney(p.discount, p.currency, lang)}${p.coupon ? ` · ${escHtml(p.coupon)}` : ""})</span>` : "";
+    ? ` <span style="color:${TEXT_DIM}">(${t("po zľave", "after a discount of")} ${fmtMoney(p.discount, p.currency, lang)})</span>` : "";
   return [
-    [t("Plán", "Plan"), `<strong>Residata Premium</strong> · ${t("mesačne", "monthly")}`],
-    [t("Zaplatené", "Paid"), fmtMoney(p.amount, p.currency, lang) + disc],
+    [t("Predplatné", "Subscription"), `<strong>${PRODUCT}</strong> · ${t("mesačne", "monthly")}`],
+    [t("Suma", "Amount"), fmtMoney(p.amount, p.currency, lang) + disc],
+    [t("Dátum platby", "Payment date"), p.paidAt ? fmtDaySec(p.paidAt, lang) : null],
     [t("Obdobie", "Period"), period],
+    [t("Číslo faktúry", "Invoice number"), p.number ? escHtml(p.number) : null],
     [t("Ďalšia platba", "Next payment"), next],
-    [t("Číslo faktúry", "Invoice no."), p.number ? (p.hostedUrl ? link(p.hostedUrl, escHtml(p.number)) : escHtml(p.number)) : null],
   ];
 }
 
@@ -712,78 +728,50 @@ const KIND_TEXT = { new: "new subscription", renewal: "renewal", change: "plan c
 
 /**
  * The customer's e-mail after a successful payment.
- * `p` = { kind, amount, discount, coupon, currency, number, periodStart, periodEnd, nextAmount,
- *         hostedUrl, pdfUrl, name, pdfAttached }
- * kind "new" is the celebration; anything else is the invoice for the next period.
+ * `p` = { kind, amount, discount, currency, number, paidAt, periodStart, periodEnd, nextAmount,
+ *         hostedUrl, name, pdfAttached }
  */
 export function customerPaymentSubject(p, lang = "sk") {
   const sk = lang === "sk";
-  if (p.kind === "new") return sk ? "Vitajte v Residata Premium 🎉" : "Welcome to Residata Premium 🎉";
-  return `${sk ? "Faktúra" : "Invoice"} ${p.number || ""} · Residata`.replace(/\s+/g, " ").trim();
+  if (p.kind === "new") return sk ? `Predplatné ${PRODUCT} je aktívne` : `Your ${PRODUCT} subscription is active`;
+  return p.number ? `${sk ? "Faktúra" : "Invoice"} ${p.number} – Residata` : (sk ? "Potvrdenie platby – Residata" : "Payment confirmation – Residata");
 }
 
 export function customerPaymentHtml(p, webUrl, lang = "sk") {
   const sk = lang === "sk";
   const t = (a, b) => (sk ? a : b);
   const free = !(Number(p.amount) > 0);           // a 100 % coupon or credit: nothing was charged
-  const invoiceLine = p.pdfAttached
-    ? t("Faktúru máte v prílohe tohto e-mailu — doklad pre vaše účtovníctvo.",
-        "Your invoice is attached to this e-mail — a document for your accounts.")
-    : p.pdfUrl || p.hostedUrl
-      ? t("Faktúru si stiahnete tlačidlom nižšie — doklad pre vaše účtovníctvo.",
-          "Download your invoice with the button below — a document for your accounts.")
-      : null;
-  const pdfButton = p.pdfUrl ? [p.pdfUrl, t("Stiahnuť faktúru (PDF)", "Download invoice (PDF)")] : null;
-  const manage = `<p style="${S.p};font-size:13px;color:${TEXT_DIM};margin-top:18px">${t(
-    "Predplatné sa obnovuje mesačne. Kartu, fakturačné údaje aj zrušenie spravujete v aplikácii v časti <strong style=\"color:" + TEXT_MID + "\">Predplatné</strong>. Otázky? Odpíšte na info@residata.eu.",
-    "The subscription renews monthly. Your card, billing details and cancellation are in the app under <strong style=\"color:" + TEXT_MID + "\">Plan &amp; billing</strong>. Questions? Write to info@residata.eu.",
-  )}</p>`;
-
-  let inner;
+  const invoice = p.pdfAttached ? t("Faktúru nájdete v prílohe.", "Your invoice is attached.")
+    : t("Faktúru si stiahnete tlačidlom nižšie.", "You can download your invoice with the button below.");
+  const invoiceButton = !p.pdfAttached && p.hostedUrl ? [p.hostedUrl, t("Stiahnuť faktúru", "Download invoice"), "outline"] : null;
+  let title, lead, btns;
   if (p.kind === "new") {
-    const lead = free
-      ? t("ďakujeme za dôveru. <strong style=\"color:" + TEXT_HI + "\">Premium máte aktívne hneď teraz</strong> — s vaším kupónom je toto obdobie zadarmo.",
-          "thank you for your trust. <strong style=\"color:" + TEXT_HI + "\">Premium is active right now</strong> — with your coupon this period is free.")
-      : t("ďakujeme za dôveru. Platba prebehla a <strong style=\"color:" + TEXT_HI + "\">Premium máte aktívne hneď teraz</strong> — stačí otvoriť Residata.",
-          "thank you for your trust. The payment went through and <strong style=\"color:" + TEXT_HI + "\">Premium is active right now</strong> — just open Residata.");
-    inner = `
-    <div style="${S.eyebrow}">${t("Premium je aktívne", "Premium is active")}</div>
-    <h1 style="${S.h1}">${t("Vitajte v Residata Premium 🎉", "Welcome to Residata Premium 🎉")}</h1>
-    <p style="${S.p}">${helloLine(p.name, lang)}</p>
-    <p style="${S.p}">${lead}</p>
-    ${checklist([
-      t("<strong style=\"color:" + TEXT_HI + "\">Všetky projekty</strong> novostavieb na Slovensku a v Česku v plnom detaile",
-        "<strong style=\"color:" + TEXT_HI + "\">Every project</strong> in the Slovak and Czech new-build market, in full detail"),
-      t("Analytika trhu a história cien a predaja", "Market analytics and the history of prices and sales"),
-      t("Exporty dát", "Data exports"),
-      invoiceLine,
-    ])}
-    ${sectionLabel(t("Súhrn", "Summary"))}
-    ${kvTable(paymentRows(p, lang))}
-    ${buttons([[`${webUrl}/app`, `${t("Otvoriť Residata", "Open Residata")} →`, "primary"], pdfButton])}
-    ${manage}`;
+    title = t("Ďakujeme za objednávku", "Thank you for your order");
+    lead = t(`predplatné ${strong(PRODUCT)} je aktívne${free ? "." : " a platbu sme prijali."} ${invoice}`,
+      `your ${strong(PRODUCT)} subscription is active${free ? "." : " and we have received your payment."} ${invoice}`);
+    btns = buttons([[`${webUrl}/app`, t("Otvoriť Residata", "Open Residata"), "primary"], invoiceButton]);
   } else {
-    inner = `
-    <div style="${S.eyebrow}">${t("Faktúra", "Invoice")}</div>
-    <h1 style="${S.h1}">${t("Ďakujeme za platbu", "Thank you for your payment")}</h1>
-    <p style="${S.p}">${helloLine(p.name, lang)}</p>
-    <p style="${S.p}">${p.kind === "change"
-      ? t("platba za zmenu predplatného prebehla. ", "the payment for your subscription change went through. ")
-      : t("platba za ďalšie obdobie Residata Premium prebehla a predplatné beží ďalej. ", "the payment for the next period of Residata Premium went through and your subscription continues. ")}${invoiceLine || ""}</p>
-    ${kvTable(paymentRows(p, lang))}
-    ${buttons([p.hostedUrl ? [p.hostedUrl, t("Otvoriť faktúru", "View invoice"), "primary"] : null, pdfButton])}
-    ${manage}`;
+    title = t("Ďakujeme za platbu", "Thank you for your payment");
+    lead = p.kind === "change"
+      ? t(`platbu za zmenu predplatného ${strong(PRODUCT)} sme prijali. ${invoice}`, `we have received your payment for the change to your ${strong(PRODUCT)} subscription. ${invoice}`)
+      : t(`platbu za ďalšie obdobie predplatného ${strong(PRODUCT)} sme prijali. ${invoice}`, `we have received your payment for the next period of ${strong(PRODUCT)}. ${invoice}`);
+    btns = buttons([invoiceButton]);
   }
-  const attached = p.pdfAttached ? t(" Faktúra je v prílohe.", " Your invoice is attached.") : "";
+  const inner = `
+    <h1 style="${S.h1}">${title}</h1>
+    ${para(helloLine(p.name, lang))}
+    ${para(lead)}
+    ${kvTable(paymentRows(p, lang))}
+    ${btns}
+    ${signOff(lang)}
+    ${contactLine(lang)}`;
+  const paid = free ? t(`Predplatné ${PRODUCT} je aktívne.`, `Your ${PRODUCT} subscription is active.`)
+    : t(`Platbu ${fmtMoney(p.amount, p.currency, lang)} sme prijali.`, `We have received your payment of ${fmtMoney(p.amount, p.currency, lang)}.`);
   return shell({
     lang,
-    title: p.kind === "new" ? t("Vitajte v Residata Premium", "Welcome to Residata Premium") : t("Faktúra od Residata", "Invoice from Residata"),
-    preheader: p.kind === "new"
-      ? (free ? t("Premium je aktívne — toto obdobie máte s kupónom zadarmo.", "Premium is active — this period is free with your coupon.")
-              : t("Platba prebehla, Premium je aktívne.", "Payment received, Premium is active.")) + attached
-      : t(`Faktúra ${p.number || ""} · ${fmtMoney(p.amount, p.currency, lang)}`, `Invoice ${p.number || ""} · ${fmtMoney(p.amount, p.currency, lang)}`) + attached,
+    title,
+    preheader: paid + (p.pdfAttached && p.number ? t(` Faktúra ${p.number} je v prílohe.`, ` Invoice ${p.number} is attached.`) : ""),
     inner,
-    footer: t("Residata · doklad k vášmu predplatnému", "Residata · receipt for your subscription"),
   });
 }
 
@@ -791,7 +779,7 @@ export function customerPaymentHtml(p, webUrl, lang = "sk") {
 export function invoicePaidHtml(inv, webUrl, lang = "sk") {
   return customerPaymentHtml({
     kind: "renewal", amount: inv.amount_paid ?? inv.total ?? 0, currency: inv.currency, number: inv.number || inv.id,
-    hostedUrl: inv.hosted_invoice_url, pdfUrl: inv.invoice_pdf,
+    paidAt: inv.status_transitions?.paid_at, hostedUrl: inv.hosted_invoice_url,
   }, webUrl, lang);
 }
 
@@ -804,104 +792,93 @@ export function invoicePaidHtml(inv, webUrl, lang = "sk") {
  */
 export function customerPaymentFailedSubject(lang = "sk", p = null) {
   const sk = lang === "sk";
-  if (p?.kind === "new") {
-    return sk ? "Platba za Residata Premium neprešla — predplatné sa nespustilo" : "Your Residata Premium payment did not go through — the subscription did not start";
-  }
-  if (p?.final) return sk ? "Platba za Residata Premium opäť neprešla — Premium je pozastavené" : "Your Residata Premium payment failed again — Premium is paused";
-  return sk ? "Platba za Residata Premium sa nepodarila — Premium je pozastavené" : "Your Residata Premium payment did not go through — Premium is paused";
+  if (p?.kind === "new") return sk ? "Platba sa nepodarila – Residata" : "Your payment did not go through – Residata";
+  if (p?.final) return sk ? "Predplatné čaká na úhradu – Residata" : "Your subscription is awaiting payment – Residata";
+  return sk ? "Platba za predplatné sa nepodarila – Residata" : "Your subscription payment did not go through – Residata";
 }
 
 export function customerPaymentFailedHtml(p, webUrl, lang = "sk") {
   const sk = lang === "sk";
   const t = (a, b) => (sk ? a : b);
-  const first = p.kind === "new";
-  const amount = `<strong style="color:${TEXT_HI}">${fmtMoney(p.amount, p.currency, lang)}</strong>`;
-  const hello = `<p style="${S.p}">${helloLine(p.name, lang)}</p>`;
-  let inner;
-  if (first) {
-    inner = `
-    <div style="${S.eyebrow};color:${AMBER}">${t("Predplatné sa nespustilo", "Subscription not started")}</div>
-    <h1 style="${S.h1}">${t("Platba sa nepodarila", "The payment did not go through")}</h1>
-    ${hello}
-    <p style="${S.p}">${t(
-      `platbu ${amount} za Residata Premium sa nepodarilo strhnúť, preto sa predplatné nespustilo a nič sme vám neúčtovali.`,
-      `we could not take the payment of ${amount} for Residata Premium, so the subscription did not start and you have not been charged.`)}</p>
-    <p style="${S.p}">${t(
-      "Ak chcete Premium, skúste to prosím znova — napríklad inou kartou. Trvá to minútu.",
-      "If you would like Premium, please try again — for example with another card. It takes a minute.")}</p>
-    ${buttons([[`${webUrl}/app/billing`, `${t("Skúsiť znova", "Try again")} →`, "primary"]])}`;
+  const amount = strong(fmtMoney(p.amount, p.currency, lang));
+  let body;
+  if (p.kind === "new") {
+    body = para(t(`platbu ${amount} za predplatné ${strong(PRODUCT)} sa nepodarilo uskutočniť. Predplatné sa preto neaktivovalo a nič sme vám neúčtovali.`,
+      `we could not take the payment of ${amount} for ${strong(PRODUCT)}. The subscription was therefore not activated and you have not been charged.`))
+      + para(t("Ak chcete Premium, skúste to prosím znova, napríklad inou kartou.", "If you would like Premium, please try again, for example with another card."))
+      + buttons([[`${webUrl}/app/billing`, t("Skúsiť znova", "Try again"), "primary"]])
+      + signOff(lang) + questionsLine(lang);
   } else {
     const next = !p.final && p.nextAttempt ? fmtDaySec(p.nextAttempt, lang) : null;
-    inner = `
-    <div style="${S.eyebrow};color:${AMBER}">${p.final ? t("Automatické pokusy sa skončili", "Automatic retries are over") : t("Treba vašu pozornosť", "Needs your attention")}</div>
-    <h1 style="${S.h1}">${p.final ? t("Platba opäť neprešla", "The payment failed again") : t("Platba sa nepodarila", "The payment did not go through")}</h1>
-    ${hello}
-    <p style="${S.p}">${t(
-      `platbu ${amount} za ďalšie obdobie Residata Premium sa nepodarilo strhnúť z vašej karty, preto je <strong style="color:${TEXT_HI}">Premium pozastavené</strong>, kým platba neprejde.`,
-      `we could not charge ${amount} for the next period of Residata Premium to your card, so <strong style="color:${TEXT_HI}">Premium is paused</strong> until the payment goes through.`)}</p>
-    <p style="${S.p}">${p.final
-      ? t("Ďalší automatický pokus už nebude. Ak chcete Premium ďalej, zaplaťte prosím faktúru tlačidlom nižšie alebo si v časti Predplatné zadajte inú kartu.",
-          "There will be no further automatic attempt. If you would like to keep Premium, please pay the invoice with the button below or add another card under Plan &amp; billing.")
-      : t(`Platbu skúsime znova automaticky${next ? ` (ďalší pokus ${next})` : ""}. Nemusíte čakať — zaplatiť môžete hneď tlačidlom nižšie a Premium sa obnoví okamžite. Ak je problém s kartou (platnosť, limit), zadajte inú v časti Predplatné.`,
-          `We will retry automatically${next ? ` (next attempt ${next})` : ""}. You do not have to wait — pay now with the button below and Premium comes back at once. If the card is the problem (expiry, limit), add another one under Plan &amp; billing.`)}</p>
-    ${buttons([p.hostedUrl ? [p.hostedUrl, `${t("Zaplatiť teraz", "Pay now")} →`, "primary"] : null,
-      [`${webUrl}/app/billing`, t("Zmeniť kartu", "Change card"), p.hostedUrl ? "outline" : "primary"]])}`;
+    body = para(p.final
+      ? t(`platbu ${amount} za predplatné ${strong(PRODUCT)} sa nepodarilo strhnúť ani pri opakovaných pokusoch a automaticky ju už nezopakujeme. Premium je pozastavené; ak ho chcete ďalej používať, uhraďte prosím faktúru tlačidlom nižšie (aj inou kartou).`,
+        `we could not charge ${amount} for ${strong(PRODUCT)} after several attempts, and we will not retry automatically. Premium is paused; to keep using it, please pay the invoice with the button below (any card works).`)
+      : t(`platbu ${amount} za predplatné ${strong(PRODUCT)} sa nepodarilo strhnúť z vašej platobnej karty. Premium je pozastavené, kým platba neprejde; platbu automaticky zopakujeme${next ? ` ${next}` : ""}. Ak ju chcete uhradiť hneď alebo zmeniť kartu, použite tlačidlá nižšie.`,
+        `we could not charge ${amount} for ${strong(PRODUCT)} to your card. Premium is paused until the payment goes through; we will retry automatically${next ? ` on ${next}` : ""}. To pay now or change your card, use the buttons below.`))
+      + buttons([p.hostedUrl ? [p.hostedUrl, t("Uhradiť faktúru", "Pay invoice"), "primary"] : null,
+        [`${webUrl}/app/billing`, t("Zmeniť platobnú kartu", "Change card"), p.hostedUrl ? "outline" : "primary"]])
+      + signOff(lang) + contactLine(lang);
   }
+  const title = t("Platba sa nepodarila", "The payment did not go through");
   return shell({
     lang,
-    title: customerPaymentFailedSubject(lang, p),
-    preheader: first ? t("Predplatné sa nespustilo — môžete to skúsiť znova.", "The subscription did not start — you can try again.")
-      : t("Premium je pozastavené, kým platba neprejde. Zaplatiť môžete hneď.", "Premium is paused until the payment goes through. You can pay now."),
-    inner,
+    title,
+    preheader: p.kind === "new" ? t("Predplatné sa neaktivovalo — platbu môžete skúsiť znova.", "The subscription was not activated — you can try again.")
+      : p.final ? t("Uhraďte prosím faktúru, aby ste mohli Premium ďalej používať.", "Please pay the invoice to keep using Premium.")
+        : t("Premium je pozastavené, kým platba neprejde.", "Premium is paused until the payment goes through."),
+    inner: `<h1 style="${S.h1}">${title}</h1>${para(helloLine(p.name, lang))}${body}`,
   });
 }
 
 /** The customer's confirmation of their own cancellation. `c` = { endsAt, name } */
 export function customerCancelSubject(lang = "sk") {
-  return lang === "sk" ? "Zrušenie Residata Premium potvrdené" : "Your Residata Premium cancellation is confirmed";
+  return lang === "sk" ? "Zrušenie predplatného potvrdené – Residata" : "Your cancellation is confirmed – Residata";
 }
 
 export function customerCancelHtml(c, webUrl, lang = "sk") {
   const t = (a, b) => (lang === "sk" ? a : b);
-  const until = c.endsAt ? `<strong style="color:${TEXT_HI}">${fmtDaySec(c.endsAt, lang)}</strong>` : null;
+  const day = c.endsAt ? fmtDaySec(c.endsAt, lang) : null;
+  const title = t("Predplatné je zrušené", "Your subscription is cancelled");
   const inner = `
-    <div style="${S.eyebrow}">${t("Zrušenie potvrdené", "Cancellation confirmed")}</div>
-    <h1 style="${S.h1}">${t("Predplatné ste zrušili", "You have cancelled your subscription")}</h1>
-    <p style="${S.p}">${helloLine(c.name, lang)}</p>
-    <p style="${S.p}">${until
-      ? t(`potvrdzujeme zrušenie Residata Premium. Premium vám beží do ${until} a potom vám už nič neúčtujeme.`,
-          `this confirms that Residata Premium is cancelled. Premium keeps running until ${until} and nothing more will be charged after that.`)
-      : t("potvrdzujeme zrušenie Residata Premium. Nič ďalšie vám už neúčtujeme.", "this confirms that Residata Premium is cancelled. Nothing more will be charged.")}</p>
-    <p style="${S.p}">${t("Rozmysleli ste si to? Zrušenie vrátite jedným klikom v časti Predplatné — kým Premium beží.",
-      "Changed your mind? Undo the cancellation with one click under Plan &amp; billing — while Premium is still running.")}</p>
-    ${buttons([[`${webUrl}/app/billing`, t("Ponechať Premium", "Keep Premium"), "primary"]])}
-    <p style="${S.p};font-size:13px;color:${TEXT_DIM};margin-top:18px">${t("Ak nám chcete povedať, čo vám chýbalo, stačí odpísať na tento e-mail — čítame každú odpoveď.",
-      "If you would like to tell us what was missing, just reply to this e-mail — we read every answer.")}</p>`;
-  return shell({ lang, title: customerCancelSubject(lang),
-    preheader: c.endsAt ? t(`Premium beží do ${fmtDaySec(c.endsAt, lang)}, potom už nič neúčtujeme.`, `Premium runs until ${fmtDaySec(c.endsAt, lang)}; nothing more will be charged.`) : "",
+    <h1 style="${S.h1}">${title}</h1>
+    ${para(helloLine(c.name, lang))}
+    ${para(day
+      ? t(`potvrdzujeme zrušenie predplatného ${strong(PRODUCT)}. Premium zostáva aktívne do ${strong(day)} a ďalšie platby už nebudú strhnuté.`,
+        `this confirms the cancellation of ${strong(PRODUCT)}. Premium stays active until ${strong(day)} and no further payments will be taken.`)
+      : t(`potvrdzujeme zrušenie predplatného ${strong(PRODUCT)}. Ďalšie platby už nebudú strhnuté.`, `this confirms the cancellation of ${strong(PRODUCT)}. No further payments will be taken.`))}
+    ${para(day
+      ? t(`Ak si to rozmyslíte, zrušenie môžete do ${day} vrátiť v aplikácii v časti ${strong("Predplatné")}.`, `If you change your mind, you can undo the cancellation until ${day} in the app under ${strong("Plan &amp; billing")}.`)
+      : t(`Predplatné môžete kedykoľvek znova aktivovať v časti ${strong("Predplatné")}.`, `You can restart the subscription at any time under ${strong("Plan &amp; billing")}.`))}
+    ${buttons([[`${webUrl}/app/billing`, t("Spravovať predplatné", "Manage subscription"), "primary"]])}
+    ${signOff(lang)}
+    ${questionsLine(lang)}`;
+  return shell({ lang, title,
+    preheader: day ? t(`Premium zostáva aktívne do ${day}.`, `Premium stays active until ${day}.`) : "",
     inner });
 }
 
 /** The customer's note that Premium has ended. `c` = { unpaid, name } */
 export function customerEndedSubject(lang = "sk") {
-  return lang === "sk" ? "Residata Premium sa skončilo" : "Your Residata Premium has ended";
+  return lang === "sk" ? "Predplatné Premium skončilo – Residata" : "Your Premium subscription has ended – Residata";
 }
 
 export function customerEndedHtml(c, webUrl, lang = "sk") {
   const t = (a, b) => (lang === "sk" ? a : b);
+  const title = t("Predplatné skončilo", "Your subscription has ended");
   const inner = `
-    <div style="${S.eyebrow};color:${TEXT_DIM}">${t("Predplatné skončilo", "Subscription ended")}</div>
-    <h1 style="${S.h1}">${t("Premium sa skončilo", "Premium has ended")}</h1>
-    <p style="${S.p}">${helloLine(c.name, lang)}</p>
-    <p style="${S.p}">${c.unpaid
-      ? t("predplatné Residata Premium sa skončilo, pretože sa platbu nepodarilo strhnúť. Nič ďalšie vám neúčtujeme.",
-          "your Residata Premium subscription has ended because the payment could not be taken. Nothing more will be charged.")
-      : t("vaše predplatné Residata Premium sa skončilo. Nič ďalšie vám neúčtujeme.", "your Residata Premium subscription has ended. Nothing more will be charged.")}</p>
-    <p style="${S.p}">${t("Váš účet zostáva — prihlásite sa ako doteraz, len bez funkcií Premium. Premium si môžete kedykoľvek znova zapnúť.",
-      "Your account stays — you sign in as before, just without the Premium features. You can turn Premium back on at any time.")}</p>
-    ${buttons([[`${webUrl}/app/billing`, t("Obnoviť Premium", "Restart Premium"), "primary"]])}`;
-  return shell({ lang, title: customerEndedSubject(lang),
-    preheader: t("Účet zostáva, len bez Premium. Obnoviť ho môžete kedykoľvek.", "Your account stays, without Premium. You can restart it any time."), inner });
+    <h1 style="${S.h1}">${title}</h1>
+    ${para(helloLine(c.name, lang))}
+    ${para(c.unpaid
+      ? t(`vaše predplatné ${strong(PRODUCT)} skončilo, pretože sa platbu nepodarilo strhnúť. Ďalšie platby už nebudú strhnuté.`,
+        `your ${strong(PRODUCT)} subscription has ended because the payment could not be taken. No further payments will be taken.`)
+      : t(`vaše predplatné ${strong(PRODUCT)} skončilo. Ďalšie platby už nebudú strhnuté.`, `your ${strong(PRODUCT)} subscription has ended. No further payments will be taken.`))}
+    ${para(t(`Účet vám zostáva, len bez funkcií Premium. Predplatné môžete kedykoľvek znova aktivovať v aplikácii v časti ${strong("Predplatné")}.`,
+      `Your account stays, just without the Premium features. You can restart the subscription at any time in the app under ${strong("Plan &amp; billing")}.`))}
+    ${buttons([[`${webUrl}/app/billing`, t("Obnoviť predplatné", "Restart subscription"), "primary"]])}
+    ${signOff(lang)}
+    ${questionsLine(lang)}`;
+  return shell({ lang, title,
+    preheader: t("Účet zostáva, len bez Premium.", "Your account stays, without Premium."), inner });
 }
 
 // ── owner (Boss) — English, like the sign-up note ──────────────────────────

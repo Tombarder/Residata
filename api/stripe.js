@@ -339,7 +339,10 @@ async function persistBillingIdentity(admin, stripe, session) {
   if (customerId) {
     const invoice_settings = { footer: invoiceSellerFooter("sk", await bankDetailsFromSecrets(admin)) };
     if (companyId) invoice_settings.custom_fields = [{ name: "IČO", value: companyId.slice(0, 30) }];
-    await stripe.customers.update(customerId, { invoice_settings })
+    // Stripe's own pages (paying a failed invoice, the customer portal) in the customer's language —
+    // KamhalCo sets Slovak the same way (2026-10-08).
+    const { lang } = await customerLang(admin, null, { userId, customerId, country: address?.country });
+    await stripe.customers.update(customerId, { invoice_settings, preferred_locales: [lang] })
       .catch((e) => console.warn("[stripe] invoice settings not written:", e?.message || e));
   }
 }
@@ -480,7 +483,9 @@ async function sendInvoiceEmail(admin, inv, stripe = null) {
     // attached — an accountant files an attachment, not a link — and when Stripe's
     // PDF cannot be fetched the e-mail still goes, with the download button.
     const facts = await paymentFacts(stripe, inv);
-    const pdf = await fetchInvoicePdf(inv.invoice_pdf);   // a 0 € invoice is a document too
+    // OUR invoice (api/_lib/invoicePdf.js — the same template as KamhalCo's), Stripe's PDF only
+    // when ours cannot be drawn. A 0 € invoice is a document too.
+    const pdf = (await ourInvoicePdf(stripe, inv.id, lang)) || await fetchInvoicePdf(inv.invoice_pdf);
     const p = { ...facts, name, pdfAttached: Boolean(pdf) };
     const { customerPaymentHtml, customerPaymentSubject, sendEmail } = await import("./_lib/emails.js");
     // No `conversational` flag: an invoice is machine mail, so it goes from
@@ -529,6 +534,23 @@ const releaseMail = (admin, key) => admin.from("invoice_emails_sent").delete().e
 
 const stripeDashUrl = (path) =>
   `https://dashboard.stripe.com/${/^(sk|rk)_test_/.test(process.env.STRIPE_SECRET_KEY || "") ? "test/" : ""}${path}`;
+
+/**
+ * Our own invoice PDF (Boss 2026-10-08: Stripe's template was English, said "due … Pay online" on a
+ * paid invoice and differed from KamhalCo's). Null when it cannot be drawn — the caller falls back
+ * to Stripe's PDF, a true document in Stripe's layout. Never throws.
+ */
+async function ourInvoicePdf(stripe, invoiceId, lang = "sk") {
+  if (!stripe || !invoiceId) return null;
+  try {
+    const { loadInvoice, invoicePdf } = await import("./_lib/invoicePdf.js");
+    const { inv, products } = await loadInvoice(stripe, invoiceId);
+    return (await invoicePdf(inv, { brand: "residata", products, lang })).pdf;
+  } catch (e) {
+    console.warn("[stripe] our invoice PDF failed, using Stripe's:", e?.message || e);
+    return null;
+  }
+}
 
 /** Stripe's invoice PDF (a signed public URL), or null. Never throws. */
 async function fetchInvoicePdf(url) {
@@ -590,6 +612,7 @@ async function paymentFacts(stripe, inv) {
     coupon: coupon ? (coupon.name || coupon.id) : null,
     currency: inv.currency || "eur",
     number: inv.number || null,
+    paidAt: inv.status_transitions?.paid_at || null,
     periodStart: f.periodStart,
     periodEnd: f.periodEnd,
     nextAmount,
@@ -882,6 +905,28 @@ async function notifyDispute(admin, stripe, d, phase) {
 // Read from Stripe on each call (Stripe is the truth for money), joined to our
 // profiles by customer id. An action here and not a new file: the Hobby plan
 // allows 12 functions and api/ is at 12 (vercelFunctionBudget.test.mjs).
+/** Our invoice PDF for an admin (admin → Revenue / a person's payments → PDF). */
+async function handleAdminInvoicePdf(req, res) {
+  if (!isTrustedRequest(req)) return res.status(403).json({ error: "untrusted origin" });
+  const admin = getSupabaseAdmin();
+  const { profile, error, status } = await getUserFromRequest(req, admin);
+  if (error) return res.status(status).json({ error });
+  if (profile?.tier !== "admin") return res.status(403).json({ error: "admin only" });
+  let body = req.body;
+  if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = {}; } }
+  const id = String(body?.invoice_id || "").trim();
+  if (!/^in_[A-Za-z0-9]+$/.test(id)) return res.status(400).json({ error: "invoice_id" });
+  const lang = body?.lang === "en" ? "en" : "sk";
+  const stripe = getStripe();
+  const pdf = await ourInvoicePdf(stripe, id, lang);
+  if (!pdf) return res.status(502).json({ error: "invoice PDF could not be drawn" });
+  let number = id;
+  try { number = (await stripe.invoices.retrieve(id))?.number || id; } catch { /* the id names the file */ }
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="${lang === "sk" ? "Faktura" : "Invoice"}-${String(number).replace(/[^A-Za-z0-9-]/g, "")}.pdf"`);
+  return res.status(200).send(pdf);
+}
+
 async function handleAdminBilling(req, res) {
   if (!isTrustedRequest(req)) return res.status(403).json({ error: "untrusted origin" });
   const admin = getSupabaseAdmin();
@@ -1505,6 +1550,7 @@ const METHODS = {
   reconcile: ["GET", "POST"],     // Vercel cron GETs; POST stays for a manual run with the secret
   mode: ["GET"],                  // public: "live" | "test" | "missing", no secret in it
   "admin-billing": ["POST"],      // admin → Revenue and a person's payments (admin token)
+  "admin-invoice-pdf": ["POST"],  // admin → our invoice PDF (the one the customer got), admin token
 };
 
 export default async function handler(req, res) {
@@ -1524,6 +1570,7 @@ export default async function handler(req, res) {
     if (action === "reconcile") return await handleReconcile(req, res);
     if (action === "mode") return await handleMode(req, res);
     if (action === "admin-billing") return await handleAdminBilling(req, res);
+    if (action === "admin-invoice-pdf") return await handleAdminInvoicePdf(req, res);
     return res.status(400).json({ error: "unknown action" });
   } catch (e) {
     console.error("[stripe] crash", e);

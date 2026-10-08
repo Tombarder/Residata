@@ -1,0 +1,1935 @@
+{
+ "_poznamka": "VZOR ROZLOŽENIA FAKTÚRY — ten istý súbor leží v faktury-mvp (tests/fixtures/faktura/faktura_vzor.json) aj v residata-frontend (api/_lib/__fixtures__/faktura_vzor.json). faktura_pdf.rozloz (Python) aj layout v api/_lib/invoicePdf.js (JS) z modelu musia vyrobiť presne tieto príkazy. Pregenerovať: python3 scripts/faktura_vzor.py (a skopírovať do Residaty).",
+ "pripady": [
+  {
+   "nazov": "zvysenie_planu_sk_kamhalco",
+   "model": {
+    "lang": "sk",
+    "znacka": {
+     "meno": "Kamhal & Co.",
+     "znak": "K",
+     "farba": "#103a5e",
+     "znak_farba": "#ffffff",
+     "nazov_farba": "#103a5e",
+     "web": "kamhalco.eu",
+     "email": "info@kamhalco.eu"
+    },
+    "cislo": "KCO-0042",
+    "stav": "paid",
+    "vystavena": "2026-11-03",
+    "dodanie": "2026-11-03",
+    "splatnost": "2026-11-03",
+    "uhradena": "2026-11-03",
+    "dodavatel": {
+     "nazov": "Kamhal & Co. s. r. o.",
+     "riadky": [
+      "Krasovského 13",
+      "851 01 Bratislava – mestská časť Petržalka",
+      "Slovenská republika"
+     ],
+     "cisla": [
+      [
+       "IČO",
+       "57 849 471"
+      ],
+      [
+       "DIČ",
+       "2123312356"
+      ]
+     ],
+     "register": "Kamhal & Co. s. r. o., zapísaná v Obchodnom registri Mestského súdu Bratislava III, oddiel: Sro, vložka č. 203519/B"
+    },
+    "odberatel": {
+     "nazov": "Účtovná kancelária Šťastný & partneri, spoločnosť s ručením obmedzeným",
+     "riadky": [
+      "Hlavná 1048/27",
+      "040 01 Košice – Staré Mesto",
+      "Slovenská republika"
+     ],
+     "cisla": [
+      [
+       "IČO",
+       "12 345 678"
+      ],
+      [
+       "IČ DPH",
+       "SK2020123456"
+      ]
+     ],
+     "email": "fakturacia@stastny-partneri.sk"
+    },
+    "polozky": [
+     {
+      "popis": "Nevyužitá časť – Kamhal & Co. Basic",
+      "obdobie": [
+       "2026-11-03",
+       "2026-11-07"
+      ],
+      "mnozstvo": 1,
+      "cena": -333,
+      "spolu": -333
+     },
+     {
+      "popis": "Predplatné Kamhal & Co. Premium",
+      "obdobie": [
+       "2026-11-03",
+       "2026-12-03"
+      ],
+      "mnozstvo": 1,
+      "cena": 9900,
+      "spolu": 9900
+     }
+    ],
+    "medzisucet": 9567,
+    "zlavy": [
+     {
+      "percent": 20,
+      "suma": 1913
+     }
+    ],
+    "zostatok": -500,
+    "celkom": 7654,
+    "uhradene": 7154,
+    "k_uhrade": 0,
+    "mena": "eur"
+   },
+   "ops": [
+    {
+     "op": "rect",
+     "x": 0.0,
+     "y": 0.0,
+     "w": 595.28,
+     "h": 4.0,
+     "r": 0,
+     "fill": "#103a5e"
+    },
+    {
+     "op": "rect",
+     "x": 48.0,
+     "y": 44.0,
+     "w": 26.0,
+     "h": 26.0,
+     "r": 6,
+     "fill": "#103a5e"
+    },
+    {
+     "op": "text",
+     "x": 56.08,
+     "y": 62.5,
+     "size": 14,
+     "font": "b",
+     "color": "#ffffff",
+     "text": "K"
+    },
+    {
+     "op": "text",
+     "x": 84.0,
+     "y": 62.0,
+     "size": 15,
+     "font": "b",
+     "color": "#103a5e",
+     "text": "Kamhal & Co."
+    },
+    {
+     "op": "text",
+     "x": 473.92,
+     "y": 62.0,
+     "size": 20,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "Faktúra"
+    },
+    {
+     "op": "text",
+     "x": 487.57,
+     "y": 79.0,
+     "size": 9.5,
+     "font": "r",
+     "color": "#5b6577",
+     "text": "č. KCO-0042"
+    },
+    {
+     "op": "rect",
+     "x": 493.51,
+     "y": 88.0,
+     "w": 53.77,
+     "h": 17.0,
+     "r": 8.5,
+     "fill": "#e4f3ec"
+    },
+    {
+     "op": "text",
+     "x": 501.51,
+     "y": 99.6,
+     "size": 8,
+     "font": "b",
+     "color": "#0f6b4f",
+     "text": "Uhradená"
+    },
+    {
+     "op": "line",
+     "x1": 48.0,
+     "y1": 128.0,
+     "x2": 547.28,
+     "y2": 128.0,
+     "color": "#e6ebf0",
+     "width": 0.75
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 152.0,
+     "size": 7,
+     "font": "b",
+     "color": "#5b6577",
+     "text": "DODÁVATEĽ"
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 169.0,
+     "size": 10.5,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "Kamhal & Co. s. r. o."
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 184.0,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "Krasovského 13"
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 197.5,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "851 01 Bratislava – mestská časť Petržalka"
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 211.0,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "Slovenská republika"
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 228.5,
+     "size": 9.5,
+     "font": "r",
+     "color": "#5b6577",
+     "text": "IČO:"
+    },
+    {
+     "op": "text",
+     "x": 94.0,
+     "y": 228.5,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "57 849 471"
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 242.0,
+     "size": 9.5,
+     "font": "r",
+     "color": "#5b6577",
+     "text": "DIČ:"
+    },
+    {
+     "op": "text",
+     "x": 94.0,
+     "y": 242.0,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "2123312356"
+    },
+    {
+     "op": "text",
+     "x": 310.0,
+     "y": 152.0,
+     "size": 7,
+     "font": "b",
+     "color": "#5b6577",
+     "text": "ODBERATEĽ"
+    },
+    {
+     "op": "text",
+     "x": 310.0,
+     "y": 169.0,
+     "size": 10.5,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "Účtovná kancelária Šťastný & partneri,"
+    },
+    {
+     "op": "text",
+     "x": 310.0,
+     "y": 183.0,
+     "size": 10.5,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "spoločnosť s ručením obmedzeným"
+    },
+    {
+     "op": "text",
+     "x": 310.0,
+     "y": 198.0,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "Hlavná 1048/27"
+    },
+    {
+     "op": "text",
+     "x": 310.0,
+     "y": 211.5,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "040 01 Košice – Staré Mesto"
+    },
+    {
+     "op": "text",
+     "x": 310.0,
+     "y": 225.0,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "Slovenská republika"
+    },
+    {
+     "op": "text",
+     "x": 310.0,
+     "y": 242.5,
+     "size": 9.5,
+     "font": "r",
+     "color": "#5b6577",
+     "text": "IČO:"
+    },
+    {
+     "op": "text",
+     "x": 356.0,
+     "y": 242.5,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "12 345 678"
+    },
+    {
+     "op": "text",
+     "x": 310.0,
+     "y": 256.0,
+     "size": 9.5,
+     "font": "r",
+     "color": "#5b6577",
+     "text": "IČ DPH:"
+    },
+    {
+     "op": "text",
+     "x": 356.0,
+     "y": 256.0,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "SK2020123456"
+    },
+    {
+     "op": "text",
+     "x": 310.0,
+     "y": 273.5,
+     "size": 9.5,
+     "font": "r",
+     "color": "#5b6577",
+     "text": "fakturacia@stastny-partneri.sk"
+    },
+    {
+     "op": "rect",
+     "x": 48.0,
+     "y": 301.0,
+     "w": 499.28,
+     "h": 48.0,
+     "r": 6,
+     "fill": "#f6f8fa"
+    },
+    {
+     "op": "text",
+     "x": 62.0,
+     "y": 320.0,
+     "size": 7,
+     "font": "b",
+     "color": "#5b6577",
+     "text": "DÁTUM VYSTAVENIA"
+    },
+    {
+     "op": "text",
+     "x": 62.0,
+     "y": 336.0,
+     "size": 10,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "3. 11. 2026"
+    },
+    {
+     "op": "text",
+     "x": 186.82,
+     "y": 320.0,
+     "size": 7,
+     "font": "b",
+     "color": "#5b6577",
+     "text": "DÁTUM DODANIA"
+    },
+    {
+     "op": "text",
+     "x": 186.82,
+     "y": 336.0,
+     "size": 10,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "3. 11. 2026"
+    },
+    {
+     "op": "text",
+     "x": 311.64,
+     "y": 320.0,
+     "size": 7,
+     "font": "b",
+     "color": "#5b6577",
+     "text": "DÁTUM SPLATNOSTI"
+    },
+    {
+     "op": "text",
+     "x": 311.64,
+     "y": 336.0,
+     "size": 10,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "3. 11. 2026"
+    },
+    {
+     "op": "text",
+     "x": 436.46,
+     "y": 320.0,
+     "size": 7,
+     "font": "b",
+     "color": "#5b6577",
+     "text": "FORMA ÚHRADY"
+    },
+    {
+     "op": "text",
+     "x": 436.46,
+     "y": 336.0,
+     "size": 10,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "Platobná karta"
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 381.0,
+     "size": 7,
+     "font": "b",
+     "color": "#5b6577",
+     "text": "POPIS"
+    },
+    {
+     "op": "text",
+     "x": 305.92,
+     "y": 381.0,
+     "size": 7,
+     "font": "b",
+     "color": "#5b6577",
+     "text": "MNOŽSTVO"
+    },
+    {
+     "op": "text",
+     "x": 427.48,
+     "y": 381.0,
+     "size": 7,
+     "font": "b",
+     "color": "#5b6577",
+     "text": "CENA"
+    },
+    {
+     "op": "text",
+     "x": 523.72,
+     "y": 381.0,
+     "size": 7,
+     "font": "b",
+     "color": "#5b6577",
+     "text": "SPOLU"
+    },
+    {
+     "op": "line",
+     "x1": 48.0,
+     "y1": 389.0,
+     "x2": 547.28,
+     "y2": 389.0,
+     "color": "#c9d1da",
+     "width": 0.75
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 409.0,
+     "size": 10,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "Nevyužitá časť – Kamhal & Co. Basic"
+    },
+    {
+     "op": "text",
+     "x": 343.21,
+     "y": 409.0,
+     "size": 10,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "1"
+    },
+    {
+     "op": "text",
+     "x": 409.78,
+     "y": 409.0,
+     "size": 10,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "−3,33 €"
+    },
+    {
+     "op": "text",
+     "x": 509.78,
+     "y": 409.0,
+     "size": 10,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "−3,33 €"
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 423.0,
+     "size": 8.5,
+     "font": "r",
+     "color": "#5b6577",
+     "text": "Obdobie 3. 11. 2026 – 7. 11. 2026"
+    },
+    {
+     "op": "line",
+     "x1": 48.0,
+     "y1": 435.0,
+     "x2": 547.28,
+     "y2": 435.0,
+     "color": "#e6ebf0",
+     "width": 0.75
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 455.0,
+     "size": 10,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "Predplatné Kamhal & Co. Premium"
+    },
+    {
+     "op": "text",
+     "x": 343.21,
+     "y": 455.0,
+     "size": 10,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "1"
+    },
+    {
+     "op": "text",
+     "x": 409.9,
+     "y": 455.0,
+     "size": 10,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "99,00 €"
+    },
+    {
+     "op": "text",
+     "x": 509.9,
+     "y": 455.0,
+     "size": 10,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "99,00 €"
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 469.0,
+     "size": 8.5,
+     "font": "r",
+     "color": "#5b6577",
+     "text": "Obdobie 3. 11. 2026 – 3. 12. 2026"
+    },
+    {
+     "op": "line",
+     "x1": 48.0,
+     "y1": 481.0,
+     "x2": 547.28,
+     "y2": 481.0,
+     "color": "#e6ebf0",
+     "width": 0.75
+    },
+    {
+     "op": "text",
+     "x": 317.28,
+     "y": 505.0,
+     "size": 9.5,
+     "font": "r",
+     "color": "#5b6577",
+     "text": "Medzisúčet"
+    },
+    {
+     "op": "text",
+     "x": 512.75,
+     "y": 505.0,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "95,67 €"
+    },
+    {
+     "op": "text",
+     "x": 317.28,
+     "y": 523.0,
+     "size": 9.5,
+     "font": "r",
+     "color": "#5b6577",
+     "text": "Zľava 20 %"
+    },
+    {
+     "op": "text",
+     "x": 509.77,
+     "y": 523.0,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "−19,13 €"
+    },
+    {
+     "op": "text",
+     "x": 317.28,
+     "y": 541.0,
+     "size": 9.5,
+     "font": "r",
+     "color": "#5b6577",
+     "text": "Uplatnený zostatok na účte"
+    },
+    {
+     "op": "text",
+     "x": 511.63,
+     "y": 541.0,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "−5,00 €"
+    },
+    {
+     "op": "line",
+     "x1": 317.28,
+     "y1": 551.0,
+     "x2": 547.28,
+     "y2": 551.0,
+     "color": "#c9d1da",
+     "width": 0.75
+    },
+    {
+     "op": "text",
+     "x": 317.28,
+     "y": 569.0,
+     "size": 11.5,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "Celkom"
+    },
+    {
+     "op": "text",
+     "x": 504.23,
+     "y": 569.0,
+     "size": 11.5,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "76,54 €"
+    },
+    {
+     "op": "text",
+     "x": 317.28,
+     "y": 591.0,
+     "size": 9.5,
+     "font": "r",
+     "color": "#5b6577",
+     "text": "Uhradené kartou 3. 11. 2026"
+    },
+    {
+     "op": "text",
+     "x": 508.24,
+     "y": 591.0,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "−71,54 €"
+    },
+    {
+     "op": "text",
+     "x": 317.28,
+     "y": 609.0,
+     "size": 10,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "Zostáva uhradiť"
+    },
+    {
+     "op": "text",
+     "x": 514.99,
+     "y": 609.0,
+     "size": 10,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "0,00 €"
+    },
+    {
+     "op": "line",
+     "x1": 48.0,
+     "y1": 749.89,
+     "x2": 547.28,
+     "y2": 749.89,
+     "color": "#e6ebf0",
+     "width": 0.75
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 769.89,
+     "size": 8.5,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "Dodávateľ nie je platiteľom DPH."
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 783.89,
+     "size": 8,
+     "font": "r",
+     "color": "#5b6577",
+     "text": "Kamhal & Co. s. r. o., zapísaná v Obchodnom registri Mestského súdu Bratislava III, oddiel: Sro, vložka č. 203519/B"
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 794.89,
+     "size": 8,
+     "font": "r",
+     "color": "#5b6577",
+     "text": "info@kamhalco.eu  ·  kamhalco.eu"
+    }
+   ]
+  },
+  {
+   "nazov": "obnova_en_residata",
+   "model": {
+    "lang": "en",
+    "znacka": {
+     "meno": "Residata",
+     "znak": "R",
+     "farba": "#00e5a0",
+     "znak_farba": "#0a0a0b",
+     "nazov_farba": "#0a0a0b",
+     "web": "residata.eu",
+     "email": "info@residata.eu"
+    },
+    "cislo": "RES-0107",
+    "stav": "paid",
+    "vystavena": "2026-12-01",
+    "dodanie": "2026-12-01",
+    "splatnost": "2026-12-01",
+    "uhradena": "2026-12-02",
+    "dodavatel": {
+     "nazov": "Kamhal & Co. s. r. o.",
+     "riadky": [
+      "Krasovského 13",
+      "851 01 Bratislava – Petržalka",
+      "Slovak Republic"
+     ],
+     "cisla": [
+      [
+       "Company ID",
+       "57 849 471"
+      ],
+      [
+       "Tax ID",
+       "2123312356"
+      ]
+     ],
+     "register": "Kamhal & Co. s. r. o., registered in the Commercial Register of the Municipal Court Bratislava III, section: Sro, file no. 203519/B"
+    },
+    "odberatel": {
+     "nazov": "Prague Realty Partners s.r.o.",
+     "riadky": [
+      "Václavské náměstí 1",
+      "110 00 Praha 1",
+      "Czech Republic"
+     ],
+     "cisla": [
+      [
+       "VAT ID",
+       "CZ12345678"
+      ]
+     ],
+     "email": "billing@prague-realty.cz"
+    },
+    "polozky": [
+     {
+      "popis": "Residata Premium subscription",
+      "obdobie": [
+       "2026-12-01",
+       "2027-01-01"
+      ],
+      "mnozstvo": 1,
+      "cena": 27999,
+      "spolu": 27999
+     }
+    ],
+    "medzisucet": 27999,
+    "zlavy": [],
+    "zostatok": 0,
+    "celkom": 27999,
+    "uhradene": 27999,
+    "k_uhrade": 0,
+    "mena": "eur"
+   },
+   "ops": [
+    {
+     "op": "rect",
+     "x": 0.0,
+     "y": 0.0,
+     "w": 595.28,
+     "h": 4.0,
+     "r": 0,
+     "fill": "#00e5a0"
+    },
+    {
+     "op": "rect",
+     "x": 48.0,
+     "y": 44.0,
+     "w": 26.0,
+     "h": 26.0,
+     "r": 6,
+     "fill": "#00e5a0"
+    },
+    {
+     "op": "text",
+     "x": 56.43,
+     "y": 62.5,
+     "size": 14,
+     "font": "b",
+     "color": "#0a0a0b",
+     "text": "R"
+    },
+    {
+     "op": "text",
+     "x": 84.0,
+     "y": 62.0,
+     "size": 15,
+     "font": "b",
+     "color": "#0a0a0b",
+     "text": "Residata"
+    },
+    {
+     "op": "text",
+     "x": 476.88,
+     "y": 62.0,
+     "size": 20,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "Invoice"
+    },
+    {
+     "op": "text",
+     "x": 485.5,
+     "y": 79.0,
+     "size": 9.5,
+     "font": "r",
+     "color": "#5b6577",
+     "text": "No. RES-0107"
+    },
+    {
+     "op": "rect",
+     "x": 514.44,
+     "y": 88.0,
+     "w": 32.84,
+     "h": 17.0,
+     "r": 8.5,
+     "fill": "#e4f3ec"
+    },
+    {
+     "op": "text",
+     "x": 522.44,
+     "y": 99.6,
+     "size": 8,
+     "font": "b",
+     "color": "#0f6b4f",
+     "text": "Paid"
+    },
+    {
+     "op": "line",
+     "x1": 48.0,
+     "y1": 128.0,
+     "x2": 547.28,
+     "y2": 128.0,
+     "color": "#e6ebf0",
+     "width": 0.75
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 152.0,
+     "size": 7,
+     "font": "b",
+     "color": "#5b6577",
+     "text": "SUPPLIER"
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 169.0,
+     "size": 10.5,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "Kamhal & Co. s. r. o."
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 184.0,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "Krasovského 13"
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 197.5,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "851 01 Bratislava – Petržalka"
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 211.0,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "Slovak Republic"
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 228.5,
+     "size": 9.5,
+     "font": "r",
+     "color": "#5b6577",
+     "text": "Company ID:"
+    },
+    {
+     "op": "text",
+     "x": 113.88,
+     "y": 228.5,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "57 849 471"
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 242.0,
+     "size": 9.5,
+     "font": "r",
+     "color": "#5b6577",
+     "text": "Tax ID:"
+    },
+    {
+     "op": "text",
+     "x": 113.88,
+     "y": 242.0,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "2123312356"
+    },
+    {
+     "op": "text",
+     "x": 310.0,
+     "y": 152.0,
+     "size": 7,
+     "font": "b",
+     "color": "#5b6577",
+     "text": "BILL TO"
+    },
+    {
+     "op": "text",
+     "x": 310.0,
+     "y": 169.0,
+     "size": 10.5,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "Prague Realty Partners s.r.o."
+    },
+    {
+     "op": "text",
+     "x": 310.0,
+     "y": 184.0,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "Václavské náměstí 1"
+    },
+    {
+     "op": "text",
+     "x": 310.0,
+     "y": 197.5,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "110 00 Praha 1"
+    },
+    {
+     "op": "text",
+     "x": 310.0,
+     "y": 211.0,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "Czech Republic"
+    },
+    {
+     "op": "text",
+     "x": 310.0,
+     "y": 228.5,
+     "size": 9.5,
+     "font": "r",
+     "color": "#5b6577",
+     "text": "VAT ID:"
+    },
+    {
+     "op": "text",
+     "x": 356.0,
+     "y": 228.5,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "CZ12345678"
+    },
+    {
+     "op": "text",
+     "x": 310.0,
+     "y": 246.0,
+     "size": 9.5,
+     "font": "r",
+     "color": "#5b6577",
+     "text": "billing@prague-realty.cz"
+    },
+    {
+     "op": "rect",
+     "x": 48.0,
+     "y": 273.5,
+     "w": 499.28,
+     "h": 48.0,
+     "r": 6,
+     "fill": "#f6f8fa"
+    },
+    {
+     "op": "text",
+     "x": 62.0,
+     "y": 292.5,
+     "size": 7,
+     "font": "b",
+     "color": "#5b6577",
+     "text": "ISSUE DATE"
+    },
+    {
+     "op": "text",
+     "x": 62.0,
+     "y": 308.5,
+     "size": 10,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "1 Dec 2026"
+    },
+    {
+     "op": "text",
+     "x": 186.82,
+     "y": 292.5,
+     "size": 7,
+     "font": "b",
+     "color": "#5b6577",
+     "text": "SUPPLY DATE"
+    },
+    {
+     "op": "text",
+     "x": 186.82,
+     "y": 308.5,
+     "size": 10,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "1 Dec 2026"
+    },
+    {
+     "op": "text",
+     "x": 311.64,
+     "y": 292.5,
+     "size": 7,
+     "font": "b",
+     "color": "#5b6577",
+     "text": "DUE DATE"
+    },
+    {
+     "op": "text",
+     "x": 311.64,
+     "y": 308.5,
+     "size": 10,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "1 Dec 2026"
+    },
+    {
+     "op": "text",
+     "x": 436.46,
+     "y": 292.5,
+     "size": 7,
+     "font": "b",
+     "color": "#5b6577",
+     "text": "PAYMENT METHOD"
+    },
+    {
+     "op": "text",
+     "x": 436.46,
+     "y": 308.5,
+     "size": 10,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "Card"
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 353.5,
+     "size": 7,
+     "font": "b",
+     "color": "#5b6577",
+     "text": "DESCRIPTION"
+    },
+    {
+     "op": "text",
+     "x": 332.25,
+     "y": 353.5,
+     "size": 7,
+     "font": "b",
+     "color": "#5b6577",
+     "text": "QTY"
+    },
+    {
+     "op": "text",
+     "x": 408.08,
+     "y": 353.5,
+     "size": 7,
+     "font": "b",
+     "color": "#5b6577",
+     "text": "UNIT PRICE"
+    },
+    {
+     "op": "text",
+     "x": 515.26,
+     "y": 353.5,
+     "size": 7,
+     "font": "b",
+     "color": "#5b6577",
+     "text": "AMOUNT"
+    },
+    {
+     "op": "line",
+     "x1": 48.0,
+     "y1": 361.5,
+     "x2": 547.28,
+     "y2": 361.5,
+     "color": "#c9d1da",
+     "width": 0.75
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 381.5,
+     "size": 10,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "Residata Premium subscription"
+    },
+    {
+     "op": "text",
+     "x": 343.21,
+     "y": 381.5,
+     "size": 10,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "1"
+    },
+    {
+     "op": "text",
+     "x": 407.37,
+     "y": 381.5,
+     "size": 10,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "€279.99"
+    },
+    {
+     "op": "text",
+     "x": 507.37,
+     "y": 381.5,
+     "size": 10,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "€279.99"
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 395.5,
+     "size": 8.5,
+     "font": "r",
+     "color": "#5b6577",
+     "text": "Period 1 Dec 2026 – 1 Jan 2027"
+    },
+    {
+     "op": "line",
+     "x1": 48.0,
+     "y1": 407.5,
+     "x2": 547.28,
+     "y2": 407.5,
+     "color": "#e6ebf0",
+     "width": 0.75
+    },
+    {
+     "op": "text",
+     "x": 317.28,
+     "y": 431.5,
+     "size": 9.5,
+     "font": "r",
+     "color": "#5b6577",
+     "text": "Subtotal"
+    },
+    {
+     "op": "text",
+     "x": 509.37,
+     "y": 431.5,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "€279.99"
+    },
+    {
+     "op": "line",
+     "x1": 317.28,
+     "y1": 441.5,
+     "x2": 547.28,
+     "y2": 441.5,
+     "color": "#c9d1da",
+     "width": 0.75
+    },
+    {
+     "op": "text",
+     "x": 317.28,
+     "y": 459.5,
+     "size": 11.5,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "Total"
+    },
+    {
+     "op": "text",
+     "x": 499.95,
+     "y": 459.5,
+     "size": 11.5,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "€279.99"
+    },
+    {
+     "op": "text",
+     "x": 317.28,
+     "y": 481.5,
+     "size": 9.5,
+     "font": "r",
+     "color": "#5b6577",
+     "text": "Paid by card on 2 Dec 2026"
+    },
+    {
+     "op": "text",
+     "x": 503.08,
+     "y": 481.5,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "−€279.99"
+    },
+    {
+     "op": "text",
+     "x": 317.28,
+     "y": 499.5,
+     "size": 10,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "Amount due"
+    },
+    {
+     "op": "text",
+     "x": 517.51,
+     "y": 499.5,
+     "size": 10,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "€0.00"
+    },
+    {
+     "op": "line",
+     "x1": 48.0,
+     "y1": 749.89,
+     "x2": 547.28,
+     "y2": 749.89,
+     "color": "#e6ebf0",
+     "width": 0.75
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 769.89,
+     "size": 8.5,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "The supplier is not registered for VAT."
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 783.89,
+     "size": 8,
+     "font": "r",
+     "color": "#5b6577",
+     "text": "Kamhal & Co. s. r. o., registered in the Commercial Register of the Municipal Court Bratislava III, section: Sro, file no. 203519/B"
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 794.89,
+     "size": 8,
+     "font": "r",
+     "color": "#5b6577",
+     "text": "info@residata.eu  ·  residata.eu"
+    }
+   ]
+  },
+  {
+   "nazov": "neuhradena_sk_residata",
+   "model": {
+    "lang": "sk",
+    "znacka": {
+     "meno": "Residata",
+     "znak": "R",
+     "farba": "#00e5a0",
+     "znak_farba": "#0a0a0b",
+     "nazov_farba": "#0a0a0b",
+     "web": "residata.eu",
+     "email": "info@residata.eu"
+    },
+    "cislo": "RES-0108",
+    "stav": "open",
+    "vystavena": "2026-12-05",
+    "dodanie": "2026-12-05",
+    "splatnost": "2026-12-05",
+    "uhradena": null,
+    "dodavatel": {
+     "nazov": "Kamhal & Co. s. r. o.",
+     "riadky": [
+      "Krasovského 13",
+      "851 01 Bratislava – mestská časť Petržalka",
+      "Slovenská republika"
+     ],
+     "cisla": [
+      [
+       "IČO",
+       "57 849 471"
+      ],
+      [
+       "DIČ",
+       "2123312356"
+      ]
+     ],
+     "register": "Kamhal & Co. s. r. o., zapísaná v Obchodnom registri Mestského súdu Bratislava III, oddiel: Sro, vložka č. 203519/B"
+    },
+    "odberatel": {
+     "nazov": "Ing. Ľubomír Ďurček",
+     "riadky": [
+      "Nábrežie 4",
+      "949 01 Nitra",
+      "Slovenská republika"
+     ],
+     "cisla": [],
+     "email": ""
+    },
+    "polozky": [
+     {
+      "popis": "Predplatné Residata Premium",
+      "obdobie": [
+       "2026-12-05",
+       "2027-01-05"
+      ],
+      "mnozstvo": 1,
+      "cena": 27999,
+      "spolu": 27999
+     }
+    ],
+    "medzisucet": 27999,
+    "zlavy": [
+     {
+      "percent": null,
+      "suma": 5000
+     }
+    ],
+    "zostatok": 0,
+    "celkom": 22999,
+    "uhradene": 0,
+    "k_uhrade": 22999,
+    "mena": "eur"
+   },
+   "ops": [
+    {
+     "op": "rect",
+     "x": 0.0,
+     "y": 0.0,
+     "w": 595.28,
+     "h": 4.0,
+     "r": 0,
+     "fill": "#00e5a0"
+    },
+    {
+     "op": "rect",
+     "x": 48.0,
+     "y": 44.0,
+     "w": 26.0,
+     "h": 26.0,
+     "r": 6,
+     "fill": "#00e5a0"
+    },
+    {
+     "op": "text",
+     "x": 56.43,
+     "y": 62.5,
+     "size": 14,
+     "font": "b",
+     "color": "#0a0a0b",
+     "text": "R"
+    },
+    {
+     "op": "text",
+     "x": 84.0,
+     "y": 62.0,
+     "size": 15,
+     "font": "b",
+     "color": "#0a0a0b",
+     "text": "Residata"
+    },
+    {
+     "op": "text",
+     "x": 473.92,
+     "y": 62.0,
+     "size": 20,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "Faktúra"
+    },
+    {
+     "op": "text",
+     "x": 492.43,
+     "y": 79.0,
+     "size": 9.5,
+     "font": "r",
+     "color": "#5b6577",
+     "text": "č. RES-0108"
+    },
+    {
+     "op": "rect",
+     "x": 491.14,
+     "y": 88.0,
+     "w": 56.14,
+     "h": 17.0,
+     "r": 8.5,
+     "fill": "#fff4e0"
+    },
+    {
+     "op": "text",
+     "x": 499.14,
+     "y": 99.6,
+     "size": 8,
+     "font": "b",
+     "color": "#8a5300",
+     "text": "Na úhradu"
+    },
+    {
+     "op": "line",
+     "x1": 48.0,
+     "y1": 128.0,
+     "x2": 547.28,
+     "y2": 128.0,
+     "color": "#e6ebf0",
+     "width": 0.75
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 152.0,
+     "size": 7,
+     "font": "b",
+     "color": "#5b6577",
+     "text": "DODÁVATEĽ"
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 169.0,
+     "size": 10.5,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "Kamhal & Co. s. r. o."
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 184.0,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "Krasovského 13"
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 197.5,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "851 01 Bratislava – mestská časť Petržalka"
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 211.0,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "Slovenská republika"
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 228.5,
+     "size": 9.5,
+     "font": "r",
+     "color": "#5b6577",
+     "text": "IČO:"
+    },
+    {
+     "op": "text",
+     "x": 94.0,
+     "y": 228.5,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "57 849 471"
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 242.0,
+     "size": 9.5,
+     "font": "r",
+     "color": "#5b6577",
+     "text": "DIČ:"
+    },
+    {
+     "op": "text",
+     "x": 94.0,
+     "y": 242.0,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "2123312356"
+    },
+    {
+     "op": "text",
+     "x": 310.0,
+     "y": 152.0,
+     "size": 7,
+     "font": "b",
+     "color": "#5b6577",
+     "text": "ODBERATEĽ"
+    },
+    {
+     "op": "text",
+     "x": 310.0,
+     "y": 169.0,
+     "size": 10.5,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "Ing. Ľubomír Ďurček"
+    },
+    {
+     "op": "text",
+     "x": 310.0,
+     "y": 184.0,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "Nábrežie 4"
+    },
+    {
+     "op": "text",
+     "x": 310.0,
+     "y": 197.5,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "949 01 Nitra"
+    },
+    {
+     "op": "text",
+     "x": 310.0,
+     "y": 211.0,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "Slovenská republika"
+    },
+    {
+     "op": "rect",
+     "x": 48.0,
+     "y": 269.5,
+     "w": 499.28,
+     "h": 48.0,
+     "r": 6,
+     "fill": "#f6f8fa"
+    },
+    {
+     "op": "text",
+     "x": 62.0,
+     "y": 288.5,
+     "size": 7,
+     "font": "b",
+     "color": "#5b6577",
+     "text": "DÁTUM VYSTAVENIA"
+    },
+    {
+     "op": "text",
+     "x": 62.0,
+     "y": 304.5,
+     "size": 10,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "5. 12. 2026"
+    },
+    {
+     "op": "text",
+     "x": 186.82,
+     "y": 288.5,
+     "size": 7,
+     "font": "b",
+     "color": "#5b6577",
+     "text": "DÁTUM DODANIA"
+    },
+    {
+     "op": "text",
+     "x": 186.82,
+     "y": 304.5,
+     "size": 10,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "5. 12. 2026"
+    },
+    {
+     "op": "text",
+     "x": 311.64,
+     "y": 288.5,
+     "size": 7,
+     "font": "b",
+     "color": "#5b6577",
+     "text": "DÁTUM SPLATNOSTI"
+    },
+    {
+     "op": "text",
+     "x": 311.64,
+     "y": 304.5,
+     "size": 10,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "5. 12. 2026"
+    },
+    {
+     "op": "text",
+     "x": 436.46,
+     "y": 288.5,
+     "size": 7,
+     "font": "b",
+     "color": "#5b6577",
+     "text": "FORMA ÚHRADY"
+    },
+    {
+     "op": "text",
+     "x": 436.46,
+     "y": 304.5,
+     "size": 10,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "Platobná karta"
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 349.5,
+     "size": 7,
+     "font": "b",
+     "color": "#5b6577",
+     "text": "POPIS"
+    },
+    {
+     "op": "text",
+     "x": 305.92,
+     "y": 349.5,
+     "size": 7,
+     "font": "b",
+     "color": "#5b6577",
+     "text": "MNOŽSTVO"
+    },
+    {
+     "op": "text",
+     "x": 427.48,
+     "y": 349.5,
+     "size": 7,
+     "font": "b",
+     "color": "#5b6577",
+     "text": "CENA"
+    },
+    {
+     "op": "text",
+     "x": 523.72,
+     "y": 349.5,
+     "size": 7,
+     "font": "b",
+     "color": "#5b6577",
+     "text": "SPOLU"
+    },
+    {
+     "op": "line",
+     "x1": 48.0,
+     "y1": 357.5,
+     "x2": 547.28,
+     "y2": 357.5,
+     "color": "#c9d1da",
+     "width": 0.75
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 377.5,
+     "size": 10,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "Predplatné Residata Premium"
+    },
+    {
+     "op": "text",
+     "x": 343.21,
+     "y": 377.5,
+     "size": 10,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "1"
+    },
+    {
+     "op": "text",
+     "x": 404.56,
+     "y": 377.5,
+     "size": 10,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "279,99 €"
+    },
+    {
+     "op": "text",
+     "x": 504.56,
+     "y": 377.5,
+     "size": 10,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "279,99 €"
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 391.5,
+     "size": 8.5,
+     "font": "r",
+     "color": "#5b6577",
+     "text": "Obdobie 5. 12. 2026 – 5. 1. 2027"
+    },
+    {
+     "op": "line",
+     "x1": 48.0,
+     "y1": 403.5,
+     "x2": 547.28,
+     "y2": 403.5,
+     "color": "#e6ebf0",
+     "width": 0.75
+    },
+    {
+     "op": "text",
+     "x": 317.28,
+     "y": 427.5,
+     "size": 9.5,
+     "font": "r",
+     "color": "#5b6577",
+     "text": "Medzisúčet"
+    },
+    {
+     "op": "text",
+     "x": 506.7,
+     "y": 427.5,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "279,99 €"
+    },
+    {
+     "op": "text",
+     "x": 317.28,
+     "y": 445.5,
+     "size": 9.5,
+     "font": "r",
+     "color": "#5b6577",
+     "text": "Zľava"
+    },
+    {
+     "op": "text",
+     "x": 505.64,
+     "y": 445.5,
+     "size": 9.5,
+     "font": "r",
+     "color": "#0c1622",
+     "text": "−50,00 €"
+    },
+    {
+     "op": "line",
+     "x1": 317.28,
+     "y1": 455.5,
+     "x2": 547.28,
+     "y2": 455.5,
+     "color": "#c9d1da",
+     "width": 0.75
+    },
+    {
+     "op": "text",
+     "x": 317.28,
+     "y": 473.5,
+     "size": 11.5,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "Celkom"
+    },
+    {
+     "op": "text",
+     "x": 496.51,
+     "y": 473.5,
+     "size": 11.5,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "229,99 €"
+    },
+    {
+     "op": "text",
+     "x": 317.28,
+     "y": 495.5,
+     "size": 10,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "Zostáva uhradiť"
+    },
+    {
+     "op": "text",
+     "x": 503.13,
+     "y": 495.5,
+     "size": 10,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "229,99 €"
+    },
+    {
+     "op": "line",
+     "x1": 48.0,
+     "y1": 749.89,
+     "x2": 547.28,
+     "y2": 749.89,
+     "color": "#e6ebf0",
+     "width": 0.75
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 769.89,
+     "size": 8.5,
+     "font": "b",
+     "color": "#0c1622",
+     "text": "Dodávateľ nie je platiteľom DPH."
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 783.89,
+     "size": 8,
+     "font": "r",
+     "color": "#5b6577",
+     "text": "Kamhal & Co. s. r. o., zapísaná v Obchodnom registri Mestského súdu Bratislava III, oddiel: Sro, vložka č. 203519/B"
+    },
+    {
+     "op": "text",
+     "x": 48.0,
+     "y": 794.89,
+     "size": 8,
+     "font": "r",
+     "color": "#5b6577",
+     "text": "info@residata.eu  ·  residata.eu"
+    }
+   ]
+  }
+ ]
+}

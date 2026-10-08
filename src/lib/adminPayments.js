@@ -43,6 +43,32 @@ export const KIND = {
   other: ["Platba", "Payment"],
 };
 
+/**
+ * Download OUR invoice PDF (api/_lib/invoicePdf.js — what the customer got, not Stripe's template)
+ * with a fresh admin session, and open it. Returns an error message or null.
+ */
+export async function openInvoicePdf(invoiceId, lang) {
+  let token;
+  try { token = await getFreshAccessToken(); } catch (e) { return authErrorMessage(e, lang); }
+  try {
+    const r = await fetch("/api/stripe?action=admin-invoice-pdf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ invoice_id: invoiceId, lang }),
+    });
+    if (!r.ok) return (await r.json().catch(() => ({}))).error || `HTTP ${r.status}`;
+    // a download, not window.open: after the await a pop-up blocker would swallow a new window
+    const name = (/filename="([^"]+)"/.exec(r.headers.get("Content-Disposition") || "") || [])[1] || `${invoiceId}.pdf`;
+    const url = URL.createObjectURL(await r.blob());
+    const a = Object.assign(document.createElement("a"), { href: url, download: name });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    return null;
+  } catch (e) {
+    return String(e?.message || e);
+  }
+}
+
 /** POST /api/stripe?action=admin-billing with a fresh admin session. */
 export async function loadAdminBilling(body, lang) {
   let token;

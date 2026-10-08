@@ -10,7 +10,7 @@
  */
 import { useEffect, useState } from "react";
 import Kpi from "../components/Kpi";
-import { L, money, day, period, KIND, loadAdminBilling, payments } from "../lib/adminPayments";
+import { L, money, day, period, KIND, loadAdminBilling, openInvoicePdf, payments } from "../lib/adminPayments";
 
 export function StatusBadge({ inv, lang }) {
   const t = L(lang);
@@ -67,7 +67,10 @@ export function InvoiceLinks({ inv, mode, lang }) {
     <span style={{ display: "inline-flex", gap: "0.7rem", whiteSpace: "nowrap", fontSize: "0.8rem" }}>
       {inv.hostedUrl && <a href={inv.hostedUrl} target="_blank" rel="noreferrer">{inv.number || t("faktúra", "invoice")}</a>}
       {!inv.hostedUrl && <span>{inv.number || "—"}</span>}
-      {inv.pdfUrl && <a href={inv.pdfUrl} target="_blank" rel="noreferrer">PDF</a>}
+      {inv.number && (
+        <a href="#pdf" title={t("Faktúra, akú dostal zákazník", "The invoice the customer received")}
+          onClick={async (e) => { e.preventDefault(); const err = await openInvoicePdf(inv.id, lang); if (err) window.alert(err); }}>PDF</a>
+      )}
       <a href={stripeUrl} target="_blank" rel="noreferrer" title={t("Platba, poplatok a vrátenie v Stripe", "Payment, fee and refund in Stripe")}>Stripe ↗</a>
     </span>
   );

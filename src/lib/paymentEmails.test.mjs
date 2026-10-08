@@ -145,7 +145,7 @@ function call({ query = {}, headers = {}, body } = {}) {
   Object.assign(req, { method: "POST", query, body, headers: { origin: "https://residata.eu", ...headers } });
   const res = { statusCode: 200, body: undefined, headers: {},
     status(c) { this.statusCode = c; return this; }, json(b) { this.body = b; return this; },
-    setHeader(k, v) { this.headers[k] = v; }, end() { return this; } };
+    setHeader(k, v) { this.headers[k] = v; }, send(b) { this.body = b; return this; }, end() { return this; } };
   return Promise.resolve(stripeApi(req, res)).then(() => res);
 }
 let evt = 0;
@@ -172,6 +172,7 @@ function invoice(fields = {}) {
   const inv = { id: "in_1", object: "invoice", status: "paid", billing_reason: "subscription_create",
     customer: "cus_1", customer_email: "eva@firma.sk", customer_name: "Firma s.r.o.", number: "RES-0001",
     amount_paid: amount, amount_due: amount, currency: "eur", created: NOW, attempt_count: 1,
+    subtotal: 27999, total: amount, amount_remaining: 0,
     status_transitions: { paid_at: NOW }, discounts: ["di_1"],
     total_discount_amounts: [{ amount: 27439, discount: "di_1" }],
     hosted_invoice_url: "https://invoice.stripe.com/i/acct_x/inv", invoice_pdf: "https://pay.stripe.com/invoice/acct_x/inv/pdf",
@@ -203,13 +204,19 @@ test("first payment: one welcome with the invoice PDF to the customer, one payme
   assert.equal(toBoss().length, 1, "one owner e-mail");
 
   const w = toEva()[0];
-  assert.equal(w.subject, "Vitajte v Residata Premium 🎉");
-  for (const s of ["Premium je aktívne", "Dobrý deň, Eva,", "Všetky projekty", "RES-0001", "5,60 €", "Faktúru máte v prílohe", "/app"]) {
+  assert.equal(w.subject, "Predplatné Residata Premium je aktívne");
+  for (const s of ["je aktívne a platbu sme prijali", "Dobrý deň, Eva,", "RES-0001", "5,60 €", "Faktúru nájdete v prílohe", "/app",
+    "S pozdravom", "info@residata.eu"]) {
     assert.ok(text(w).includes(s), s);
   }
+  // Boss 2026-10-08: "what is this nonsense in there" — no feature list, no 🎉, no telling them what to do with it
+  for (const s of ["🎉", "dôveru", "účtovníctv", "doklad", "Všetky projekty", "Exporty dát"]) assert.ok(!text(w).includes(s) && !w.subject.includes(s), s);
   assert.equal(w.attachments?.length, 1);
   assert.equal(w.attachments[0].filename, "Faktura-RES-0001.pdf");
-  assert.ok(w.attachments[0].content.equals(PDF));
+  // OUR invoice (api/_lib/invoicePdf.js — the KamhalCo template), not Stripe's PDF
+  assert.ok(!w.attachments[0].content.equals(PDF) && w.attachments[0].content.subarray(0, 4).toString() === "%PDF");
+  const { PDFDocument } = await import("pdf-lib");
+  assert.equal((await PDFDocument.load(w.attachments[0].content)).getTitle(), "Faktúra RES-0001");
 
   const b = toBoss()[0];
   assert.equal(b.subject, "[Residata] 💶 €5.60 — Eva Malá (Firma s.r.o.) · Premium (new subscription)");
@@ -222,8 +229,10 @@ test("first payment: one welcome with the invoice PDF to the customer, one payme
 test("a customer who uses Residata in English gets the welcome in English", async () => {
   rows("user_profiles")[0].ui_prefs = { language: "en" };
   await webhook("invoice.paid", invoice());
-  assert.equal(toEva()[0].subject, "Welcome to Residata Premium 🎉");
+  assert.equal(toEva()[0].subject, "Your Residata Premium subscription is active");
   assert.ok(text(toEva()[0]).includes("Your invoice is attached"));
+  const { PDFDocument } = await import("pdf-lib");
+  assert.equal((await PDFDocument.load(toEva()[0].attachments[0].content)).getTitle(), "Invoice RES-0001", "the invoice in English too");
   assert.equal(toEva()[0].attachments[0].filename, "Invoice-RES-0001.pdf");
 });
 
@@ -231,7 +240,7 @@ test("a renewal: the invoice e-mail, not a second welcome", async () => {
   await webhook("invoice.paid", invoice({ id: "in_2", number: "RES-0002", billing_reason: "subscription_cycle",
     amount_paid: 27999, total_discount_amounts: [], discounts: [],
     lines: { data: [{ amount: 27999, period: { start: NOW, end: NOW + 30 * 86400 }, parent: { subscription_item_details: { proration: false } }, discount_amounts: [] }] } }));
-  assert.equal(toEva()[0].subject, "Faktúra RES-0002 · Residata");
+  assert.equal(toEva()[0].subject, "Faktúra RES-0002 – Residata");
   assert.ok(text(toEva()[0]).includes("Ďakujeme za platbu") && !text(toEva()[0]).includes("Vitajte"));
   assert.ok(toBoss()[0].subject.includes("(renewal)"));
 });
@@ -274,8 +283,8 @@ test("a failed renewal: Boss and the customer hear once, however often Stripe re
   assert.equal(toBoss()[0].subject, "[Residata] ⚠ Payment failed: €279.99 — Eva Malá (Firma s.r.o.)");
   // the truth about access: a failing renewal does not extend paid_until → Premium is paused
   assert.ok(text(toBoss()[0]).includes("Premium is paused") && !text(toBoss()[0]).includes("keeps running"));
-  assert.equal(toEva()[0].subject, "Platba za Residata Premium sa nepodarila — Premium je pozastavené");
-  for (const x of ["Premium pozastavené", "ďalší pokus", "Zaplatiť teraz", "https://invoice.stripe.com/i/acct_x/inv", "/app/billing"]) {
+  assert.equal(toEva()[0].subject, "Platba za predplatné sa nepodarila – Residata");
+  for (const x of ["Premium je pozastavené", "zopakujeme", "Uhradiť faktúru", "https://invoice.stripe.com/i/acct_x/inv", "/app/billing"]) {
     assert.ok(text(toEva()[0]).includes(x), x);
   }
   assert.ok(!/neprídete|nepríde o prístup|keep your access/.test(text(toEva()[0])));
@@ -287,8 +296,8 @@ test("a failed renewal: Boss and the customer hear once, however often Stripe re
   assert.equal(toBoss().length, 2);
   assert.equal(toEva().length, 2);
   assert.ok(toBoss()[1].subject.startsWith("[Residata] ⚠ Payment failed — retries over"));
-  assert.equal(toEva()[1].subject, "Platba za Residata Premium opäť neprešla — Premium je pozastavené");
-  assert.ok(text(toEva()[1]).includes("Ďalší automatický pokus už nebude"));
+  assert.equal(toEva()[1].subject, "Predplatné čaká na úhradu – Residata");
+  assert.ok(text(toEva()[1]).includes("automaticky ju už nezopakujeme"));
 });
 
 test("a late 'payment failed' for an invoice that has since been paid sends nothing", async () => {
@@ -308,8 +317,8 @@ test("a failed FIRST payment: nobody is told 'we will retry / Premium keeps runn
   assert.equal(toBoss()[0].subject, "[Residata] ⚠ First payment failed: €279.99 — Eva Malá (Firma s.r.o.)");
   assert.ok(!text(toBoss()[0]).includes("keeps running"), "no 'Premium keeps running' for someone who never had it");
   assert.equal(toEva().length, 1);
-  assert.equal(toEva()[0].subject, "Platba za Residata Premium neprešla — predplatné sa nespustilo");
-  assert.ok(!/skúsime znova|neprišli/.test(text(toEva()[0])), "no 'we will retry, keep your access'");
+  assert.equal(toEva()[0].subject, "Platba sa nepodarila – Residata");
+  assert.ok(!/skúsime znova|neprišli|zopakujeme|pozastavené/.test(text(toEva()[0])), "no 'we will retry, keep your access'");
   assert.ok(text(toEva()[0]).includes("nič sme vám neúčtovali") && text(toEva()[0]).includes("/app/billing"));
 });
 
@@ -327,8 +336,8 @@ test("a cancellation: Boss once and a confirmation to the customer; the end: Bos
   assert.ok(text(toBoss()[0]).includes("Too expensive") && text(toBoss()[0]).includes("&lt;b&gt;drahé&lt;/b&gt;"), "the reason, escaped");
   assert.equal(toBoss()[0].replyTo, "eva@firma.sk", "Boss can answer the customer straight from the e-mail");
   assert.equal(toEva().length, 1);
-  assert.equal(toEva()[0].subject, "Zrušenie Residata Premium potvrdené");
-  assert.ok(text(toEva()[0]).includes("Premium vám beží do") && text(toEva()[0]).includes("/app/billing"));
+  assert.equal(toEva()[0].subject, "Zrušenie predplatného potvrdené – Residata");
+  assert.ok(text(toEva()[0]).includes("Premium zostáva aktívne do") && text(toEva()[0]).includes("/app/billing"));
 
   ST.subs.set("sub_1", { ...s, status: "canceled", ended_at: NOW });
   await webhook("customer.subscription.deleted", { ...s, status: "canceled" });
@@ -336,7 +345,7 @@ test("a cancellation: Boss once and a confirmation to the customer; the end: Bos
   assert.equal(toBoss().length, 2);
   assert.equal(toBoss()[1].subject, "[Residata] Subscription ended: Eva Malá (Firma s.r.o.)");
   assert.equal(toEva().length, 2);
-  assert.equal(toEva()[1].subject, "Residata Premium sa skončilo");
+  assert.equal(toEva()[1].subject, "Predplatné Premium skončilo – Residata");
 });
 
 test("an undone cancellation: Boss hears that they stayed — only if he heard they left", async () => {
@@ -405,21 +414,21 @@ test("the customer's language: explicit pick, else the sign-up language, else th
   delete rows("user_profiles")[0].ui_prefs;
   DB.meta[U] = { lang: "en" };
   await webhook("invoice.paid", invoice({ id: "in_l1" }));
-  assert.equal(toEva().at(-1).subject, "Welcome to Residata Premium 🎉", "signed up in English");
+  assert.equal(toEva().at(-1).subject, "Your Residata Premium subscription is active", "signed up in English");
 
   DB.meta[U] = {};
   await webhook("invoice.paid", invoice({ id: "in_l2", customer_address: { country: "SK" } }));
-  assert.equal(toEva().at(-1).subject, "Vitajte v Residata Premium 🎉", "billing address in Slovakia");
+  assert.equal(toEva().at(-1).subject, "Predplatné Residata Premium je aktívne", "billing address in Slovakia");
 
   await webhook("invoice.paid", invoice({ id: "in_l3", customer_address: { country: "AT" } }));
-  assert.equal(toEva().at(-1).subject, "Welcome to Residata Premium 🎉", "a foreign customer is not written to in Slovak");
+  assert.equal(toEva().at(-1).subject, "Your Residata Premium subscription is active", "a foreign customer is not written to in Slovak");
 });
 
 // ── 0 € first invoice ───────────────────────────────────────────────────
 test("a 100 % coupon on the first invoice still gets the welcome — worded honestly", async () => {
   await webhook("invoice.paid", invoice({ amount_paid: 0, amount_due: 0, total_discount_amounts: [{ amount: 27999, discount: "di_1" }] }));
   assert.equal(toEva().length, 1);
-  assert.ok(text(toEva()[0]).includes("toto obdobie zadarmo") && !text(toEva()[0]).includes("Platba prebehla"));
+  assert.ok(text(toEva()[0]).includes("je aktívne.") && text(toEva()[0]).includes("0,00 €") && !text(toEva()[0]).includes("platbu sme prijali"));
   assert.equal(toBoss().length, 1);
   assert.ok(text(toBoss()[0]).includes("nothing charged"));
 });
@@ -499,4 +508,18 @@ test("the nightly reconcile adds a missing event to OUR webhook endpoint — and
   DB.rpc = [];
   await call({ query: { action: "reconcile" }, headers: { authorization: "Bearer cron-test" } });
   assert.equal(DB.rpc.find(([n]) => n === "record_cron_heartbeat")[1].p_ok, false);
+});
+
+// ── admin → our invoice PDF ─────────────────────────────────────────────
+test("admin → PDF: our invoice (the one the customer got), admins only", async () => {
+  invoice();
+  const r = await call({ query: { action: "admin-invoice-pdf" }, headers: asTier("admin"), body: { invoice_id: "in_1" } });
+  assert.equal(r.statusCode, 200);
+  assert.equal(r.headers["Content-Type"], "application/pdf");
+  assert.match(r.headers["Content-Disposition"], /filename="Faktura-RES-0001\.pdf"/);
+  const { PDFDocument } = await import("pdf-lib");
+  assert.equal((await PDFDocument.load(r.body)).getTitle(), "Faktúra RES-0001");
+  assert.equal((await call({ query: { action: "admin-invoice-pdf" }, headers: asTier("free"), body: { invoice_id: "in_1" } })).statusCode, 403);
+  assert.equal((await call({ query: { action: "admin-invoice-pdf" }, body: { invoice_id: "in_1" } })).statusCode, 401);
+  assert.equal((await call({ query: { action: "admin-invoice-pdf" }, headers: asTier("admin"), body: { invoice_id: "../x" } })).statusCode, 400);
 });
