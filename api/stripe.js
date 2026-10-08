@@ -614,7 +614,12 @@ async function notifyPaymentFailed(admin, stripe, inv) {
     subject: em.ownerPaymentFailedSubject(p), html: em.ownerPaymentFailedHtml(p, "https://residata.eu"),
     customerId, amount: inv.amount_due, currency: inv.currency,
   }).catch((e) => console.warn("[stripe] owner failed-payment e-mail not sent:", e?.message || e));
-  // the customer: check your card — once per invoice (Stripe retries several times)
+  // the customer, once per invoice (Stripe retries a renewal several times). A FIRST
+  // payment gets its own wording (customerPaymentFailedHtml, kind "new"): the
+  // subscription did not start and nothing is retried — "we'll retry, so you keep
+  // access" would be untrue. Measured 8 Oct 2026 in the Stripe sandbox: a card declined
+  // on the Checkout page creates no invoice and no event at all, so when a first-payment
+  // failure does reach us, it happened after they left the page and they may not know.
   const to = inv.customer_email || who.user?.email;
   if (!to) return;
   if (!(await claimMail(admin, `failed:${inv.id}`, { customerId, to, amount: inv.amount_due, currency: inv.currency }))) return;
@@ -624,7 +629,7 @@ async function notifyPaymentFailed(admin, stripe, inv) {
     if (data?.ui_prefs?.language === "en") lang = "en";
   }
   try {
-    await em.sendEmail({ to, subject: em.customerPaymentFailedSubject(lang),
+    await em.sendEmail({ to, subject: em.customerPaymentFailedSubject(lang, p),
       html: em.customerPaymentFailedHtml({ ...p, name: who.user?.full_name ? String(who.user.full_name).split(" ")[0] : null }, "https://residata.eu", lang),
       gmailUser: process.env.GMAIL_FROM, gmailPassword: process.env.GMAIL_APP_PASSWORD });
   } catch (e) {
@@ -1017,7 +1022,7 @@ async function handleReconcile(req, res) {
     await admin.rpc("record_cron_heartbeat", {
       p_job: "residata_stripe_reconcile",
       p_ok: failed === 0,
-      p_detail: `scanned=${scanned} applied=${applied} skipped=${skipped} failed=${failed}`,
+      p_detail: `scanned=${scanned} applied=${applied} skipped=${skipped} failed=${failed} ${webhookNote(webhook)}`,
     });
   } catch (e) {
     console.error("[stripe reconcile] heartbeat not recorded", String(e?.message || e));
@@ -1040,8 +1045,10 @@ const OUR_WEBHOOK = /^https:\/\/(www\.)?residata\.eu\/api\/(webhooks\/stripe|str
 
 async function ensureWebhookEvents(stripe) {
   const added = [];
+  let ours = 0;
   for await (const w of stripe.webhookEndpoints.list({ limit: 100 })) {
     if (w.status !== "enabled" || !OUR_WEBHOOK.test(String(w.url || ""))) continue;
+    ours++;
     const have = w.enabled_events || [];
     if (have.includes("*")) continue;
     const missing = WEBHOOK_EVENTS.filter((e) => !have.includes(e));
@@ -1050,7 +1057,15 @@ async function ensureWebhookEvents(stripe) {
     console.log(`[stripe reconcile] webhook ${w.id}: added ${missing.join(", ")}`);
     added.push({ id: w.id, added: missing });
   }
-  return { added };
+  return { ours, added };
+}
+
+/** One short line for the heartbeat — the console line is gone after an hour on Hobby. */
+function webhookNote(w) {
+  if (!w) return "webhook=not-checked";
+  if (!w.ours) return "webhook=NONE-OURS";
+  const added = w.added.flatMap((a) => a.added);
+  return `webhook=ok(${w.ours})${added.length ? ` added:${added.join("+")}` : ""}`;
 }
 
 async function handleWebhook(req, res) {

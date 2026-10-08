@@ -10,6 +10,7 @@
 //   · the next payment's amount follows the coupon's duration, and is left out when unknown;
 //   · a failed SMTP send leaves no claim, so Stripe's retry delivers it;
 //   · a failed renewal → Boss and the customer once, however often Stripe retries;
+//   · a failed FIRST payment → Boss and the customer once, without "we retry / Premium keeps running";
 //   · a cancellation and an ended subscription → Boss once each;
 //   · admin → Revenue / a person's payments: admins only, numbers from Stripe.
 // Invoice shapes copied from the live Residata account (in_1UO0g6…, 7 Oct 2026).
@@ -103,7 +104,7 @@ function query(table) {
 }
 const createClient = () => ({
   from: query,
-  rpc: async () => ({ data: null, error: null }),
+  rpc: async (name, args) => { (DB.rpc ||= []).push([name, args]); return { data: null, error: null }; },
   auth: { getUser: async (tok) => (DB.tokens[tok] ? { data: { user: DB.tokens[tok] }, error: null } : { data: { user: null }, error: { message: "bad" } }) },
 });
 
@@ -255,6 +256,21 @@ test("a failed renewal: Boss and the customer hear once, however often Stripe re
   assert.ok(text(toEva()[0]).includes("/app/billing"));
 });
 
+test("a failed FIRST payment: nobody is told 'we will retry / Premium keeps running' — it started nothing", async () => {
+  // Stripe sandbox 8 Oct 2026: a subscription whose first charge fails → invoice.payment_failed
+  // with billing_reason subscription_create; nothing is retried and the person never had Premium.
+  const inv = invoice({ id: "in_first", status: "open", billing_reason: "subscription_create", amount_paid: 0, amount_due: 27999, discounts: [], total_discount_amounts: [] });
+  await webhook("invoice.payment_failed", inv);
+  await webhook("invoice.payment_failed", inv);
+  assert.equal(toBoss().length, 1);
+  assert.equal(toBoss()[0].subject, "[Residata] ⚠ First payment failed: €279.99 — Eva Malá (Firma s.r.o.)");
+  assert.ok(!text(toBoss()[0]).includes("keeps running"), "no 'Premium keeps running' for someone who never had it");
+  assert.equal(toEva().length, 1);
+  assert.equal(toEva()[0].subject, "Platba za Residata Premium neprešla — predplatné sa nespustilo");
+  assert.ok(!/skúsime znova|neprišli/.test(text(toEva()[0])), "no 'we will retry, keep your access'");
+  assert.ok(text(toEva()[0]).includes("nič sme vám neúčtovali") && text(toEva()[0]).includes("/app/billing"));
+});
+
 // ── cancellation ────────────────────────────────────────────────────────
 test("a cancellation and an ended subscription: Boss hears once each", async () => {
   const end = NOW + 20 * 86400;
@@ -324,4 +340,7 @@ test("the nightly reconcile adds a missing event to OUR webhook endpoint — and
   assert.ok(updates[0][1].includes("invoice.payment_failed"));
   assert.equal(updates[0][1].length, 8, "nothing removed, nothing doubled");
   assert.deepEqual(r.body.webhook.added, [{ id: "we_ours", added: ["invoice.payment_failed"] }]);
+  // the heartbeat outlives Hobby's one-hour log: "did the webhook check run, what did it add?"
+  const beat = (DB.rpc || []).find(([n]) => n === "record_cron_heartbeat");
+  assert.ok(beat[1].p_detail.endsWith("webhook=ok(1) added:invoice.payment_failed"), beat[1].p_detail);
 });

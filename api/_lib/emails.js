@@ -740,28 +740,45 @@ export function invoicePaidHtml(inv, webUrl, lang = "sk") {
 }
 
 /** The customer's e-mail when a renewal could not be charged. */
-export function customerPaymentFailedSubject(lang = "sk") {
+export function customerPaymentFailedSubject(lang = "sk", p = null) {
+  if (p?.kind === "new") {
+    return lang === "sk" ? "Platba za Residata Premium neprešla — predplatné sa nespustilo" : "Your Residata Premium payment did not go through — the subscription did not start";
+  }
   return lang === "sk" ? "Platba za Residata Premium sa nepodarila" : "Your Residata Premium payment did not go through";
 }
 
+// Two different situations, two different truths: a failed RENEWAL is retried and
+// Premium keeps running meanwhile; a failed FIRST payment (kind "new") started nothing,
+// is not retried and charged nothing — they simply try again.
 export function customerPaymentFailedHtml(p, webUrl, lang = "sk") {
   const sk = lang === "sk";
   const t = (a, b) => (sk ? a : b);
+  const first = p.kind === "new";
+  const amount = `<strong style="color:${TEXT_HI}">${fmtMoney(p.amount, p.currency, lang)}</strong>`;
   const inner = `
-    <div style="${S.eyebrow};color:#f5a623">${t("Treba vašu pozornosť", "Needs your attention")}</div>
+    <div style="${S.eyebrow};color:#f5a623">${first ? t("Predplatné sa nespustilo", "Subscription not started") : t("Treba vašu pozornosť", "Needs your attention")}</div>
     <h1 style="${S.h1}">${t("Platba sa nepodarila", "The payment did not go through")}</h1>
     <p style="${S.p}">${p.name ? t(`Dobrý deň, ${escHtml(p.name)},`, `Hello ${escHtml(p.name)},`) : t("Dobrý deň,", "Hello,")}</p>
+    ${first ? `
     <p style="${S.p}">${t(
-      `platbu <strong style="color:${TEXT_HI}">${fmtMoney(p.amount, p.currency, lang)}</strong> za Residata Premium sa nepodarilo strhnúť z vašej karty. Platbu skúsime znova automaticky.`,
-      `we could not charge <strong style="color:${TEXT_HI}">${fmtMoney(p.amount, p.currency, lang)}</strong> for Residata Premium to your card. We will retry automatically.`)}</p>
+      `platbu ${amount} za Residata Premium sa nepodarilo strhnúť, preto sa predplatné nespustilo a nič sme vám neúčtovali.`,
+      `we could not take the payment of ${amount} for Residata Premium, so the subscription did not start and you have not been charged.`)}</p>
+    <p style="${S.p}">${t(
+      "Ak chcete Premium, skúste to prosím znova — napríklad inou kartou. Trvá to minútu.",
+      "If you would like Premium, please try again — for example with another card. It takes a minute.")}</p>
+    <a href="${webUrl}/app/billing" style="${S.btnGreen}">${t("Skúsiť znova", "Try again")} →</a>` : `
+    <p style="${S.p}">${t(
+      `platbu ${amount} za Residata Premium sa nepodarilo strhnúť z vašej karty. Platbu skúsime znova automaticky.`,
+      `we could not charge ${amount} for Residata Premium to your card. We will retry automatically.`)}</p>
     <p style="${S.p}">${t(
       "Aby ste o prístup neprišli, skontrolujte prosím kartu (platnosť, limit) alebo zadajte inú v aplikácii v časti Predplatné.",
       "To keep your access, please check your card (expiry, limit) or add another one in the app under Plan &amp; billing.")}</p>
-    <a href="${webUrl}/app/billing" style="${S.btnGreen}">${t("Skontrolovať kartu", "Check my card")} →</a>`;
+    <a href="${webUrl}/app/billing" style="${S.btnGreen}">${t("Skontrolovať kartu", "Check my card")} →</a>`}`;
   return shell({
     lang,
-    title: customerPaymentFailedSubject(lang),
-    preheader: t("Skontrolujte prosím platobnú kartu.", "Please check your payment card."),
+    title: customerPaymentFailedSubject(lang, p),
+    preheader: first ? t("Predplatné sa nespustilo — môžete to skúsiť znova.", "The subscription did not start — you can try again.")
+      : t("Skontrolujte prosím platobnú kartu.", "Please check your payment card."),
     inner,
   });
 }
@@ -843,16 +860,26 @@ export function ownerPaymentHtml(p, webUrl) {
 }
 
 /** Boss's note on a failed renewal. */
+// A failed FIRST payment (kind "new") is not a failed renewal: the person never had
+// Premium and Stripe does not retry it — measured against Residata's Stripe test sandbox
+// 8 Oct 2026, where the renewal wording told Boss "Premium keeps running during the retries".
 export function ownerPaymentFailedSubject(p) {
-  return `[Residata] ⚠ Payment failed: ${fmtMoney(p.amount, p.currency)} — ${whoLine(p.user)}`;
+  return p.kind === "new"
+    ? `[Residata] ⚠ First payment failed: ${fmtMoney(p.amount, p.currency)} — ${whoLine(p.user)}`
+    : `[Residata] ⚠ Payment failed: ${fmtMoney(p.amount, p.currency)} — ${whoLine(p.user)}`;
 }
 
 export function ownerPaymentFailedHtml(p, webUrl) {
+  const first = p.kind === "new";
   const inner = `
-    <div style="${S.eyebrow};color:#f5a623">⚠ Payment failed</div>
-    <h1 style="${S.h1}">${escHtml(whoLine(p.user))}'s payment did not go through</h1>
-    ${bigAmount(fmtMoney(p.amount, p.currency), `Attempt ${p.attempts || 1} · Stripe retries on its own`, "#f5a623")}
-    <p style="${S.p}">Premium keeps running during the retries. The customer got an e-mail asking to check their card.</p>
+    <div style="${S.eyebrow};color:#f5a623">${first ? "⚠ First payment failed" : "⚠ Payment failed"}</div>
+    <h1 style="${S.h1}">${escHtml(whoLine(p.user))}${first ? " tried to subscribe — the payment did not go through" : "'s payment did not go through"}</h1>
+    ${first
+      ? bigAmount(fmtMoney(p.amount, p.currency), "First payment · not retried", "#f5a623")
+      : bigAmount(fmtMoney(p.amount, p.currency), `Attempt ${p.attempts || 1} · Stripe retries on its own`, "#f5a623")}
+    <p style="${S.p}">${first
+      ? "No subscription started, no Premium was given and nothing was charged; Stripe does not retry a first payment. We e-mailed them that it did not go through, with a link to try again. Worth a personal note if they do not come back."
+      : "Premium keeps running during the retries. The customer got an e-mail asking to check their card."}</p>
     ${kvTable(customerRows(p.user, p.billing))}
     <div style="margin-top:18px">
       ${p.user?.id ? `<a href="${webUrl}/app/admin?tab=users&user=${encodeURIComponent(p.user.id)}" style="${S.btnGreen}">Open the customer</a>` : ""}
