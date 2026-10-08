@@ -476,6 +476,7 @@ input[type="checkbox"], input[type="radio"] { width: 15px; height: 15px; cursor:
 }
 .rd-badge--ok { color: var(--accent-ink); background: color-mix(in srgb, var(--accent) 12%, transparent); border-color: color-mix(in srgb, var(--accent) 32%, transparent); }
 .rd-badge--warn { color: var(--accent-2); background: color-mix(in srgb, var(--accent-2) 12%, transparent); border-color: color-mix(in srgb, var(--accent-2) 32%, transparent); }
+.rd-badge--err { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); border-color: color-mix(in srgb, var(--danger) 32%, transparent); }
 
 /* ══ §10  MENUS (the shared dropdown surface — components/Picker.jsx) ════ */
 
@@ -755,9 +756,9 @@ textarea.rd-field { height: auto; min-height: 4.2rem; padding-top: 0.5rem; paddi
 @media (max-width: 1020px) { .rd-ua__kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .rd-ua__kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .rd-ua__pane { padding-top: 0.9rem; }
-.rd-ua__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+.rd-ua__grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0.8rem; }
 .rd-ua__wide { grid-column: 1 / -1; }
-@media (max-width: 760px) { .rd-ua__grid { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .rd-ua__grid { grid-template-columns: minmax(0, 1fr); } }
 
 /* daily bars */
 .rd-ua__chart { position: relative; }

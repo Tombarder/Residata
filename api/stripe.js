@@ -200,6 +200,15 @@ async function handleCheckout(req, res) {
     let live = null;
     try { live = await stripe.subscriptions.retrieve(profile.stripe_subscription_id); }
     catch (e) { if (e?.code !== "resource_missing") throw e; }
+    // A first payment that never completed (bank declined, 3-D Secure abandoned)
+    // leaves an `incomplete` subscription: nothing was paid and nothing runs. It
+    // used to answer "already subscribed" — the customer who tried again was
+    // locked out of paying. Cancel the stale one (Stripe voids its open invoice)
+    // and let this checkout start clean (review 2026-10-08).
+    if (live?.status === "incomplete") {
+      try { await stripe.subscriptions.cancel(live.id); live = null; }
+      catch (e) { console.warn("[stripe checkout] stale incomplete subscription not cancelled:", e?.message || e); }
+    }
     if (live && !CARD_DONE.includes(live.status)) {
       return res.status(409).json({
         error: "already subscribed",
@@ -398,18 +407,62 @@ async function bankDetailsFromSecrets(admin) {
 }
 
 /**
+ * The customer's language for a payment e-mail (review 2026-10-08). `ui_prefs.language`
+ * is written only after an explicit pick, and the site defaults to English — so a
+ * foreign customer who never touched the switch got the welcome in Slovak. The chain:
+ * explicit pick → the language they signed up in → Stripe (preferred locale, billing
+ * country Slovakia) → English.
+ */
+async function customerLang(admin, stripe, { customerId = null, userId = null, country = null } = {}) {
+  let prof = null;
+  try {
+    if (userId) ({ data: prof } = await admin.from("user_profiles").select("id, ui_prefs, full_name").eq("id", userId).maybeSingle());
+    if (!prof && customerId) ({ data: prof } = await admin.from("user_profiles").select("id, ui_prefs, full_name").eq("stripe_customer_id", customerId).maybeSingle());
+  } catch { /* the language falls through */ }
+  const name = prof?.full_name ? String(prof.full_name).split(" ")[0] : null;
+  const pick = prof?.ui_prefs?.language;
+  if (pick === "sk" || pick === "en") return { lang: pick, name };
+  if (prof?.id) {
+    try {
+      const { data } = await admin.auth.admin.getUserById(prof.id);
+      const l = data?.user?.user_metadata?.lang;
+      if (l === "sk" || l === "en") return { lang: l, name };
+    } catch { /* no auth admin API here — next source */ }
+  }
+  if (country) return { lang: String(country).toUpperCase() === "SK" ? "sk" : "en", name };
+  if (customerId && stripe) {
+    try {
+      const c = await stripe.customers.retrieve(customerId);
+      const loc = String(c?.preferred_locales?.[0] || "").toLowerCase();
+      if (loc) return { lang: loc.startsWith("sk") ? "sk" : "en", name };
+      if (c?.address?.country) return { lang: c.address.country === "SK" ? "sk" : "en", name };
+    } catch { /* default below */ }
+  }
+  return { lang: "en", name };
+}
+
+const customerOf = (o) => (typeof o?.customer === "string" ? o.customer : o?.customer?.id) || null;
+const userOfInvoice = (inv) => inv?.parent?.subscription_details?.metadata?.supabase_user_id || null;
+const subOfInvoice = (inv) => {
+  const r = inv?.subscription ?? inv?.parent?.subscription_details?.subscription
+    ?? inv?.lines?.data?.[0]?.parent?.subscription_item_details?.subscription ?? null;
+  return typeof r === "string" ? r : r?.id || null;
+};
+
+/**
  * Email the paid invoice to the customer, in their own language.
  *
- * Never throws: the caller catches, and an email that fails must not fail the
- * webhook — Stripe would retry it and re-apply the subscription. A missing
- * email is a support request; a retried webhook is a data problem.
+ * Throws when the send failed (after releasing the claim): the webhook then answers
+ * 500 and Stripe redelivers — the claim dedupes the e-mails that did go out.
  */
 async function sendInvoiceEmail(admin, inv, stripe = null) {
   const to = inv.customer_email || null;
   if (!to) return;
-  // Only real, payable invoices. A zero-amount one (a fully discounted period,
-  // a trial conversion) is not something to email as a receipt.
-  if (!(inv.amount_paid > 0)) return;
+  // Only real, payable invoices — except the FIRST one: a 100 % coupon (or a credit
+  // balance) still starts Premium, and that customer deserves the welcome too (review
+  // 2026-10-08: Boss got "new customer €0.00", the customer got nothing).
+  const kind = invoiceKind(inv);
+  if (!(inv.amount_paid > 0) && kind !== "new") return;
 
   // CLAIM THE SEND BEFORE SENDING. Stripe redelivers a webhook whenever the
   // handler does not return 2xx, and plenty can fail after an email has gone
@@ -417,37 +470,21 @@ async function sendInvoiceEmail(admin, inv, stripe = null) {
   // the one that mails the customer. A retry collides with the primary key and
   // returns here. Two invoices for one payment is what a finance department
   // escalates.
-  const customerId = typeof inv.customer === "string" ? inv.customer : inv.customer?.id;
+  const customerId = customerOf(inv);
   if (!(await claimMail(admin, inv.id, { customerId, to, amount: inv.amount_paid, currency: inv.currency }))) return;
 
-  // The customer's own language. The key is `language` — `lang` is what the
-  // browser uses in localStorage, and reading that name here would have quietly
-  // emailed every English-speaking customer in Slovak.
-  let lang = "sk";
-  let name = null;
-  if (customerId) {
-    const { data } = await admin
-      .from("user_profiles")
-      .select("ui_prefs, full_name")
-      .eq("stripe_customer_id", customerId)
-      .maybeSingle();
-    const pref = data?.ui_prefs?.language;
-    if (pref === "en" || pref === "sk") lang = pref;
-    name = data?.full_name || null;
-  }
-
-  // FIRST PAYMENT = THE WELCOME (Boss 2026-10-07: "no email about getting to premium
-  // tier … should be nice informative and positive"). One e-mail, not two: the
-  // celebration carries the invoice; a renewal gets the invoice alone. The PDF is
-  // attached — an accountant files an attachment, not a link — and when Stripe's
-  // PDF cannot be fetched the e-mail still goes, with the download button.
-  const facts = await paymentFacts(stripe, inv);
-  const pdf = await fetchInvoicePdf(inv.invoice_pdf);
-  const p = { ...facts, name: name ? String(name).split(" ")[0] : null, pdfAttached: Boolean(pdf) };
-  const { customerPaymentHtml, customerPaymentSubject, sendEmail } = await import("./_lib/emails.js");
-  // No `conversational` flag: an invoice is machine mail, so it goes from
-  // noreply@ per api/_lib/senders.js, which names invoices explicitly.
   try {
+    const { lang, name } = await customerLang(admin, stripe, { customerId, userId: userOfInvoice(inv), country: inv.customer_address?.country });
+    // FIRST PAYMENT = THE WELCOME (Boss 2026-10-07). One e-mail, not two: the
+    // celebration carries the invoice; a renewal gets the invoice alone. The PDF is
+    // attached — an accountant files an attachment, not a link — and when Stripe's
+    // PDF cannot be fetched the e-mail still goes, with the download button.
+    const facts = await paymentFacts(stripe, inv);
+    const pdf = await fetchInvoicePdf(inv.invoice_pdf);   // a 0 € invoice is a document too
+    const p = { ...facts, name, pdfAttached: Boolean(pdf) };
+    const { customerPaymentHtml, customerPaymentSubject, sendEmail } = await import("./_lib/emails.js");
+    // No `conversational` flag: an invoice is machine mail, so it goes from
+    // noreply@ per api/_lib/senders.js, which names invoices explicitly.
     await sendEmail({
       to,
       subject: customerPaymentSubject(p, lang),
@@ -456,30 +493,27 @@ async function sendInvoiceEmail(admin, inv, stripe = null) {
       gmailPassword: process.env.GMAIL_APP_PASSWORD,
       attachments: pdf ? [{ filename: `${lang === "sk" ? "Faktura" : "Invoice"}-${inv.number || inv.id}.pdf`, content: pdf, contentType: "application/pdf" }] : undefined,
     });
+    // Record which language actually went out — the claim above was written
+    // before we knew it, and support answering "what did they receive?" wants it.
+    await admin.from("invoice_emails_sent").update({ lang }).eq("invoice_id", inv.id);
   } catch (e) {
     // RELEASE THE CLAIM. The row above exists to stop a redelivered webhook
-    // sending a SECOND copy — it must not also stop the FIRST one. Without
-    // this, one SMTP hiccup means the claim stands, every Stripe retry sees it
-    // and returns, and the customer never receives the invoice the Terms
-    // promise them. A duplicate is embarrassing; silence is a tax document
-    // they never got and cannot book.
+    // sending a SECOND copy — it must not also stop the FIRST one. The webhook
+    // answers 500 for this, so Stripe's retry delivers it.
     await releaseMail(admin, inv.id);
     throw e;
   }
-
-  // Record which language actually went out — the claim above was written
-  // before we knew it, and support answering "what did they receive?" wants it.
-  await admin.from("invoice_emails_sent").update({ lang }).eq("invoice_id", inv.id);
 }
 
 // ─── payment e-mails to the owner (Boss 2026-10-07) ──────────────────────
 // "wanna get notified if someone pays (both on residata and on kamhalco same way i
-// get when there is new customer)". Every payment, every failed payment and every
-// cancellation → one e-mail to ADMIN_EMAIL, never two: the send is claimed in
-// invoice_emails_sent first, under its own key ("owner-paid:<invoice>",
-// "owner-failed:<invoice>", "owner-cancel:<subscription>:<end>", "owner-ended:<subscription>",
-// "failed:<invoice>" for the customer's card reminder). That table is "one row per
-// e-mail about an invoice that actually went out"; reusing it needs no new table.
+// get when there is new customer)". Every money event → one e-mail to ADMIN_EMAIL,
+// never two: the send is claimed in invoice_emails_sent first, under its own key
+// ("owner-paid:<invoice>", "owner-failed:<invoice>", "owner-cancel:<sub>:<when>",
+// "owner-reactivated:<sub>:<when>", "owner-ended:<sub>", "owner-refund:<charge>:<total>",
+// "owner-dispute:<dispute>:<created|closed>"; the customer's: "<invoice>", "failed:<invoice>",
+// "failed-final:<invoice>", "customer-cancel:<sub>:<when>", "customer-ended:<sub>").
+// That table is "one row per e-mail that actually went out"; reusing it needs no new table.
 
 /** Claim one e-mail; false = somebody already sent it. Throws on a real DB error. */
 async function claimMail(admin, key, { customerId = null, to, amount = null, currency = "eur", lang = "sk" } = {}) {
@@ -511,12 +545,30 @@ async function fetchInvoicePdf(url) {
 }
 
 /**
- * The facts every payment e-mail shows. The next charge needs the coupon's
- * duration (a 98 % test coupon is "forever", a launch discount may be "once"), and
- * the webhook's invoice carries only discount ids — so it is looked up; when the
- * lookup fails the e-mail shows the date without an amount instead of a guess.
+ * The next charge, ASKED FROM STRIPE (upcoming-invoice preview) rather than re-derived
+ * from coupon rules — the preview knows credit balance, item discounts and a repeating
+ * coupon that runs out on the boundary. Null = unknown (shown without an amount).
+ * `undefined` = the preview is not available here → the caller may fall back.
  */
+async function previewNext(stripe, subId) {
+  if (!stripe?.invoices?.createPreview || !subId) return undefined;
+  try {
+    const pv = await stripe.invoices.createPreview({ subscription: subId });
+    return Number.isFinite(Number(pv?.amount_due)) ? Number(pv.amount_due) : null;
+  } catch (e) {
+    console.warn("[stripe] next-invoice preview unavailable:", e?.message || e);
+    return null;
+  }
+}
+
+/**
+ * The facts every payment e-mail shows. Remembered per invoice OBJECT — i.e. for the one
+ * webhook delivery that carries it (the customer and the owner e-mail need the same facts,
+ * and a later delivery must read Stripe afresh).
+ */
+const factsCache = new WeakMap();
 async function paymentFacts(stripe, inv) {
+  if (factsCache.has(inv)) return factsCache.get(inv);
   const f = invoiceFacts(inv);
   let discounts = (inv.discounts || []).filter((d) => d && typeof d === "object");
   if (!discounts.length && f.discount && stripe && inv.id) {
@@ -527,62 +579,142 @@ async function paymentFacts(stripe, inv) {
       console.warn("[stripe] invoice discounts not loaded:", e?.message || e);
     }
   }
-  return {
+  const coupon = discounts.map((d) => d.source?.coupon || d.coupon).find((c) => c && typeof c === "object");
+  let nextAmount = inv.status === "paid" ? await previewNext(stripe, subOfInvoice(inv)) : null;
+  if (nextAmount === undefined) nextAmount = nextChargeCents(f, discounts);
+  const out = {
     kind: f.kind,
     amount: Number(inv.amount_paid ?? inv.amount_due ?? 0),
     discount: f.totalDiscount,
     listPrice: f.listPrice,
+    coupon: coupon ? (coupon.name || coupon.id) : null,
     currency: inv.currency || "eur",
     number: inv.number || null,
     periodStart: f.periodStart,
     periodEnd: f.periodEnd,
-    nextAmount: nextChargeCents(f, discounts),
+    nextAmount,
     hostedUrl: inv.hosted_invoice_url || null,
     pdfUrl: inv.invoice_pdf || null,
     stripeUrl: inv.id ? stripeDashUrl(`invoices/${inv.id}`) : null,
     attempts: Number(inv.attempt_count || 0),
+    nextAttempt: inv.next_payment_attempt || null,
+    test: inv.livemode === false,
   };
+  factsCache.set(inv, out);
+  return out;
+}
+
+/** The billing identity PRINTED ON THE INVOICE — what the document says, available on the
+ *  first payment (checkout.session.completed, which fills our profile copy, often lands later). */
+function invoiceBilling(inv) {
+  if (!inv) return null;
+  const a = inv.customer_address || {};
+  const address = [a.line1, a.line2, [a.postal_code, a.city].filter(Boolean).join(" "), a.country].filter(Boolean).join(", ");
+  const vat = (inv.customer_tax_ids || []).map((t) => t?.value).filter(Boolean).join(", ");
+  const companyId = (inv.custom_fields || []).find((c) => /i[cč]o|company/i.test(String(c?.name || "")))?.value || null;
+  return (inv.customer_name || address || vat) ? { name: inv.customer_name || null, companyId, vat: vat || null, address: address || null } : null;
 }
 
 /** The person behind a Stripe customer (or a subscription's metadata), with billing identity. */
-async function customerPerson(admin, { customerId = null, userId = null } = {}) {
+async function customerPerson(admin, { customerId = null, userId = null, inv = null } = {}) {
   const cols = "id, email, full_name, company, position, phone, created_at, tier, paid_started_at, paid_until, "
     + "stripe_customer_id, stripe_subscription_id, billing_company_name, billing_company_id, billing_vat_id, billing_address";
   let user = null;
   if (userId) ({ data: user } = await admin.from("user_profiles").select(cols).eq("id", userId).maybeSingle());
   if (!user && customerId) ({ data: user } = await admin.from("user_profiles").select(cols).eq("stripe_customer_id", customerId).maybeSingle());
-  if (!user) return { user: null, billing: null };
+  const fromInvoice = invoiceBilling(inv);
+  if (!user) return { user: null, billing: fromInvoice };
   const a = user.billing_address || {};
   const address = [a.line1, a.line2, [a.postal_code, a.city].filter(Boolean).join(" "), a.country].filter(Boolean).join(", ");
-  const billing = (user.billing_company_name || user.billing_vat_id || address)
+  const fromProfile = (user.billing_company_name || user.billing_vat_id || address)
     ? { name: user.billing_company_name, companyId: user.billing_company_id, vat: user.billing_vat_id, address } : null;
+  const billing = fromInvoice || fromProfile
+    ? { name: fromInvoice?.name || fromProfile?.name || null, companyId: fromInvoice?.companyId || fromProfile?.companyId || null,
+        vat: fromInvoice?.vat || fromProfile?.vat || null, address: fromInvoice?.address || fromProfile?.address || null }
+    : null;
   return { user, billing };
+}
+
+/** Who to name when we have no profile (deleted account, a customer made in Stripe). */
+async function personOrStripe(admin, stripe, { customerId, userId, inv = null, email = null, name = null }) {
+  const who = await customerPerson(admin, { customerId, userId, inv });
+  if (who.user) return who;
+  let e = email || inv?.customer_email || null, n = name || inv?.customer_name || null;
+  if ((!e || !n) && customerId && stripe) {
+    try { const c = await stripe.customers.retrieve(customerId); e = e || c?.email || null; n = n || c?.name || null; } catch { /* unknown */ }
+  }
+  return { user: e || n ? { email: e, full_name: n } : null, billing: who.billing };
+}
+
+/**
+ * Refunds and disputes onto invoices (review 2026-10-08). Stripe leaves a refunded
+ * invoice `paid` with `amount_paid` unchanged — the money facts live on the charge and
+ * the dispute, linked to the invoice only through its payment intent (measured in the
+ * sandbox: invoice.payments[].payment.payment_intent; a charge carries no invoice).
+ * Adds `refunded_cents`, `dispute_status`, `dispute_amount` to each invoice. Never throws.
+ */
+async function attachMoneyFacts(stripe, invoices, { customer = null } = {}) {
+  const byPi = new Map();
+  for (const i of invoices || []) {
+    for (const p of i.payments?.data || []) {
+      const pi = p?.payment?.payment_intent;
+      if (pi) byPi.set(typeof pi === "string" ? pi : pi.id, i);
+    }
+  }
+  if (!byPi.size) return { truncated: false };
+  let truncated = false;
+  try {
+    let n = 0;
+    for await (const ch of stripe.charges.list({ limit: 100, ...(customer ? { customer } : {}) })) {
+      if (++n > 2000) { truncated = true; break; }
+      const i = byPi.get(typeof ch.payment_intent === "string" ? ch.payment_intent : ch.payment_intent?.id);
+      if (i && ch.amount_refunded) i.refunded_cents = (i.refunded_cents || 0) + Number(ch.amount_refunded);
+    }
+  } catch (e) { console.warn("[stripe] refunds not loaded:", e?.message || e); }
+  try {
+    let n = 0;
+    for await (const d of stripe.disputes.list({ limit: 100 })) {
+      if (++n > 500) { truncated = true; break; }
+      const i = byPi.get(typeof d.payment_intent === "string" ? d.payment_intent : d.payment_intent?.id);
+      if (i) { i.dispute_status = d.status; i.dispute_amount = Number(d.amount || 0); }
+    }
+  } catch (e) { console.warn("[stripe] disputes not loaded:", e?.message || e); }
+  return { truncated };
 }
 
 /** Paying customers, MRR and revenue, straight from Stripe. Null when Stripe cannot be read. */
 async function businessNow(stripe) {
   try {
+    let truncated = false;
     const subs = [];
     for await (const x of stripe.subscriptions.list({ status: "all", limit: 100, expand: ["data.discounts.source.coupon"] })) {
-      subs.push(x); if (subs.length >= 1000) break;
+      if (subs.length >= 1000) { truncated = true; break; }
+      subs.push(x);
     }
     const invoices = [];
-    for await (const x of stripe.invoices.list({ limit: 100 })) {
-      invoices.push(x); if (invoices.length >= 2000) break;
+    for await (const x of stripe.invoices.list({ limit: 100, expand: ["data.payments", "data.discounts.source.coupon"] })) {
+      if (invoices.length >= 2000) { truncated = true; break; }
+      invoices.push(x);
     }
-    return { summary: businessSummary(subs, invoices), subs, invoices };
+    const money = await attachMoneyFacts(stripe, invoices);
+    const summary = { ...businessSummary(subs, invoices), truncated: truncated || money.truncated };
+    return { summary, subs, invoices };
   } catch (e) {
     console.warn("[stripe] business numbers unavailable:", e?.message || e);
     return null;
   }
 }
 
-async function mailOwner(admin, key, { subject, html, customerId, amount, currency }) {
+/** One owner e-mail, claimed first — `build` runs only for the delivery that will send. */
+async function mailOwner(admin, key, build, { customerId = null, amount = null, currency = "eur" } = {}) {
   const to = process.env.ADMIN_EMAIL || "tkamhal@gmail.com";
   if (!(await claimMail(admin, key, { customerId, to, amount, currency, lang: "en" }))) return false;
-  const { sendEmail } = await import("./_lib/emails.js");
   try {
-    await sendEmail({ to, subject, html, gmailUser: process.env.GMAIL_FROM, gmailPassword: process.env.GMAIL_APP_PASSWORD });
+    const { subject, html, replyTo, test } = await build();
+    const { sendEmail } = await import("./_lib/emails.js");
+    // a preview deployment on the test key must not read like real money
+    await sendEmail({ to, subject: test ? `[TEST] ${subject}` : subject, html, replyTo: replyTo || undefined,
+      gmailUser: process.env.GMAIL_FROM, gmailPassword: process.env.GMAIL_APP_PASSWORD });
     return true;
   } catch (e) {
     await releaseMail(admin, key);      // a failed send must not block the retry
@@ -590,66 +722,156 @@ async function mailOwner(admin, key, { subject, html, customerId, amount, curren
   }
 }
 
-async function notifyOwnerPayment(admin, stripe, inv) {
-  // a 100 %-discounted first invoice is still a new customer worth knowing about
-  if (!(inv.amount_paid > 0) && invoiceKind(inv) !== "new") return;
-  const customerId = typeof inv.customer === "string" ? inv.customer : inv.customer?.id;
-  const userId = inv.parent?.subscription_details?.metadata?.supabase_user_id || null;
-  const [facts, who, biz] = await Promise.all([paymentFacts(stripe, inv), customerPerson(admin, { customerId, userId }), businessNow(stripe)]);
-  const p = { ...facts, user: who.user || { email: inv.customer_email, full_name: inv.customer_name }, billing: who.billing, business: biz?.summary || null };
-  const { ownerPaymentHtml, ownerPaymentSubject } = await import("./_lib/emails.js");
-  await mailOwner(admin, `owner-paid:${inv.id}`, {
-    subject: ownerPaymentSubject(p), html: ownerPaymentHtml(p, "https://residata.eu"),
-    customerId, amount: inv.amount_paid, currency: inv.currency,
-  });
-}
-
-async function notifyPaymentFailed(admin, stripe, inv) {
-  const customerId = typeof inv.customer === "string" ? inv.customer : inv.customer?.id;
-  const userId = inv.parent?.subscription_details?.metadata?.supabase_user_id || null;
-  const [facts, who] = await Promise.all([paymentFacts(stripe, inv), customerPerson(admin, { customerId, userId })]);
-  const p = { ...facts, amount: Number(inv.amount_due || 0), user: who.user || { email: inv.customer_email, full_name: inv.customer_name }, billing: who.billing };
-  const em = await import("./_lib/emails.js");
-  await mailOwner(admin, `owner-failed:${inv.id}`, {
-    subject: em.ownerPaymentFailedSubject(p), html: em.ownerPaymentFailedHtml(p, "https://residata.eu"),
-    customerId, amount: inv.amount_due, currency: inv.currency,
-  }).catch((e) => console.warn("[stripe] owner failed-payment e-mail not sent:", e?.message || e));
-  // the customer, once per invoice (Stripe retries a renewal several times). A FIRST
-  // payment gets its own wording (customerPaymentFailedHtml, kind "new"): the
-  // subscription did not start and nothing is retried — "we'll retry, so you keep
-  // access" would be untrue. Measured 8 Oct 2026 in the Stripe sandbox: a card declined
-  // on the Checkout page creates no invoice and no event at all, so when a first-payment
-  // failure does reach us, it happened after they left the page and they may not know.
-  const to = inv.customer_email || who.user?.email;
-  if (!to) return;
-  if (!(await claimMail(admin, `failed:${inv.id}`, { customerId, to, amount: inv.amount_due, currency: inv.currency }))) return;
-  let lang = "sk";
-  if (customerId) {
-    const { data } = await admin.from("user_profiles").select("ui_prefs").eq("stripe_customer_id", customerId).maybeSingle();
-    if (data?.ui_prefs?.language === "en") lang = "en";
-  }
+/** One customer e-mail, claimed first. `build(lang, name)` → { subject, html }. */
+async function mailCustomer(admin, stripe, key, { to, customerId, userId, country = null, amount = null, currency = "eur" }, build) {
+  if (!to) return false;
+  if (!(await claimMail(admin, key, { customerId, to, amount, currency }))) return false;
   try {
-    await em.sendEmail({ to, subject: em.customerPaymentFailedSubject(lang, p),
-      html: em.customerPaymentFailedHtml({ ...p, name: who.user?.full_name ? String(who.user.full_name).split(" ")[0] : null }, "https://residata.eu", lang),
-      gmailUser: process.env.GMAIL_FROM, gmailPassword: process.env.GMAIL_APP_PASSWORD });
+    const { lang, name } = await customerLang(admin, stripe, { customerId, userId, country });
+    const { subject, html } = await build(lang, name);
+    const { sendEmail } = await import("./_lib/emails.js");
+    await sendEmail({ to, subject, html, gmailUser: process.env.GMAIL_FROM, gmailPassword: process.env.GMAIL_APP_PASSWORD });
+    await admin.from("invoice_emails_sent").update({ lang }).eq("invoice_id", key);
+    return true;
   } catch (e) {
-    await releaseMail(admin, `failed:${inv.id}`);
+    await releaseMail(admin, key);
     throw e;
   }
 }
 
-/** Customer cancelled (Premium runs to the end) or the subscription ended → Boss hears once. */
-async function notifyOwnerCancel(admin, stripe, sub, { deleted = false } = {}) {
-  const endsAt = sub.cancel_at || (sub.cancel_at_period_end
-    ? (sub.items?.data?.[0]?.current_period_end ?? sub.current_period_end ?? null) : null);
-  if (!deleted && !endsAt) return;
-  const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
-  const [who, biz] = await Promise.all([customerPerson(admin, { customerId, userId: sub.metadata?.supabase_user_id }), businessNow(stripe)]);
-  const c = { ended: deleted, endsAt, user: who.user, billing: who.billing, business: biz?.summary || null };
-  const { ownerCancelHtml, ownerCancelSubject } = await import("./_lib/emails.js");
-  await mailOwner(admin, deleted ? `owner-ended:${sub.id}` : `owner-cancel:${sub.id}:${endsAt}`, {
-    subject: ownerCancelSubject(c), html: ownerCancelHtml(c, "https://residata.eu"), customerId,
-  });
+async function notifyOwnerPayment(admin, stripe, inv) {
+  // a 100 %-discounted first invoice is still a new customer worth knowing about
+  if (!(inv.amount_paid > 0) && invoiceKind(inv) !== "new") return;
+  const customerId = customerOf(inv);
+  await mailOwner(admin, `owner-paid:${inv.id}`, async () => {
+    const [facts, who, biz] = await Promise.all([paymentFacts(stripe, inv),
+      personOrStripe(admin, stripe, { customerId, userId: userOfInvoice(inv), inv }), businessNow(stripe)]);
+    const p = { ...facts, user: who.user, billing: who.billing, business: biz?.summary || null };
+    const em = await import("./_lib/emails.js");
+    return { subject: em.ownerPaymentSubject(p), html: em.ownerPaymentHtml(p, "https://residata.eu"),
+      replyTo: who.user?.email, test: facts.test };
+  }, { customerId, amount: inv.amount_paid, currency: inv.currency });
+}
+
+/**
+ * A payment that did not go through. RE-READ FIRST (review 2026-10-08): Stripe redelivers
+ * for three days and does not keep order, so a late `payment_failed` can arrive after the
+ * invoice was paid — "check your card" after "thank you" is worse than silence.
+ * Three truths, three wordings:
+ *  · first payment (kind "new") — nothing started, nothing is retried; link to finish it;
+ *  · renewal with a next attempt — Premium is paused until it goes through, Stripe retries;
+ *  · renewal with NO next attempt — Stripe gives up; pay the invoice or Premium ends.
+ */
+async function notifyPaymentFailed(admin, stripe, inv) {
+  let fresh = inv;
+  try { fresh = (await stripe.invoices.retrieve(inv.id)) || inv; } catch { /* the event's copy */ }
+  if (["paid", "void", "uncollectible"].includes(fresh.status)) return;
+  inv = { ...inv, status: fresh.status || inv.status, next_payment_attempt: fresh.next_payment_attempt ?? inv.next_payment_attempt,
+          attempt_count: fresh.attempt_count ?? inv.attempt_count };
+  const customerId = customerOf(inv);
+  const userId = userOfInvoice(inv);
+  const final = invoiceKind(inv) !== "new" && !inv.next_payment_attempt;
+  const [facts, who] = await Promise.all([paymentFacts(stripe, inv), personOrStripe(admin, stripe, { customerId, userId, inv })]);
+  const p = { ...facts, final, amount: Number(inv.amount_due || 0), user: who.user, billing: who.billing };
+  const em = await import("./_lib/emails.js");
+  await mailOwner(admin, final ? `owner-failed-final:${inv.id}` : `owner-failed:${inv.id}`,
+    async () => ({ subject: em.ownerPaymentFailedSubject(p), html: em.ownerPaymentFailedHtml(p, "https://residata.eu"),
+      replyTo: who.user?.email, test: facts.test }),
+    { customerId, amount: inv.amount_due, currency: inv.currency });
+  // the customer: on the first failure and on the last one (Stripe retries a renewal
+  // several times — one e-mail per attempt would be nagging)
+  await mailCustomer(admin, stripe, final ? `failed-final:${inv.id}` : `failed:${inv.id}`,
+    { to: inv.customer_email || who.user?.email, customerId, userId, country: inv.customer_address?.country,
+      amount: inv.amount_due, currency: inv.currency },
+    (lang, name) => ({ subject: em.customerPaymentFailedSubject(lang, p), html: em.customerPaymentFailedHtml({ ...p, name }, "https://residata.eu", lang) }));
+}
+
+const isCancelling = (s) => Boolean(s?.cancel_at_period_end || s?.cancel_at);
+const endsAtOf = (s) => s?.cancel_at || (s?.cancel_at_period_end ? (s.items?.data?.[0]?.current_period_end ?? s.current_period_end ?? null) : null);
+
+/**
+ * Subscription changes worth an e-mail: a cancellation (Premium runs to the end) — Boss +
+ * a confirmation to the customer; an UNDONE cancellation — Boss (otherwise his inbox says
+ * the customer left); the end of a subscription — Boss + the customer. The subscription is
+ * re-read first, so a late event cannot announce a cancellation that was already undone.
+ */
+async function notifySubscriptionChange(admin, stripe, sub, { deleted = false, previous = null, eventAt = null } = {}) {
+  if (sub.status === "incomplete_expired" || (deleted && sub.status === "incomplete")) return;   // never paid: not a customer leaving
+  let s = sub;
+  if (!deleted) { try { s = (await stripe.subscriptions.retrieve(sub.id)) || sub; } catch { /* the event's copy */ } }
+  const customerId = customerOf(s);
+  const userId = s.metadata?.supabase_user_id || null;
+  const em = await import("./_lib/emails.js");
+  const ownerBuild = (c) => async () => {
+    const [who, biz] = await Promise.all([personOrStripe(admin, stripe, { customerId, userId }), businessNow(stripe)]);
+    const cc = { ...c, user: who.user, billing: who.billing, business: biz?.summary || null };
+    return { subject: em.ownerCancelSubject(cc), html: em.ownerCancelHtml(cc, "https://residata.eu"), replyTo: who.user?.email, test: s.livemode === false };
+  };
+  const reason = s.cancellation_details?.feedback || null;
+  const comment = s.cancellation_details?.comment || null;
+
+  if (deleted) {
+    const unpaid = s.cancellation_details?.reason === "payment_failed";
+    await mailOwner(admin, `owner-ended:${s.id}`, ownerBuild({ ended: true, unpaid, reason, comment }), { customerId });
+    // the customer, unless the end is not really an end: an admin gift carries Premium on,
+    // a blocked or deleted account is the admin's own decision
+    const { data: prof } = await admin.from("user_profiles").select("email, tier, paid_until").eq(userId ? "id" : "stripe_customer_id", userId || customerId).maybeSingle();
+    const stillPremium = prof?.tier === "admin" || (prof?.tier === "paid" && !prof?.paid_until)
+      || (prof?.paid_until && new Date(prof.paid_until).getTime() > Date.now() + 60_000);
+    if (prof && prof.tier !== "pending" && !stillPremium) {
+      await mailCustomer(admin, stripe, `customer-ended:${s.id}`, { to: prof.email, customerId, userId },
+        (lang, name) => ({ subject: em.customerEndedSubject(lang, { unpaid }), html: em.customerEndedHtml({ unpaid, name }, "https://residata.eu", lang) }));
+    }
+    return;
+  }
+  const wasCancelling = previous && ("cancel_at_period_end" in previous || "cancel_at" in previous)
+    ? Boolean(previous.cancel_at_period_end || previous.cancel_at) : null;
+  if (isCancelling(s)) {
+    if (wasCancelling === true) return;                    // already cancelling: another change, not a new cancellation
+    const endsAt = endsAtOf(s);
+    const when = s.canceled_at || endsAt;
+    await mailOwner(admin, `owner-cancel:${s.id}:${when}`, ownerBuild({ ended: false, endsAt, reason, comment }), { customerId });
+    const { data: prof } = await admin.from("user_profiles").select("email").eq(userId ? "id" : "stripe_customer_id", userId || customerId).maybeSingle();
+    await mailCustomer(admin, stripe, `customer-cancel:${s.id}:${when}`, { to: prof?.email, customerId, userId },
+      (lang, name) => ({ subject: em.customerCancelSubject(lang, { endsAt }), html: em.customerCancelHtml({ endsAt, name }, "https://residata.eu", lang) }));
+  } else if (wasCancelling === true && ["active", "trialing", "past_due"].includes(s.status)) {
+    // only when Boss was told about the cancellation — "they stayed" about a departure he
+    // never heard of (cancelled and undone within one delivery) is noise
+    const { data: told } = await admin.from("invoice_emails_sent").select("invoice_id").like("invoice_id", `owner-cancel:${s.id}:%`).limit(1);
+    if (!told?.length) return;
+    await mailOwner(admin, `owner-reactivated:${s.id}:${eventAt || Math.floor(Date.now() / 1000)}`,
+      ownerBuild({ reactivated: true }), { customerId });
+  }
+}
+
+/** Money given back (`charge.refunded`, cumulative). Boss hears once per new total. */
+async function notifyRefund(admin, stripe, charge) {
+  const total = Number(charge.amount_refunded || 0);
+  if (!total) return;
+  const customerId = customerOf(charge);
+  await mailOwner(admin, `owner-refund:${charge.id}:${total}`, async () => {
+    const who = await personOrStripe(admin, stripe, { customerId, email: charge.billing_details?.email, name: charge.billing_details?.name });
+    const em = await import("./_lib/emails.js");
+    const r = { amount: Number(charge.amount || 0), refunded: total, currency: charge.currency, user: who.user,
+      stripeUrl: stripeDashUrl(`payments/${typeof charge.payment_intent === "string" ? charge.payment_intent : charge.id}`) };
+    return { subject: em.ownerRefundSubject(r), html: em.ownerRefundHtml(r, "https://residata.eu"), test: charge.livemode === false };
+  }, { customerId, amount: total, currency: charge.currency });
+}
+
+/** A chargeback: it has a deadline and costs a fee — Boss hears at once, and when it closes. */
+async function notifyDispute(admin, stripe, d, phase) {
+  let customerId = null;
+  try {
+    const pi = typeof d.payment_intent === "string" ? d.payment_intent : d.payment_intent?.id;
+    if (pi) customerId = customerOf(await stripe.paymentIntents.retrieve(pi));
+  } catch { /* unknown customer */ }
+  await mailOwner(admin, `owner-dispute:${d.id}:${phase}`, async () => {
+    const who = await personOrStripe(admin, stripe, { customerId });
+    const em = await import("./_lib/emails.js");
+    const x = { phase, status: d.status, amount: Number(d.amount || 0), currency: d.currency, reason: d.reason,
+      dueBy: d.evidence_details?.due_by || null, user: who.user, stripeUrl: stripeDashUrl(`disputes/${d.id}`) };
+    return { subject: em.ownerDisputeSubject(x), html: em.ownerDisputeHtml(x, "https://residata.eu"), test: d.livemode === false };
+  }, { customerId, amount: d.amount, currency: d.currency });
 }
 
 // ─── admin billing (Boss 2026-10-07: "see all the info about the customers in the
@@ -677,24 +899,38 @@ async function handleAdminBilling(req, res) {
     const { user, billing } = await customerPerson(admin, { userId });
     if (!user) return res.status(404).json({ error: "user not found" });
     const cid = user.stripe_customer_id;
-    let subscriptions = [], invoices = [];
+    let subscriptions = [], invoices = [], next = null, truncated = false;
     if (cid) {
       try {
-        const [s, i] = await Promise.all([
-          stripe.subscriptions.list({ customer: cid, status: "all", limit: 20, expand: ["data.discounts.source.coupon"] }),
-          stripe.invoices.list({ customer: cid, limit: 50 }),
-        ]);
-        subscriptions = (s?.data || []).map((x) => subscriptionRow(x, nowSec));
-        invoices = (i?.data || []).map(invoiceRow);
+        const subsRaw = [], invRaw = [];
+        for await (const x of stripe.subscriptions.list({ customer: cid, status: "all", limit: 100, expand: ["data.discounts.source.coupon"] })) {
+          if (subsRaw.length >= 100) { truncated = true; break; }
+          subsRaw.push(x);
+        }
+        for await (const x of stripe.invoices.list({ customer: cid, limit: 100, expand: ["data.payments", "data.discounts.source.coupon"] })) {
+          if (invRaw.length >= 300) { truncated = true; break; }
+          invRaw.push(x);
+        }
+        const money = await attachMoneyFacts(stripe, invRaw, { customer: cid });
+        truncated = truncated || money.truncated;
+        subscriptions = subsRaw.map((x) => subscriptionRow(x, nowSec));
+        invoices = invRaw.filter((i) => i.status !== "draft").map(invoiceRow);
+        // the next charge, as Stripe will make it (credit balance, coupons running out)
+        const running = subsRaw.find((x) => ["active", "trialing", "past_due"].includes(x.status) && !x.cancel_at_period_end && !x.cancel_at);
+        if (running) {
+          const amount = await previewNext(stripe, running.id);
+          const r = subscriptionRow(running, nowSec);
+          next = { at: running.status === "past_due" ? null : r.periodEnd, amount: amount === undefined ? r.monthly : amount };
+        }
       } catch (e) {
         if (e?.code !== "resource_missing") return res.status(502).json({ error: "stripe_unreachable", detail: String(e?.message || e).slice(0, 200) });
       }
     }
-    const paid = invoices.filter((x) => x.status === "paid");
+    const paid = invoices.filter((x) => x.status === "paid" && x.amount > 0);
     return res.status(200).json({
-      ok: true, mode, billing,
+      ok: true, mode, billing, truncated, next,
       customer: cid ? { id: cid, url: stripeDashUrl(`customers/${cid}`) } : null,
-      totals: { paid: paid.reduce((s, x) => s + x.amount, 0), payments: paid.length,
+      totals: { paid: paid.reduce((s, x) => s + x.net, 0), refunded: paid.reduce((s, x) => s + x.refunded, 0), payments: paid.length,
                 first: paid.length ? Math.min(...paid.map((x) => x.paidAt || x.created)) : null },
       subscriptions, invoices,
     });
@@ -702,17 +938,28 @@ async function handleAdminBilling(req, res) {
 
   const biz = await businessNow(stripe);
   if (!biz) return res.status(502).json({ error: "stripe_unreachable" });
-  const cids = [...new Set([...biz.invoices.map((i) => (typeof i.customer === "string" ? i.customer : i.customer?.id)),
-    ...biz.subs.map((x) => (typeof x.customer === "string" ? x.customer : x.customer?.id))].filter(Boolean))];
-  let people = {};
-  if (cids.length) {
-    const { data } = await admin.from("user_profiles").select("id, email, full_name, company, stripe_customer_id").in("stripe_customer_id", cids);
-    people = Object.fromEntries((data || []).map((u) => [u.stripe_customer_id, { id: u.id, email: u.email, name: u.full_name, company: u.company }]));
+  const cids = [...new Set([...biz.invoices.map(customerOf), ...biz.subs.map(customerOf)].filter(Boolean))];
+  const people = {};
+  // `.in()` travels in the URL — a few hundred Stripe ids would overflow it, so in chunks
+  for (let i = 0; i < cids.length; i += 100) {
+    const { data, error: e } = await admin.from("user_profiles").select("id, email, full_name, company, stripe_customer_id").in("stripe_customer_id", cids.slice(i, i + 100));
+    if (e) console.warn("[stripe admin-billing] people not joined:", e.message);
+    for (const u of data || []) people[u.stripe_customer_id] = { id: u.id, email: u.email, name: u.full_name, company: u.company };
   }
+  // sign-up → paying conversion over 30 days: who registered, and how many of them paid
+  let signups30d = null, signups30dPaying = null;
+  try {
+    const since = new Date(Date.now() - 30 * 86400_000).toISOString();
+    const { data } = await admin.from("user_profiles").select("id, stripe_customer_id, tier").gte("created_at", since).limit(5000);
+    const payers = new Set(biz.invoices.filter((i) => i.status === "paid" && Number(i.amount_paid) > 0).map(customerOf));
+    const fresh = (data || []).filter((u) => u.tier !== "admin");
+    signups30d = fresh.length;
+    signups30dPaying = fresh.filter((u) => u.stripe_customer_id && payers.has(u.stripe_customer_id)).length;
+  } catch (e) { console.warn("[stripe admin-billing] sign-ups not counted:", e?.message || e); }
   const withPerson = (r) => ({ ...r, person: people[r.customerId] || null });
   return res.status(200).json({
     ok: true, mode,
-    summary: biz.summary,
+    summary: { ...biz.summary, signups30d, signups30dPaying },
     payments: biz.invoices.filter((i) => i.status !== "draft").map(invoiceRow).map(withPerson),
     subscriptions: biz.subs.map((x) => subscriptionRow(x, nowSec)).map(withPerson),
   });
@@ -1021,7 +1268,9 @@ async function handleReconcile(req, res) {
   try {
     await admin.rpc("record_cron_heartbeat", {
       p_job: "residata_stripe_reconcile",
-      p_ok: failed === 0,
+      // not ok when no endpoint of ours exists at Stripe: every webhook-driven e-mail
+      // and access change would silently stop (a transient read error is only noted)
+      p_ok: failed === 0 && webhook?.ours !== 0,
       p_detail: `scanned=${scanned} applied=${applied} skipped=${skipped} failed=${failed} ${webhookNote(webhook)}`,
     });
   } catch (e) {
@@ -1040,6 +1289,7 @@ export const WEBHOOK_EVENTS = [
   "checkout.session.completed", "customer.updated",
   "customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted",
   "invoice.paid", "invoice.payment_succeeded", "invoice.payment_failed",
+  "charge.refunded", "charge.dispute.created", "charge.dispute.closed",
 ];
 const OUR_WEBHOOK = /^https:\/\/(www\.)?residata\.eu\/api\/(webhooks\/stripe|stripe\?action=webhook)\b/;
 
@@ -1093,6 +1343,18 @@ async function handleWebhook(req, res) {
     return res.status(400).json({ error: `webhook signature error: ${e?.message}` });
   }
 
+  // E-mails ride on the webhook. A failed send used to be logged and swallowed, so the
+  // customer's invoice or Boss's payment e-mail could vanish while Stripe saw 200 and
+  // never retried (review 2026-10-08). Now a failed send answers 500: Stripe redelivers
+  // (for up to three days), every e-mail that did go out is claimed in
+  // invoice_emails_sent and is not repeated, and the access change is idempotent. An
+  // event older than two days gets 200 anyway — a mail server down for days is a
+  // problem the log must show, not a reason to keep Stripe's retries piling up.
+  const mailFailures = [];
+  const soft = (label) => (e) => {
+    console.warn(`[stripe webhook] ${label} not sent:`, e?.message || e);
+    mailFailures.push(label);
+  };
   try {
     const admin = getSupabaseAdmin();
     switch (event.type) {
@@ -1128,19 +1390,21 @@ async function handleWebhook(req, res) {
         await applySubscription(admin, stripe, event.data.object, {
           deleted: event.type === "customer.subscription.deleted",
         });
-        // Boss hears when someone cancels (Premium runs to the end) or stops paying —
-        // after the access change, and never able to fail the webhook.
+        // Boss (and the customer) hear about a cancellation, an undone cancellation and
+        // the end of a subscription — after the access change.
         if (event.type !== "customer.subscription.created") {
-          await notifyOwnerCancel(admin, stripe, event.data.object, { deleted: event.type === "customer.subscription.deleted" })
-            .catch((e) => console.warn("[stripe] owner cancel e-mail not sent:", e?.message || e));
+          await notifySubscriptionChange(admin, stripe, event.data.object, {
+            deleted: event.type === "customer.subscription.deleted",
+            previous: event.data.previous_attributes || null,
+            eventAt: event.created || null,
+          }).catch(soft("subscription e-mail"));
         }
         break;
       }
-      // A renewal that could not be charged: Boss and the customer hear once per invoice.
-      // Access is untouched here — the subscription events carry past_due (grace).
+      // A payment that did not go through: Boss and the customer hear on the first
+      // attempt and when Stripe gives up. Access follows the subscription events.
       case "invoice.payment_failed": {
-        await notifyPaymentFailed(admin, stripe, event.data.object)
-          .catch((e) => console.warn("[stripe] failed-payment e-mails not sent:", e?.message || e));
+        await notifyPaymentFailed(admin, stripe, event.data.object).catch(soft("failed-payment e-mail"));
         break;
       }
       case "invoice.paid":
@@ -1150,13 +1414,9 @@ async function handleWebhook(req, res) {
         // current_period_end. Resolve it robustly so this renewal safety-net path
         // doesn't silently no-op.
         const inv = event.data.object;
-        const subRef =
-          inv.subscription
-          ?? inv.parent?.subscription_details?.subscription
-          ?? inv.lines?.data?.[0]?.parent?.subscription_item_details?.subscription
-          ?? null;
+        const subRef = subOfInvoice(inv);
         if (subRef) {
-          const sub = await stripe.subscriptions.retrieve(typeof subRef === "string" ? subRef : subRef.id);
+          const sub = await stripe.subscriptions.retrieve(subRef);
           await applySubscription(admin, stripe, sub);
         }
         // Send the invoice ourselves. Stripe can email invoices, but only if
@@ -1166,16 +1426,30 @@ async function handleWebhook(req, res) {
         // invoice.payment_succeeded for the same invoice, and both arriving here
         // would send the customer two copies.
         if (event.type === "invoice.paid") {
-          await sendInvoiceEmail(admin, event.data.object, stripe)
-            .catch((e) => console.warn("[stripe] invoice email not sent:", e?.message || e));
+          await sendInvoiceEmail(admin, inv, stripe).catch(soft("invoice e-mail"));
           // …and Boss hears about the money (Boss 2026-10-07), once per invoice
-          await notifyOwnerPayment(admin, stripe, event.data.object)
-            .catch((e) => console.warn("[stripe] owner payment e-mail not sent:", e?.message || e));
+          await notifyOwnerPayment(admin, stripe, inv).catch(soft("owner payment e-mail"));
         }
+        break;
+      }
+      // Money given back, and chargebacks (a deadline and a fee): Boss hears at once.
+      case "charge.refunded": {
+        await notifyRefund(admin, stripe, event.data.object).catch(soft("refund e-mail"));
+        break;
+      }
+      case "charge.dispute.created":
+      case "charge.dispute.closed": {
+        await notifyDispute(admin, stripe, event.data.object, event.type.endsWith("created") ? "created" : "closed")
+          .catch(soft("dispute e-mail"));
         break;
       }
       default:
         break;
+    }
+    if (mailFailures.length) {
+      const ageSec = Date.now() / 1000 - Number(event.created || 0);
+      if (ageSec < 2 * 86400) return res.status(500).json({ error: "email_failed", retry: true, failed: mailFailures });
+      console.error(`[stripe webhook] ${event.id}: giving up on ${mailFailures.join(", ")} after two days of retries`);
     }
     return res.status(200).json({ received: true });
   } catch (e) {

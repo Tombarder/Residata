@@ -97,10 +97,17 @@ export default function AdminUsers({ users, setUsers, selfId, lang = "sk", premi
       return /^[0-9a-f-]{36}$/i.test(id || "") ? id : null;
     } catch { return null; }
   });
+  // …and &pane=payments opens it on that tab (the payment e-mails link there)
+  const [activityPane, setActivityPane] = useState(() => {
+    try { return new URLSearchParams(window.location.search).get("pane") === "payments" ? "payments" : "overview"; }
+    catch { return "overview"; }
+  });
   const openActivity = (id) => {
     setActivityId(id);
+    setActivityPane("overview");
     try {
       const p = new URLSearchParams(window.location.search);
+      p.delete("pane");
       if (id) { p.set("tab", "users"); p.set("user", id); } else p.delete("user");
       const qs = p.toString();
       window.history.replaceState(window.history.state, "", window.location.pathname + (qs ? `?${qs}` : ""));
@@ -397,6 +404,7 @@ export default function AdminUsers({ users, setUsers, selfId, lang = "sk", premi
           userId={activityId}
           profile={(users || []).find((x) => x.id === activityId)}
           lang={lang}
+          initialTab={activityPane}
           onClose={() => openActivity(null)}
         />
       )}

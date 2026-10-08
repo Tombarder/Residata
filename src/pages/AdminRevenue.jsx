@@ -14,14 +14,18 @@
 import { useEffect, useMemo, useState } from "react";
 import Kpi from "../components/Kpi";
 import UserActivity from "./UserActivity";
-import { StatusBadge, SubBadge, InvoiceLinks } from "./AdminPayments";
+import { StatusBadge, SubBadge, InvoiceLinks, AmountCell } from "./AdminPayments";
 import { L, money, day, period, KIND, loadAdminBilling, payments as paymentsN } from "../lib/adminPayments";
 
 const FILTERS = [
   ["all", "Všetky", "All", () => true],
   ["paid", "Zaplatené", "Paid", (i) => i.status === "paid"],
   ["failed", "Neúspešné", "Failed", (i) => i.status === "open" && i.attempts > 0],
+  ["refunded", "Vrátené", "Refunded", (i) => i.refunded > 0 || Boolean(i.dispute)],
 ];
+
+/** "1 ruší · 2 rušia · 5 ruší" */
+const rusi = (n, lang) => (lang === "sk" ? `${n} ${n >= 2 && n <= 4 ? "rušia" : "ruší"}` : `${n} cancelling`);
 
 export default function RevenuePanel({ users = [], lang = "sk" }) {
   const t = L(lang);
@@ -45,6 +49,12 @@ export default function RevenuePanel({ users = [], lang = "sk" }) {
   const cur = payments.find((p) => p.currency)?.currency || "eur";
   const person = (r) => r.person || (r.email ? { email: r.email, name: r.name } : null);
   const openPerson = (p) => { if (p?.id) setOpen(p.id); };
+  const wait = !data && !err;            // a failed load shows dashes, not an endless "…"
+  const conv = s.signups30d ? Math.round((100 * (s.signups30dPaying || 0)) / s.signups30d) : null;
+  const statusNote = [s.cancelling ? rusi(s.cancelling, lang) : null,
+    s.pastDue ? t(`${s.pastDue} platba zlyháva`, `${s.pastDue} payment failing`) : null,
+    s.comped ? t(`${s.comped} zadarmo (kupón)`, `${s.comped} free (coupon)`) : null,
+    s.trialing ? t(`${s.trialing} na skúšku`, `${s.trialing} on trial`) : null].filter(Boolean).join(" · ");
 
   return (
     <div>
@@ -55,8 +65,8 @@ export default function RevenuePanel({ users = [], lang = "sk" }) {
           </span>
         )}
         <span className="rd-note" style={{ margin: 0 }}>
-          {t("Čísla priamo zo Stripe. Výplaty na účet a poplatky: ", "Numbers straight from Stripe. Payouts and fees: ")}
-          <a href="https://dashboard.stripe.com/payouts" target="_blank" rel="noreferrer">Stripe → {t("Výplaty", "Payouts")} ↗</a>
+          {t("Čísla priamo zo Stripe, tržby po vrátených platbách. Výplaty na účet a poplatky: ", "Numbers straight from Stripe, revenue net of refunds. Payouts and fees: ")}
+          <a href={`https://dashboard.stripe.com/${data?.mode === "test" ? "test/" : ""}payouts`} target="_blank" rel="noreferrer">Stripe → {t("Výplaty", "Payouts")} ↗</a>
         </span>
         <button type="button" className="rd-btn rd-btn--sm rd-btn--ghost" style={{ marginLeft: "auto" }} onClick={() => setNonce((n) => n + 1)}>
           {loading ? t("Načítavam…", "Loading…") : t("↻ Obnoviť", "↻ Refresh")}
@@ -68,25 +78,42 @@ export default function RevenuePanel({ users = [], lang = "sk" }) {
           {err} <button type="button" className="rd-btn rd-btn--sm" onClick={() => setNonce((n) => n + 1)} style={{ marginLeft: "auto" }}>{t("Skúsiť znova", "Retry")}</button>
         </div>
       )}
+      {s.truncated && (
+        <div className="rd-alert" style={{ marginBottom: "1rem" }}>
+          {t("V Stripe je viac záznamov, než sa tu sčíta — čísla pokrývajú najnovšiu časť. Úplné čísla sú v Stripe.", "Stripe holds more records than are counted here — the numbers cover the most recent part. Full numbers are in Stripe.")}
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "0.7rem", marginBottom: "1.4rem" }}>
-        <Kpi loading={!data} label="MRR" value={money(s.mrr, cur, lang)} sub={data ? `ARR ${money(s.arr, cur, lang)}` : null}
-          info={t("Mesačný opakovaný príjem: súčet mesačných súm bežiacich predplatných po zľave, ktorá stále platí.", "Monthly recurring revenue: the monthly value of running subscriptions after any discount that still applies.")} />
-        <Kpi loading={!data} label={t("Platiaci", "Paying")} value={s.paying ?? "—"}
-          sub={data ? (s.cancelling ? `${s.cancelling} ${t("ruší", "cancelling")}` : t("nikto neruší", "nobody cancelling")) : null} subWarn={Boolean(s.cancelling)} />
-        <Kpi loading={!data} label="ARPU" value={money(s.arpu, cur, lang)} sub={t("mesačne na platiaceho", "a month per payer")} />
-        <Kpi loading={!data} label={t("Tento mesiac", "This month")} value={money(s.revenueMonth, cur, lang)} sub={data ? `${t("30 dní", "30 days")}: ${money(s.revenue30d, cur, lang)}` : null} />
-        <Kpi loading={!data} label={t("Spolu", "All time")} value={money(s.revenueTotal, cur, lang)} sub={data ? paymentsN(s.payments, lang) : null} />
-        <Kpi loading={!data} label={t("Nové za 30 dní", "New in 30 days")} value={s.new30d ?? "—"} sub={t("nové predplatné", "new subscriptions")} />
-        <Kpi loading={!data} label={t("Neúspešné platby", "Failed payments")} value={s.failedOpen ?? "—"}
-          sub={data ? (s.failedOpen ? t("Stripe ich skúša znova", "Stripe is retrying") : t("všetko prešlo", "all went through")) : null} subWarn={Boolean(s.failedOpen)} />
+        <Kpi loading={wait} label="MRR" value={data ? money(s.mrr, cur, lang) : "—"}
+          sub={data ? `ARR ${money(s.arr, cur, lang)}${s.mrrAtRisk ? ` · ${t("v ohrození", "at risk")} ${money(s.mrrAtRisk, cur, lang)}` : ""}` : null} subWarn={Boolean(s.mrrAtRisk)}
+          info={t("Mesačný opakovaný príjem: súčet mesačných súm platiacich predplatných po zľave, ktorá stále platí (bez skúšobných). „V ohrození“ = časť, ktorá je zrušená alebo ktorej platba zlyháva.", "Monthly recurring revenue: the monthly value of paying subscriptions after any discount that still applies (trials left out). “At risk” = the part that is cancelled or whose payment is failing.")} />
+        <Kpi loading={wait} label={t("Platiaci", "Paying")} value={data ? s.paying : "—"}
+          sub={data ? (statusNote || t("nikto neruší", "nobody cancelling")) : null} subWarn={Boolean(s.cancelling || s.pastDue)}
+          info={t("Zákazníci s bežiacim predplatným, ktoré má hodnotu — každý raz. Predplatné so 100 % kupónom a skúšobné sa nepočítajú.", "Customers with a running subscription worth money — each once. 100 % coupons and trials are not counted.")} />
+        <Kpi loading={wait} label="ARPU" value={data ? money(s.arpu, cur, lang) : "—"} sub={t("mesačne na platiaceho", "a month per payer")} />
+        <Kpi loading={wait} label={t("Tento mesiac", "This month")} value={data ? money(s.revenueMonth, cur, lang) : "—"} sub={data ? `${t("30 dní", "30 days")}: ${money(s.revenue30d, cur, lang)}` : null} />
+        <Kpi loading={wait} label={t("Spolu", "All time")} value={data ? money(s.revenueTotal, cur, lang) : "—"}
+          sub={data ? paymentsN(s.payments, lang) + (s.refundedTotal ? ` · ${t("vrátené", "refunded")} ${money(s.refundedTotal, cur, lang)}` : "") : null} subWarn={Boolean(s.refundedTotal)} />
+        <Kpi loading={wait} label={t("Nové za 30 dní", "New in 30 days")} value={data ? s.new30d : "—"}
+          sub={data ? t(`odišli: ${s.churned30d || 0}`, `left: ${s.churned30d || 0}`) : null} subWarn={Boolean(s.churned30d)} />
+        <Kpi loading={wait} label={t("Obnovy do 7 dní", "Renewals in 7 days")} value={data ? s.renewals7d : "—"}
+          sub={data ? (s.renewals7d ? `${t("asi", "about")} ${money(s.renewals7dAmount, cur, lang)}` : t("žiadne", "none")) : null} />
+        <Kpi loading={wait} label={t("Registrácia → platba", "Sign-up → paid")} value={data && conv != null ? `${conv} %` : "—"}
+          sub={data && s.signups30d != null ? t(`${s.signups30dPaying || 0} z ${s.signups30d} za 30 dní`, `${s.signups30dPaying || 0} of ${s.signups30d} in 30 days`) : null}
+          info={t("Z ľudí, ktorí sa zaregistrovali za posledných 30 dní, koľkí už zaplatili.", "Of the people who signed up in the last 30 days, how many have paid.")} />
+        <Kpi loading={wait} label={t("Neúspešné platby", "Failed payments")} value={data ? s.failedOpen : "—"}
+          sub={data ? (s.failedOpen ? t("Premium pozastavené, kým nezaplatia", "Premium paused until paid") : t("všetko prešlo", "all went through")) : null} subWarn={Boolean(s.failedOpen)} />
+        {(s.disputesOpen > 0) && (
+          <Kpi label={t("Reklamácie v banke", "Chargebacks")} value={s.disputesOpen} sub={t("treba odpovedať v Stripe", "respond in Stripe")} subWarn />
+        )}
       </div>
 
       <section className="rd-card rd-card--pad" style={{ marginBottom: "1.2rem" }}>
         <div className="rd-sect" style={{ marginBottom: "0.7rem" }}>
           <span className="rd-sect__tick" /><span className="rd-sect__name">{t("Platby a faktúry", "Payments and invoices")}</span>
-          <span className="rd-sect__count">{payments.length}</span>
-          <div className="rd-seg" role="group" style={{ marginLeft: "auto" }}>
+          <span className="rd-sect__count">{payments.length}{s.truncated ? "+" : ""}</span>
+          <div className="rd-seg" role="group" style={{ marginLeft: "auto", maxWidth: "100%", overflowX: "auto" }}>
             {FILTERS.map(([k, sk, en, fn]) => (
               <button key={k} type="button" className="rd-seg__btn" aria-pressed={filter === k} onClick={() => setFilter(k)}>
                 {lang === "sk" ? sk : en} <span style={{ opacity: 0.6 }}>{payments.filter(fn).length}</span>
@@ -115,8 +142,7 @@ export default function RevenuePanel({ users = [], lang = "sk" }) {
                       </td>
                       <td>{L(lang)(...(KIND[i.kind] || KIND.other))}</td>
                       <td style={{ whiteSpace: "nowrap" }}>{period(i.periodStart, i.periodEnd, lang)}</td>
-                      <td style={{ whiteSpace: "nowrap", fontWeight: 600 }}>{money(i.amount, i.currency, lang)}
-                        {i.discount ? <div className="rd-note" style={{ margin: 0, fontWeight: 400 }}>{t("zľava", "discount")} {money(i.discount, i.currency, lang)}</div> : null}</td>
+                      <AmountCell inv={i} lang={lang} />
                       <td><StatusBadge inv={i} lang={lang} /></td>
                       <td><InvoiceLinks inv={i} mode={data.mode} lang={lang} /></td>
                     </tr>
@@ -125,7 +151,7 @@ export default function RevenuePanel({ users = [], lang = "sk" }) {
               </tbody>
             </table>
           </div>
-        ) : <p className="rd-note">{data ? (payments.length ? t("Žiadna platba pre tento filter.", "No payment for this filter.") : t("Zatiaľ žiadna platba. Prvá sa tu ukáže hneď, ako ju Stripe potvrdí.", "No payments yet. The first appears here as soon as Stripe confirms it.")) : t("Načítavam…", "Loading…")}</p>}
+        ) : <p className="rd-note">{data ? (payments.length ? t("Žiadna platba pre tento filter.", "No payment for this filter.") : t("Zatiaľ žiadna platba. Prvá sa tu ukáže hneď, ako ju Stripe potvrdí.", "No payments yet. The first appears here as soon as Stripe confirms it.")) : err ? "—" : t("Načítavam…", "Loading…")}</p>}
       </section>
 
       <section className="rd-card rd-card--pad">
@@ -147,14 +173,15 @@ export default function RevenuePanel({ users = [], lang = "sk" }) {
                       <td><SubBadge s={x} lang={lang} /></td>
                       <td style={{ whiteSpace: "nowrap" }}>{day(x.created, lang)}</td>
                       <td style={{ whiteSpace: "nowrap" }}>{period(x.periodStart, x.periodEnd, lang)}</td>
-                      <td style={{ whiteSpace: "nowrap", fontWeight: 600 }}>{x.monthly ? money(x.monthly, cur, lang) : "—"}</td>
+                      <td style={{ whiteSpace: "nowrap", fontWeight: 600 }}>{x.monthly ? money(x.monthly, cur, lang) : "—"}
+                        {x.coupon ? <div className="rd-note" style={{ margin: 0, fontWeight: 400 }}>{x.coupon}</div> : null}</td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
           </div>
-        ) : <p className="rd-note">{data ? t("Žiadne predplatné.", "No subscriptions.") : t("Načítavam…", "Loading…")}</p>}
+        ) : <p className="rd-note">{data ? t("Žiadne predplatné.", "No subscriptions.") : err ? "—" : t("Načítavam…", "Loading…")}</p>}
       </section>
 
       {open && (

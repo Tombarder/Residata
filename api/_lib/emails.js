@@ -555,6 +555,23 @@ export function feedbackReceiptHtml(fb, webUrl, lang = "sk", convId = null) {
 // sender, and there is no second place where an address is written down.
 // Automated mail still carries Reply-To: info@, so a customer who hits reply
 // reaches a monitored mailbox instead of the void.
+/** Readable plain text from one of our HTML e-mails: links kept as "label (url)", rows on lines. */
+export function htmlToText(html) {
+  return String(html || "")
+    .replace(/<(style|head|script)[^>]*>[\s\S]*?<\/\1>/gi, "")
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<a\s[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi, (m, href, label) => {
+      const l = label.replace(/<[^>]+>/g, "").trim();
+      return href.startsWith("mailto:") || !l ? l || href.replace(/^mailto:/, "") : `${l} (${href})`;
+    })
+    .replace(/<(br|\/p|\/div|\/h[1-6]|\/tr|\/li)[^>]*>/gi, "\n")
+    .replace(/<\/t[dh]>/gi, "  ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;|&#160;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&[a-z0-9#]+;/gi, "")
+    .replace(/[ \t]+/g, " ").replace(/ *\n */g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
 export async function sendEmail({ to, subject, html, from, gmailUser, gmailPassword, replyTo, conversational = false, attachments }) {
   const host = process.env.SMTP_HOST || "smtp.gmail.com";
   const port = Number(process.env.SMTP_PORT || 465);
@@ -576,6 +593,9 @@ export async function sendEmail({ to, subject, html, from, gmailUser, gmailPassw
     ...(replyAddr ? { replyTo: replyAddr } : {}),
     subject,
     html,
+    // A plain-text part next to the HTML (2026-10-08): mail with HTML only scores worse with
+    // spam filters, and text-only readers (watches, some corporate clients) showed nothing.
+    text: htmlToText(html),
     // [{ filename, content: Buffer, contentType }] — e.g. the invoice PDF (2026-10-07)
     ...(attachments && attachments.length ? { attachments } : {}),
   });
@@ -588,14 +608,21 @@ export async function sendEmail({ to, subject, html, from, gmailUser, gmailPassw
 // ──────────────────────────────────────────────────────────
 // PAYMENTS (Boss 2026-10-07): "wanna get notified if someone pays … no invoice for
 // the user when i bought, and no email about getting to premium tier (should be
-// nice informative and positive/cool)". Four e-mails, all built from the same
-// pieces so they read as one family:
+// nice informative and positive/cool)". One family of e-mails, built from the same
+// pieces (review 2026-10-08 completed the set and made every sentence true):
 //   · customer, first payment  → "Welcome to Residata Premium 🎉" + invoice (PDF attached)
 //   · customer, renewal/change → the invoice
-//   · customer, failed renewal → check your card
-//   · owner (Boss, English)    → every payment, failed payment and cancellation
+//   · customer, failed payment → first payment: nothing started, finish it;
+//                                renewal: Premium paused, Stripe retries, pay now;
+//                                last attempt: retries are over
+//   · customer, cancellation   → confirmation (Premium runs until …); the end → "it ended"
+//   · owner (Boss, English)    → every payment, failure, cancellation (and its undoing),
+//                                end, refund and chargeback
+// Access truth behind the wording: Premium runs while `paid_until` is in the future, and
+// a failing renewal does NOT extend it (applySubscription, GRACE) — so a failed renewal
+// pauses Premium; the e-mails used to say "Premium keeps running during the retries".
 // Money and facts come from Stripe objects (lib/billingStats.js); every value
-// that a person typed (name, company) is escaped.
+// that a person typed (name, company, cancellation comment) is escaped.
 // ──────────────────────────────────────────────────────────
 
 /** 2499 → "€24.99" (en) / "24,99 €" (sk). */
@@ -614,11 +641,14 @@ const fmtDaySec = (sec, lang = "en") => (sec
     { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Bratislava" })
   : "");
 
+const AMBER = "#f5a623";
+const RED = "#ef5350";
+
 /** Label → value table on the dark card. Values must already be escaped (they may carry HTML). */
 function kvTable(rows) {
   const tr = rows.filter((r) => r && r[1] != null && r[1] !== "").map(([k, v]) =>
     `<tr><td style="padding:9px 14px 9px 0;border-top:1px solid ${CARD_BORDER};vertical-align:top;white-space:nowrap;width:128px;color:${TEXT_DIM};font-family:'JetBrains Mono',Consolas,monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.05em">${k}</td>`
-    + `<td style="padding:9px 0;border-top:1px solid ${CARD_BORDER};color:${TEXT_HI};font-size:14px;line-height:1.5">${v}</td></tr>`).join("");
+    + `<td style="padding:9px 0;border-top:1px solid ${CARD_BORDER};color:${TEXT_HI};font-size:14px;line-height:1.5;word-break:break-word">${v}</td></tr>`).join("");
   return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;margin:4px 0">${tr}</table>`;
 }
 
@@ -638,6 +668,26 @@ function checklist(items) {
 
 const link = (href, text) => `<a href="${escHtml(href)}" style="color:${GREEN};text-decoration:none">${text}</a>`;
 
+/**
+ * Buttons that survive Outlook for Windows: it ignores padding and border-radius on a
+ * link, so a styled <a> shrinks to underlined text. The colour sits on a table cell
+ * (bgcolor), the link inside it. `[[href, label, "primary"|"outline"], …]`.
+ */
+function buttons(list) {
+  const cells = list.filter((b) => b && b[0]).map(([href, label, kind = "outline"]) => {
+    const primary = kind === "primary";
+    return `<td style="padding:6px 8px 6px 0"><table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr>`
+      + `<td bgcolor="${primary ? GREEN : CARD_BG}" style="border-radius:8px;${primary ? "" : `border:1px solid ${CARD_BORDER};`}">`
+      + `<a href="${escHtml(href)}" style="display:inline-block;padding:12px 22px;font-size:14px;font-weight:${primary ? 700 : 500};color:${primary ? "#0a0a0b" : TEXT_HI};text-decoration:none;border-radius:8px">${label}</a>`
+      + `</td></tr></table></td>`;
+  }).join("");
+  return cells ? `<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin-top:18px"><tr>${cells}</tr></table>` : "";
+}
+
+const helloLine = (name, lang) => (name
+  ? (lang === "sk" ? `Dobrý deň, ${escHtml(name)},` : `Hello ${escHtml(name)},`)
+  : (lang === "sk" ? "Dobrý deň," : "Hello,"));
+
 /** Shared facts of a payment, in the customer's language. */
 function paymentRows(p, lang) {
   const sk = lang === "sk";
@@ -647,10 +697,11 @@ function paymentRows(p, lang) {
   const next = p.periodEnd && p.periodStart !== p.periodEnd
     ? fmtDaySec(p.periodEnd, lang) + (p.nextAmount != null ? ` · ${fmtMoney(p.nextAmount, p.currency, lang)}` : "")
     : null;
+  const disc = p.discount
+    ? ` <span style="color:${TEXT_DIM}">(${t("zľava", "discount")} ${fmtMoney(p.discount, p.currency, lang)}${p.coupon ? ` · ${escHtml(p.coupon)}` : ""})</span>` : "";
   return [
     [t("Plán", "Plan"), `<strong>Residata Premium</strong> · ${t("mesačne", "monthly")}`],
-    [t("Zaplatené", "Paid"), fmtMoney(p.amount, p.currency, lang)
-      + (p.discount ? ` <span style="color:${TEXT_DIM}">(${t("zľava", "discount")} ${fmtMoney(p.discount, p.currency, lang)})</span>` : "")],
+    [t("Zaplatené", "Paid"), fmtMoney(p.amount, p.currency, lang) + disc],
     [t("Obdobie", "Period"), period],
     [t("Ďalšia platba", "Next payment"), next],
     [t("Číslo faktúry", "Invoice no."), p.number ? (p.hostedUrl ? link(p.hostedUrl, escHtml(p.number)) : escHtml(p.number)) : null],
@@ -661,7 +712,7 @@ const KIND_TEXT = { new: "new subscription", renewal: "renewal", change: "plan c
 
 /**
  * The customer's e-mail after a successful payment.
- * `p` = { kind, amount, discount, currency, number, periodStart, periodEnd, nextAmount,
+ * `p` = { kind, amount, discount, coupon, currency, number, periodStart, periodEnd, nextAmount,
  *         hostedUrl, pdfUrl, name, pdfAttached }
  * kind "new" is the celebration; anything else is the invoice for the next period.
  */
@@ -674,16 +725,15 @@ export function customerPaymentSubject(p, lang = "sk") {
 export function customerPaymentHtml(p, webUrl, lang = "sk") {
   const sk = lang === "sk";
   const t = (a, b) => (sk ? a : b);
-  const hello = p.name ? t(`Dobrý deň, ${escHtml(p.name)},`, `Hello ${escHtml(p.name)},`) : t("Dobrý deň,", "Hello,");
+  const free = !(Number(p.amount) > 0);           // a 100 % coupon or credit: nothing was charged
   const invoiceLine = p.pdfAttached
-    ? t("Faktúru máte v prílohe tohto e-mailu — je to daňový doklad pre vaše účtovníctvo.",
-        "Your invoice is attached to this e-mail — it is a tax document for your records.")
-    : t("Faktúru si stiahnete tlačidlom nižšie — je to daňový doklad pre vaše účtovníctvo.",
-        "Download your invoice with the button below — it is a tax document for your records.");
-  const buttons = (primary) => `<div style="margin-top:18px">
-      ${primary}
-      ${p.pdfUrl ? `<a href="${escHtml(p.pdfUrl)}" style="${S.btnOutline}">${t("Stiahnuť faktúru (PDF)", "Download invoice (PDF)")}</a>` : ""}
-    </div>`;
+    ? t("Faktúru máte v prílohe tohto e-mailu — doklad pre vaše účtovníctvo.",
+        "Your invoice is attached to this e-mail — a document for your accounts.")
+    : p.pdfUrl || p.hostedUrl
+      ? t("Faktúru si stiahnete tlačidlom nižšie — doklad pre vaše účtovníctvo.",
+          "Download your invoice with the button below — a document for your accounts.")
+      : null;
+  const pdfButton = p.pdfUrl ? [p.pdfUrl, t("Stiahnuť faktúru (PDF)", "Download invoice (PDF)")] : null;
   const manage = `<p style="${S.p};font-size:13px;color:${TEXT_DIM};margin-top:18px">${t(
     "Predplatné sa obnovuje mesačne. Kartu, fakturačné údaje aj zrušenie spravujete v aplikácii v časti <strong style=\"color:" + TEXT_MID + "\">Predplatné</strong>. Otázky? Odpíšte na info@residata.eu.",
     "The subscription renews monthly. Your card, billing details and cancellation are in the app under <strong style=\"color:" + TEXT_MID + "\">Plan &amp; billing</strong>. Questions? Write to info@residata.eu.",
@@ -691,12 +741,16 @@ export function customerPaymentHtml(p, webUrl, lang = "sk") {
 
   let inner;
   if (p.kind === "new") {
+    const lead = free
+      ? t("ďakujeme za dôveru. <strong style=\"color:" + TEXT_HI + "\">Premium máte aktívne hneď teraz</strong> — s vaším kupónom je toto obdobie zadarmo.",
+          "thank you for your trust. <strong style=\"color:" + TEXT_HI + "\">Premium is active right now</strong> — with your coupon this period is free.")
+      : t("ďakujeme za dôveru. Platba prebehla a <strong style=\"color:" + TEXT_HI + "\">Premium máte aktívne hneď teraz</strong> — stačí otvoriť Residata.",
+          "thank you for your trust. The payment went through and <strong style=\"color:" + TEXT_HI + "\">Premium is active right now</strong> — just open Residata.");
     inner = `
     <div style="${S.eyebrow}">${t("Premium je aktívne", "Premium is active")}</div>
     <h1 style="${S.h1}">${t("Vitajte v Residata Premium 🎉", "Welcome to Residata Premium 🎉")}</h1>
-    <p style="${S.p}">${hello}</p>
-    <p style="${S.p}">${t("ďakujeme za dôveru. Platba prebehla a <strong style=\"color:" + TEXT_HI + "\">Premium máte aktívne hneď teraz</strong> — stačí otvoriť Residata.",
-                         "thank you for your trust. The payment went through and <strong style=\"color:" + TEXT_HI + "\">Premium is active right now</strong> — just open Residata.")}</p>
+    <p style="${S.p}">${helloLine(p.name, lang)}</p>
+    <p style="${S.p}">${lead}</p>
     ${checklist([
       t("<strong style=\"color:" + TEXT_HI + "\">Všetky projekty</strong> novostavieb na Slovensku a v Česku v plnom detaile",
         "<strong style=\"color:" + TEXT_HI + "\">Every project</strong> in the Slovak and Czech new-build market, in full detail"),
@@ -706,26 +760,28 @@ export function customerPaymentHtml(p, webUrl, lang = "sk") {
     ])}
     ${sectionLabel(t("Súhrn", "Summary"))}
     ${kvTable(paymentRows(p, lang))}
-    ${buttons(`<a href="${webUrl}/app" style="${S.btnGreen}">${t("Otvoriť Residata", "Open Residata")} →</a>`)}
+    ${buttons([[`${webUrl}/app`, `${t("Otvoriť Residata", "Open Residata")} →`, "primary"], pdfButton])}
     ${manage}`;
   } else {
     inner = `
     <div style="${S.eyebrow}">${t("Faktúra", "Invoice")}</div>
     <h1 style="${S.h1}">${t("Ďakujeme za platbu", "Thank you for your payment")}</h1>
-    <p style="${S.p}">${hello}</p>
+    <p style="${S.p}">${helloLine(p.name, lang)}</p>
     <p style="${S.p}">${p.kind === "change"
       ? t("platba za zmenu predplatného prebehla. ", "the payment for your subscription change went through. ")
-      : t("platba za ďalšie obdobie Residata Premium prebehla a predplatné beží ďalej. ", "the payment for the next period of Residata Premium went through and your subscription continues. ")}${invoiceLine}</p>
+      : t("platba za ďalšie obdobie Residata Premium prebehla a predplatné beží ďalej. ", "the payment for the next period of Residata Premium went through and your subscription continues. ")}${invoiceLine || ""}</p>
     ${kvTable(paymentRows(p, lang))}
-    ${buttons(p.hostedUrl ? `<a href="${escHtml(p.hostedUrl)}" style="${S.btnGreen}">${t("Otvoriť faktúru", "View invoice")}</a>` : "")}
+    ${buttons([p.hostedUrl ? [p.hostedUrl, t("Otvoriť faktúru", "View invoice"), "primary"] : null, pdfButton])}
     ${manage}`;
   }
+  const attached = p.pdfAttached ? t(" Faktúra je v prílohe.", " Your invoice is attached.") : "";
   return shell({
     lang,
     title: p.kind === "new" ? t("Vitajte v Residata Premium", "Welcome to Residata Premium") : t("Faktúra od Residata", "Invoice from Residata"),
     preheader: p.kind === "new"
-      ? t("Platba prebehla, Premium je aktívne. Faktúra je v prílohe.", "Payment received, Premium is active. Your invoice is attached.")
-      : t(`Faktúra ${p.number || ""} · ${fmtMoney(p.amount, p.currency, lang)}`, `Invoice ${p.number || ""} · ${fmtMoney(p.amount, p.currency, lang)}`),
+      ? (free ? t("Premium je aktívne — toto obdobie máte s kupónom zadarmo.", "Premium is active — this period is free with your coupon.")
+              : t("Platba prebehla, Premium je aktívne.", "Payment received, Premium is active.")) + attached
+      : t(`Faktúra ${p.number || ""} · ${fmtMoney(p.amount, p.currency, lang)}`, `Invoice ${p.number || ""} · ${fmtMoney(p.amount, p.currency, lang)}`) + attached,
     inner,
     footer: t("Residata · doklad k vášmu predplatnému", "Residata · receipt for your subscription"),
   });
@@ -739,48 +795,113 @@ export function invoicePaidHtml(inv, webUrl, lang = "sk") {
   }, webUrl, lang);
 }
 
-/** The customer's e-mail when a renewal could not be charged. */
+/**
+ * The customer's e-mail when a payment did not go through. `p` adds { final, nextAttempt }.
+ * Three truths:
+ *  · first payment (kind "new") — nothing started, nothing charged, nothing retried;
+ *  · renewal — Premium is paused until it goes through; Stripe retries; paying now restores it;
+ *  · renewal, last attempt (`final`) — the automatic retries are over.
+ */
 export function customerPaymentFailedSubject(lang = "sk", p = null) {
+  const sk = lang === "sk";
   if (p?.kind === "new") {
-    return lang === "sk" ? "Platba za Residata Premium neprešla — predplatné sa nespustilo" : "Your Residata Premium payment did not go through — the subscription did not start";
+    return sk ? "Platba za Residata Premium neprešla — predplatné sa nespustilo" : "Your Residata Premium payment did not go through — the subscription did not start";
   }
-  return lang === "sk" ? "Platba za Residata Premium sa nepodarila" : "Your Residata Premium payment did not go through";
+  if (p?.final) return sk ? "Platba za Residata Premium opäť neprešla — Premium je pozastavené" : "Your Residata Premium payment failed again — Premium is paused";
+  return sk ? "Platba za Residata Premium sa nepodarila — Premium je pozastavené" : "Your Residata Premium payment did not go through — Premium is paused";
 }
 
-// Two different situations, two different truths: a failed RENEWAL is retried and
-// Premium keeps running meanwhile; a failed FIRST payment (kind "new") started nothing,
-// is not retried and charged nothing — they simply try again.
 export function customerPaymentFailedHtml(p, webUrl, lang = "sk") {
   const sk = lang === "sk";
   const t = (a, b) => (sk ? a : b);
   const first = p.kind === "new";
   const amount = `<strong style="color:${TEXT_HI}">${fmtMoney(p.amount, p.currency, lang)}</strong>`;
-  const inner = `
-    <div style="${S.eyebrow};color:#f5a623">${first ? t("Predplatné sa nespustilo", "Subscription not started") : t("Treba vašu pozornosť", "Needs your attention")}</div>
+  const hello = `<p style="${S.p}">${helloLine(p.name, lang)}</p>`;
+  let inner;
+  if (first) {
+    inner = `
+    <div style="${S.eyebrow};color:${AMBER}">${t("Predplatné sa nespustilo", "Subscription not started")}</div>
     <h1 style="${S.h1}">${t("Platba sa nepodarila", "The payment did not go through")}</h1>
-    <p style="${S.p}">${p.name ? t(`Dobrý deň, ${escHtml(p.name)},`, `Hello ${escHtml(p.name)},`) : t("Dobrý deň,", "Hello,")}</p>
-    ${first ? `
+    ${hello}
     <p style="${S.p}">${t(
       `platbu ${amount} za Residata Premium sa nepodarilo strhnúť, preto sa predplatné nespustilo a nič sme vám neúčtovali.`,
       `we could not take the payment of ${amount} for Residata Premium, so the subscription did not start and you have not been charged.`)}</p>
     <p style="${S.p}">${t(
       "Ak chcete Premium, skúste to prosím znova — napríklad inou kartou. Trvá to minútu.",
       "If you would like Premium, please try again — for example with another card. It takes a minute.")}</p>
-    <a href="${webUrl}/app/billing" style="${S.btnGreen}">${t("Skúsiť znova", "Try again")} →</a>` : `
+    ${buttons([[`${webUrl}/app/billing`, `${t("Skúsiť znova", "Try again")} →`, "primary"]])}`;
+  } else {
+    const next = !p.final && p.nextAttempt ? fmtDaySec(p.nextAttempt, lang) : null;
+    inner = `
+    <div style="${S.eyebrow};color:${AMBER}">${p.final ? t("Automatické pokusy sa skončili", "Automatic retries are over") : t("Treba vašu pozornosť", "Needs your attention")}</div>
+    <h1 style="${S.h1}">${p.final ? t("Platba opäť neprešla", "The payment failed again") : t("Platba sa nepodarila", "The payment did not go through")}</h1>
+    ${hello}
     <p style="${S.p}">${t(
-      `platbu ${amount} za Residata Premium sa nepodarilo strhnúť z vašej karty. Platbu skúsime znova automaticky.`,
-      `we could not charge ${amount} for Residata Premium to your card. We will retry automatically.`)}</p>
-    <p style="${S.p}">${t(
-      "Aby ste o prístup neprišli, skontrolujte prosím kartu (platnosť, limit) alebo zadajte inú v aplikácii v časti Predplatné.",
-      "To keep your access, please check your card (expiry, limit) or add another one in the app under Plan &amp; billing.")}</p>
-    <a href="${webUrl}/app/billing" style="${S.btnGreen}">${t("Skontrolovať kartu", "Check my card")} →</a>`}`;
+      `platbu ${amount} za ďalšie obdobie Residata Premium sa nepodarilo strhnúť z vašej karty, preto je <strong style="color:${TEXT_HI}">Premium pozastavené</strong>, kým platba neprejde.`,
+      `we could not charge ${amount} for the next period of Residata Premium to your card, so <strong style="color:${TEXT_HI}">Premium is paused</strong> until the payment goes through.`)}</p>
+    <p style="${S.p}">${p.final
+      ? t("Ďalší automatický pokus už nebude. Ak chcete Premium ďalej, zaplaťte prosím faktúru tlačidlom nižšie alebo si v časti Predplatné zadajte inú kartu.",
+          "There will be no further automatic attempt. If you would like to keep Premium, please pay the invoice with the button below or add another card under Plan &amp; billing.")
+      : t(`Platbu skúsime znova automaticky${next ? ` (ďalší pokus ${next})` : ""}. Nemusíte čakať — zaplatiť môžete hneď tlačidlom nižšie a Premium sa obnoví okamžite. Ak je problém s kartou (platnosť, limit), zadajte inú v časti Predplatné.`,
+          `We will retry automatically${next ? ` (next attempt ${next})` : ""}. You do not have to wait — pay now with the button below and Premium comes back at once. If the card is the problem (expiry, limit), add another one under Plan &amp; billing.`)}</p>
+    ${buttons([p.hostedUrl ? [p.hostedUrl, `${t("Zaplatiť teraz", "Pay now")} →`, "primary"] : null,
+      [`${webUrl}/app/billing`, t("Zmeniť kartu", "Change card"), p.hostedUrl ? "outline" : "primary"]])}`;
+  }
   return shell({
     lang,
     title: customerPaymentFailedSubject(lang, p),
     preheader: first ? t("Predplatné sa nespustilo — môžete to skúsiť znova.", "The subscription did not start — you can try again.")
-      : t("Skontrolujte prosím platobnú kartu.", "Please check your payment card."),
+      : t("Premium je pozastavené, kým platba neprejde. Zaplatiť môžete hneď.", "Premium is paused until the payment goes through. You can pay now."),
     inner,
   });
+}
+
+/** The customer's confirmation of their own cancellation. `c` = { endsAt, name } */
+export function customerCancelSubject(lang = "sk") {
+  return lang === "sk" ? "Zrušenie Residata Premium potvrdené" : "Your Residata Premium cancellation is confirmed";
+}
+
+export function customerCancelHtml(c, webUrl, lang = "sk") {
+  const t = (a, b) => (lang === "sk" ? a : b);
+  const until = c.endsAt ? `<strong style="color:${TEXT_HI}">${fmtDaySec(c.endsAt, lang)}</strong>` : null;
+  const inner = `
+    <div style="${S.eyebrow}">${t("Zrušenie potvrdené", "Cancellation confirmed")}</div>
+    <h1 style="${S.h1}">${t("Predplatné ste zrušili", "You have cancelled your subscription")}</h1>
+    <p style="${S.p}">${helloLine(c.name, lang)}</p>
+    <p style="${S.p}">${until
+      ? t(`potvrdzujeme zrušenie Residata Premium. Premium vám beží do ${until} a potom vám už nič neúčtujeme.`,
+          `this confirms that Residata Premium is cancelled. Premium keeps running until ${until} and nothing more will be charged after that.`)
+      : t("potvrdzujeme zrušenie Residata Premium. Nič ďalšie vám už neúčtujeme.", "this confirms that Residata Premium is cancelled. Nothing more will be charged.")}</p>
+    <p style="${S.p}">${t("Rozmysleli ste si to? Zrušenie vrátite jedným klikom v časti Predplatné — kým Premium beží.",
+      "Changed your mind? Undo the cancellation with one click under Plan &amp; billing — while Premium is still running.")}</p>
+    ${buttons([[`${webUrl}/app/billing`, t("Ponechať Premium", "Keep Premium"), "primary"]])}
+    <p style="${S.p};font-size:13px;color:${TEXT_DIM};margin-top:18px">${t("Ak nám chcete povedať, čo vám chýbalo, stačí odpísať na tento e-mail — čítame každú odpoveď.",
+      "If you would like to tell us what was missing, just reply to this e-mail — we read every answer.")}</p>`;
+  return shell({ lang, title: customerCancelSubject(lang),
+    preheader: c.endsAt ? t(`Premium beží do ${fmtDaySec(c.endsAt, lang)}, potom už nič neúčtujeme.`, `Premium runs until ${fmtDaySec(c.endsAt, lang)}; nothing more will be charged.`) : "",
+    inner });
+}
+
+/** The customer's note that Premium has ended. `c` = { unpaid, name } */
+export function customerEndedSubject(lang = "sk") {
+  return lang === "sk" ? "Residata Premium sa skončilo" : "Your Residata Premium has ended";
+}
+
+export function customerEndedHtml(c, webUrl, lang = "sk") {
+  const t = (a, b) => (lang === "sk" ? a : b);
+  const inner = `
+    <div style="${S.eyebrow};color:${TEXT_DIM}">${t("Predplatné skončilo", "Subscription ended")}</div>
+    <h1 style="${S.h1}">${t("Premium sa skončilo", "Premium has ended")}</h1>
+    <p style="${S.p}">${helloLine(c.name, lang)}</p>
+    <p style="${S.p}">${c.unpaid
+      ? t("predplatné Residata Premium sa skončilo, pretože sa platbu nepodarilo strhnúť. Nič ďalšie vám neúčtujeme.",
+          "your Residata Premium subscription has ended because the payment could not be taken. Nothing more will be charged.")
+      : t("vaše predplatné Residata Premium sa skončilo. Nič ďalšie vám neúčtujeme.", "your Residata Premium subscription has ended. Nothing more will be charged.")}</p>
+    <p style="${S.p}">${t("Váš účet zostáva — prihlásite sa ako doteraz, len bez funkcií Premium. Premium si môžete kedykoľvek znova zapnúť.",
+      "Your account stays — you sign in as before, just without the Premium features. You can turn Premium back on at any time.")}</p>
+    ${buttons([[`${webUrl}/app/billing`, t("Obnoviť Premium", "Restart Premium"), "primary"]])}`;
+  return shell({ lang, title: customerEndedSubject(lang),
+    preheader: t("Účet zostáva, len bez Premium. Obnoviť ho môžete kedykoľvek.", "Your account stays, without Premium. You can restart it any time."), inner });
 }
 
 // ── owner (Boss) — English, like the sign-up note ──────────────────────────
@@ -791,11 +912,14 @@ function whoLine(u) {
 
 function businessRows(b) {
   if (!b) return [];
+  const extra = [b.cancelling && `${b.cancelling} cancelling`, b.pastDue && `${b.pastDue} payment failing`,
+    b.comped && `${b.comped} free (100 % coupon)`, b.trialing && `${b.trialing} on trial`].filter(Boolean).join(" · ");
   return [
-    ["Paying", `<strong>${b.paying}</strong>${b.cancelling ? ` <span style="color:${TEXT_DIM}">(${b.cancelling} cancelling)</span>` : ""}`],
-    ["MRR", `<strong>${fmtMoney(b.mrr)}</strong> / month · ARR ${fmtMoney(b.arr)}`],
+    ["Paying", `<strong>${b.paying}</strong>${extra ? ` <span style="color:${TEXT_DIM}">(${extra})</span>` : ""}`],
+    ["MRR", `<strong>${fmtMoney(b.mrr)}</strong> / month · ARR ${fmtMoney(b.arr)}${b.mrrAtRisk ? ` <span style="color:${AMBER}">(${fmtMoney(b.mrrAtRisk)} at risk)</span>` : ""}`],
     ["This month", fmtMoney(b.revenueMonth)],
-    ["All time", `${fmtMoney(b.revenueTotal)} <span style="color:${TEXT_DIM}">(${b.payments} payment${b.payments === 1 ? "" : "s"})</span>`],
+    ["All time", `${fmtMoney(b.revenueTotal)} <span style="color:${TEXT_DIM}">(${b.payments} payment${b.payments === 1 ? "" : "s"}${b.refundedTotal ? ` · ${fmtMoney(b.refundedTotal)} refunded` : ""})</span>`],
+    b.truncated ? ["Note", `<span style="color:${AMBER}">More than the counted maximum in Stripe — the numbers cover the most recent part.</span>`] : null,
   ];
 }
 
@@ -814,27 +938,32 @@ function customerRows(u, billing) {
   ];
 }
 
+const customerUrl = (webUrl, u, pane = "payments") => (u?.id
+  ? `${webUrl}/app/admin?tab=users&user=${encodeURIComponent(u.id)}&pane=${pane}` : null);
+
 /**
- * Boss's note on every payment. `p` = { kind, amount, discount, listPrice, currency, number,
+ * Boss's note on every payment. `p` = { kind, amount, discount, coupon, listPrice, currency, number,
  * periodStart, periodEnd, nextAmount, hostedUrl, stripeUrl, user, billing, business }
  */
 export function ownerPaymentSubject(p) {
+  if (!(Number(p.amount) > 0)) return `[Residata] 🎉 Premium started, nothing charged (100 % discount) — ${whoLine(p.user)}`;
   return `[Residata] 💶 ${fmtMoney(p.amount, p.currency)} — ${whoLine(p.user)} · Premium (${KIND_TEXT[p.kind] || "payment"})`;
 }
 
 export function ownerPaymentHtml(p, webUrl) {
-  const eyebrow = { new: "🎉 New paying customer", renewal: "🔁 Renewal", change: "⬆ Plan change" }[p.kind] || "💶 Payment";
+  const free = !(Number(p.amount) > 0);
+  const eyebrow = free && p.kind === "new" ? "🎉 New customer — free period"
+    : { new: "🎉 New paying customer", renewal: "🔁 Renewal", change: "⬆ Plan change" }[p.kind] || "💶 Payment";
   const period = p.periodStart && p.periodEnd && p.periodStart !== p.periodEnd
     ? `${fmtDaySec(p.periodStart)} – ${fmtDaySec(p.periodEnd)}` : null;
   const next = p.periodEnd && p.periodStart !== p.periodEnd
     ? fmtDaySec(p.periodEnd) + (p.nextAmount != null ? ` · ${fmtMoney(p.nextAmount, p.currency)}` : "") : null;
   const discount = p.discount
-    ? `−${fmtMoney(p.discount, p.currency)}${p.listPrice ? ` off the ${fmtMoney(p.listPrice, p.currency)}/month price` : ""}` : null;
-  const userUrl = p.user?.id ? `${webUrl}/app/admin?tab=users&user=${encodeURIComponent(p.user.id)}` : `${webUrl}/app/admin?tab=revenue`;
+    ? `−${fmtMoney(p.discount, p.currency)}${p.listPrice ? ` off the ${fmtMoney(p.listPrice, p.currency)}/month price` : ""}${p.coupon ? ` · coupon ${escHtml(p.coupon)}` : ""}` : null;
   const inner = `
     <div style="${S.eyebrow}">${eyebrow}</div>
-    <h1 style="${S.h1}">${escHtml(whoLine(p.user))} paid ${fmtMoney(p.amount, p.currency)}</h1>
-    ${bigAmount(fmtMoney(p.amount, p.currency), `${(KIND_TEXT[p.kind] || "payment").replace(/^./, (c) => c.toUpperCase())} · Residata Premium`)}
+    <h1 style="${S.h1}">${escHtml(whoLine(p.user))} ${free ? "started Premium — nothing charged" : `paid ${fmtMoney(p.amount, p.currency)}`}</h1>
+    ${bigAmount(fmtMoney(p.amount, p.currency), `${(KIND_TEXT[p.kind] || "payment").replace(/^./, (c) => c.toUpperCase())} · Residata Premium${free ? " · 100 % discount or credit" : ""}`)}
     ${sectionLabel("Payment")}
     ${kvTable([
       ["Discount", discount],
@@ -845,11 +974,8 @@ export function ownerPaymentHtml(p, webUrl) {
     ${sectionLabel("Customer")}
     ${kvTable(customerRows(p.user, p.billing))}
     ${p.business ? sectionLabel("Residata now") + kvTable(businessRows(p.business)) : ""}
-    <div style="margin-top:18px">
-      <a href="${userUrl}" style="${S.btnGreen}">Open the customer</a>
-      ${p.stripeUrl ? `<a href="${escHtml(p.stripeUrl)}" style="${S.btnOutline}">Invoice in Stripe</a>` : ""}
-      <a href="${webUrl}/app/admin?tab=revenue" style="${S.btnOutline}">Revenue</a>
-    </div>`;
+    ${buttons([[customerUrl(webUrl, p.user) || `${webUrl}/app/admin?tab=revenue`, "Open the customer", "primary"],
+      p.stripeUrl ? [p.stripeUrl, "Invoice in Stripe"] : null, [`${webUrl}/app/admin?tab=revenue`, "Revenue"]])}`;
   return shell({
     title: "Residata payment",
     preheader: `${fmtMoney(p.amount, p.currency)} · ${KIND_TEXT[p.kind] || "payment"} · ${whoLine(p.user)}`,
@@ -859,56 +985,113 @@ export function ownerPaymentHtml(p, webUrl) {
   });
 }
 
-/** Boss's note on a failed renewal. */
-// A failed FIRST payment (kind "new") is not a failed renewal: the person never had
-// Premium and Stripe does not retry it — measured against Residata's Stripe test sandbox
-// 8 Oct 2026, where the renewal wording told Boss "Premium keeps running during the retries".
+/**
+ * Boss's note on a failed payment. A failed FIRST payment (kind "new") is not a failed
+ * renewal: the person never had Premium and Stripe does not retry it (measured in the
+ * test sandbox 8 Oct 2026). A failed renewal pauses Premium (paid_until is not extended).
+ */
 export function ownerPaymentFailedSubject(p) {
-  return p.kind === "new"
-    ? `[Residata] ⚠ First payment failed: ${fmtMoney(p.amount, p.currency)} — ${whoLine(p.user)}`
-    : `[Residata] ⚠ Payment failed: ${fmtMoney(p.amount, p.currency)} — ${whoLine(p.user)}`;
+  if (p.kind === "new") return `[Residata] ⚠ First payment failed: ${fmtMoney(p.amount, p.currency)} — ${whoLine(p.user)}`;
+  if (p.final) return `[Residata] ⚠ Payment failed — retries over: ${fmtMoney(p.amount, p.currency)} — ${whoLine(p.user)}`;
+  return `[Residata] ⚠ Payment failed: ${fmtMoney(p.amount, p.currency)} — ${whoLine(p.user)}`;
 }
 
 export function ownerPaymentFailedHtml(p, webUrl) {
   const first = p.kind === "new";
+  const caption = first ? "First payment · not retried"
+    : p.final ? `Attempt ${p.attempts || 1} · Stripe has stopped retrying`
+      : `Attempt ${p.attempts || 1} · Stripe retries${p.nextAttempt ? ` — next ${fmtDaySec(p.nextAttempt)}` : ""}`;
+  const body = first
+    ? "No subscription started, no Premium was given and nothing was charged; Stripe does not retry a first payment. We e-mailed them that it did not go through, with a link to try again. Worth a personal note if they do not come back."
+    : p.final
+      ? "Stripe has made its last automatic attempt. Premium is paused; what happens to the subscription now follows the Stripe retry settings (it may be cancelled or stay unpaid). The customer got an e-mail with a link to pay the invoice. A personal note is worth it now."
+      : "Premium is paused until the payment goes through — the paid period has ended and a failing renewal does not extend it. The customer got an e-mail with a link to pay now or change the card; paying restores Premium at once.";
   const inner = `
-    <div style="${S.eyebrow};color:#f5a623">${first ? "⚠ First payment failed" : "⚠ Payment failed"}</div>
+    <div style="${S.eyebrow};color:${AMBER}">${first ? "⚠ First payment failed" : p.final ? "⚠ Payment failed — retries over" : "⚠ Payment failed"}</div>
     <h1 style="${S.h1}">${escHtml(whoLine(p.user))}${first ? " tried to subscribe — the payment did not go through" : "'s payment did not go through"}</h1>
-    ${first
-      ? bigAmount(fmtMoney(p.amount, p.currency), "First payment · not retried", "#f5a623")
-      : bigAmount(fmtMoney(p.amount, p.currency), `Attempt ${p.attempts || 1} · Stripe retries on its own`, "#f5a623")}
-    <p style="${S.p}">${first
-      ? "No subscription started, no Premium was given and nothing was charged; Stripe does not retry a first payment. We e-mailed them that it did not go through, with a link to try again. Worth a personal note if they do not come back."
-      : "Premium keeps running during the retries. The customer got an e-mail asking to check their card."}</p>
+    ${bigAmount(fmtMoney(p.amount, p.currency), caption, AMBER)}
+    <p style="${S.p}">${body}</p>
     ${kvTable(customerRows(p.user, p.billing))}
-    <div style="margin-top:18px">
-      ${p.user?.id ? `<a href="${webUrl}/app/admin?tab=users&user=${encodeURIComponent(p.user.id)}" style="${S.btnGreen}">Open the customer</a>` : ""}
-      ${p.stripeUrl ? `<a href="${escHtml(p.stripeUrl)}" style="${S.btnOutline}">Invoice in Stripe</a>` : ""}
-    </div>`;
+    ${buttons([customerUrl(webUrl, p.user) ? [customerUrl(webUrl, p.user), "Open the customer", "primary"] : null,
+      p.stripeUrl ? [p.stripeUrl, "Invoice in Stripe"] : null])}`;
   return shell({ title: "Residata payment failed", preheader: ownerPaymentFailedSubject(p), inner,
     footer: "Residata · real-time FYI", lang: "en" });
 }
 
-/** Boss's note when a customer cancels (Premium runs to `endsAt`) or a subscription ends. */
+const FEEDBACK = {
+  too_expensive: "Too expensive", missing_features: "Missing features", switched_service: "Switched to another service",
+  unused: "Not using it", customer_service: "Customer service", too_complex: "Too complex", low_quality: "Quality", other: "Other",
+};
+
+/**
+ * Boss's note on a subscription change. `c` = { ended, unpaid, reactivated, endsAt, reason, comment,
+ * user, billing, business }: a cancellation (Premium runs to `endsAt`), an undone
+ * cancellation, or the end of a subscription.
+ */
 export function ownerCancelSubject(c) {
-  return c.ended
-    ? `[Residata] Subscription ended: ${whoLine(c.user)}`
-    : `[Residata] Subscription cancelled: ${whoLine(c.user)} — Premium until ${fmtDaySec(c.endsAt)}`;
+  if (c.reactivated) return `[Residata] ✅ Cancellation undone: ${whoLine(c.user)} — Premium continues`;
+  if (c.ended) return `[Residata] Subscription ended${c.unpaid ? " (unpaid)" : ""}: ${whoLine(c.user)}`;
+  return `[Residata] Subscription cancelled: ${whoLine(c.user)}${c.endsAt ? ` — Premium until ${fmtDaySec(c.endsAt)}` : ""}`;
 }
 
 export function ownerCancelHtml(c, webUrl) {
+  const reason = [c.reason && (FEEDBACK[c.reason] || c.reason), c.comment && `“${c.comment}”`].filter(Boolean).map(escHtml).join(" — ");
+  const eyebrow = c.reactivated ? "✅ Stayed" : c.ended ? "Subscription ended" : "Cancellation";
+  const head = c.reactivated ? "undid the cancellation" : c.ended ? "is no longer paying" : "cancelled Premium";
+  const body = c.reactivated
+    ? "They changed their mind: the subscription renews as before and the next payment is charged as usual."
+    : c.ended
+      ? (c.unpaid ? "The subscription ended in Stripe after the payment could not be taken. " : "The subscription has ended in Stripe. ")
+        + "Their account falls back to Free unless Premium was given another way."
+      : `Premium keeps running until <strong style="color:${TEXT_HI}">${fmtDaySec(c.endsAt)}</strong>; nothing more will be charged. They can undo it themselves until then — they got a confirmation e-mail.`;
   const inner = `
-    <div style="${S.eyebrow};color:#f5a623">${c.ended ? "Subscription ended" : "Cancellation"}</div>
-    <h1 style="${S.h1}">${escHtml(whoLine(c.user))} ${c.ended ? "is no longer paying" : "cancelled Premium"}</h1>
-    <p style="${S.p}">${c.ended
-      ? "The subscription has ended in Stripe. Their account falls back to Free unless Premium was given another way."
-      : `Premium keeps running until <strong style="color:${TEXT_HI}">${fmtDaySec(c.endsAt)}</strong>; nothing more will be charged. They can undo it themselves until then.`}</p>
+    <div style="${S.eyebrow};color:${c.reactivated ? GREEN : AMBER}">${eyebrow}</div>
+    <h1 style="${S.h1}">${escHtml(whoLine(c.user))} ${head}</h1>
+    <p style="${S.p}">${body}</p>
+    ${reason ? kvTable([["Reason", reason]]) : ""}
     ${kvTable(customerRows(c.user, c.billing))}
     ${c.business ? sectionLabel("Residata now") + kvTable(businessRows(c.business)) : ""}
-    <div style="margin-top:18px">
-      ${c.user?.id ? `<a href="${webUrl}/app/admin?tab=users&user=${encodeURIComponent(c.user.id)}" style="${S.btnGreen}">Open the customer</a>` : ""}
-      ${c.user?.email ? `<a href="mailto:${escHtml(c.user.email)}" style="${S.btnOutline}">Write to them</a>` : ""}
-    </div>`;
+    ${buttons([customerUrl(webUrl, c.user) ? [customerUrl(webUrl, c.user), "Open the customer", "primary"] : null,
+      c.user?.email && !c.reactivated ? [`mailto:${c.user.email}`, "Write to them"] : null])}`;
   return shell({ title: "Residata subscription", preheader: ownerCancelSubject(c), inner,
     footer: "Residata · real-time FYI", lang: "en" });
+}
+
+/** Boss's note on a refund. `r` = { amount, refunded, currency, user, stripeUrl } (refunded = the charge's total so far) */
+export function ownerRefundSubject(r) {
+  return `[Residata] ↩ Refund ${fmtMoney(r.refunded, r.currency)} — ${whoLine(r.user)}`;
+}
+
+export function ownerRefundHtml(r, webUrl) {
+  const full = Number(r.refunded) >= Number(r.amount);
+  const inner = `
+    <div style="${S.eyebrow};color:${AMBER}">↩ Refund</div>
+    <h1 style="${S.h1}">${fmtMoney(r.refunded, r.currency)} went back to ${escHtml(whoLine(r.user))}</h1>
+    ${bigAmount(fmtMoney(r.refunded, r.currency), full ? `Full refund of the ${fmtMoney(r.amount, r.currency)} payment` : `Partial refund of the ${fmtMoney(r.amount, r.currency)} payment`, AMBER)}
+    <p style="${S.p}">Revenue in admin now counts this payment net of the refund. A refund does not end the subscription by itself — cancel it in Stripe if that was the intent.</p>
+    ${kvTable(customerRows(r.user, null))}
+    ${buttons([r.stripeUrl ? [r.stripeUrl, "Payment in Stripe", "primary"] : null, [`${webUrl}/app/admin?tab=revenue`, "Revenue"]])}`;
+  return shell({ title: "Residata refund", preheader: ownerRefundSubject(r), inner, footer: "Residata · real-time FYI", lang: "en" });
+}
+
+/** Boss's note on a chargeback. `x` = { phase: created|closed, status, amount, currency, reason, dueBy, user, stripeUrl } */
+export function ownerDisputeSubject(x) {
+  if (x.phase === "closed") return `[Residata] Chargeback ${x.status === "won" ? "won" : x.status === "lost" ? "lost" : "closed"}: ${fmtMoney(x.amount, x.currency)} — ${whoLine(x.user)}`;
+  return `[Residata] 🚨 Chargeback ${fmtMoney(x.amount, x.currency)} — ${whoLine(x.user)}${x.dueBy ? ` — respond by ${fmtDaySec(x.dueBy)}` : ""}`;
+}
+
+export function ownerDisputeHtml(x, webUrl) {
+  const open = x.phase !== "closed";
+  const body = open
+    ? `The card holder disputed this payment with their bank. Stripe has taken the amount (plus a dispute fee) until it is decided. Answer in Stripe with evidence — the invoice, the sign-up and the usage — ${x.dueBy ? `by <strong style="color:${TEXT_HI}">${fmtDaySec(x.dueBy)}</strong>` : "before the deadline Stripe shows"}; no answer means the dispute is lost.`
+    : x.status === "won" ? "The bank decided in our favour; the money comes back." : x.status === "lost" ? "The bank decided for the card holder; the money and the fee are gone." : `The dispute closed with status “${escHtml(x.status || "")}”.`;
+  const inner = `
+    <div style="${S.eyebrow};color:${open || x.status === "lost" ? RED : GREEN}">${open ? "🚨 Chargeback" : "Chargeback closed"}</div>
+    <h1 style="${S.h1}">${escHtml(whoLine(x.user))} — ${open ? "payment disputed" : x.status === "won" ? "dispute won" : x.status === "lost" ? "dispute lost" : "dispute closed"}</h1>
+    ${bigAmount(fmtMoney(x.amount, x.currency), x.reason ? `Reason given: ${escHtml(String(x.reason).replace(/_/g, " "))}` : "Disputed amount", open || x.status === "lost" ? RED : GREEN)}
+    <p style="${S.p}">${body}</p>
+    ${kvTable(customerRows(x.user, null))}
+    ${buttons([x.stripeUrl ? [x.stripeUrl, open ? "Respond in Stripe" : "Dispute in Stripe", "primary"] : null,
+      customerUrl(webUrl, x.user) ? [customerUrl(webUrl, x.user), "Open the customer"] : null])}`;
+  return shell({ title: "Residata chargeback", preheader: ownerDisputeSubject(x), inner, footer: "Residata · real-time FYI", lang: "en" });
 }
