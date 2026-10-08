@@ -85,7 +85,7 @@ function shell({ title, preheader = "", inner, footer, lang = "sk" }) {
         <table role="presentation" width="560" cellspacing="0" cellpadding="0" border="0" style="max-width:560px;width:100%">
           <tr>
             <td style="${S.footer}">
-              ${footer || "Residata · dáta o trhu novostavieb na Slovensku a v Česku"}
+              ${footer || (lang === "en" ? "Residata · new-build market intelligence for Slovakia &amp; Czechia" : "Residata · dáta o trhu novostavieb na Slovensku a v Česku")}
               <div style="${S.legalFooter}">${legalFooterHtml(lang)}</div>
             </td>
           </tr>
@@ -713,7 +713,7 @@ function paymentRows(p, lang) {
     ? fmtDaySec(p.periodEnd, lang) + (p.nextAmount != null ? ` · ${fmtMoney(p.nextAmount, p.currency, lang)}` : "")
     : null;
   const disc = p.discount
-    ? ` <span style="color:${TEXT_DIM}">(${t("po zľave", "after a discount of")} ${fmtMoney(p.discount, p.currency, lang)})</span>` : "";
+    ? ` <span style="color:${TEXT_DIM}">(${t("zľava", "after a discount of")} ${fmtMoney(p.discount, p.currency, lang)})</span>` : "";
   return [
     [t("Predplatné", "Subscription"), `<strong>${PRODUCT}</strong> · ${t("mesačne", "monthly")}`],
     [t("Suma", "Amount"), fmtMoney(p.amount, p.currency, lang) + disc],
@@ -729,7 +729,7 @@ const KIND_TEXT = { new: "new subscription", renewal: "renewal", change: "plan c
 /**
  * The customer's e-mail after a successful payment.
  * `p` = { kind, amount, discount, currency, number, paidAt, periodStart, periodEnd, nextAmount,
- *         hostedUrl, name, pdfAttached }
+ *         hostedUrl, name, pdfAttached, recovered }
  */
 export function customerPaymentSubject(p, lang = "sk") {
   const sk = lang === "sk";
@@ -748,13 +748,17 @@ export function customerPaymentHtml(p, webUrl, lang = "sk") {
   if (p.kind === "new") {
     title = t("Ďakujeme za objednávku", "Thank you for your order");
     lead = t(`predplatné ${strong(PRODUCT)} je aktívne${free ? "." : " a platbu sme prijali."} ${invoice}`,
-      `your ${strong(PRODUCT)} subscription is active${free ? "." : " and we have received your payment."} ${invoice}`);
+      `Your ${strong(PRODUCT)} subscription is active${free ? "." : " and we have received your payment."} ${invoice}`);
     btns = buttons([[`${webUrl}/app`, t("Otvoriť Residata", "Open Residata"), "primary"], invoiceButton]);
   } else {
     title = t("Ďakujeme za platbu", "Thank you for your payment");
-    lead = p.kind === "change"
-      ? t(`platbu za zmenu predplatného ${strong(PRODUCT)} sme prijali. ${invoice}`, `we have received your payment for the change to your ${strong(PRODUCT)} subscription. ${invoice}`)
-      : t(`platbu za ďalšie obdobie predplatného ${strong(PRODUCT)} sme prijali. ${invoice}`, `we have received your payment for the next period of ${strong(PRODUCT)}. ${invoice}`);
+    // `recovered` = this invoice failed before (Premium was paused meanwhile) — say it is back
+    lead = p.recovered
+      ? t(`platbu za predplatné ${strong(PRODUCT)}, ktorá predtým neprešla, sme prijali. Premium je znova aktívne. ${invoice}`,
+        `We have received the payment for ${strong(PRODUCT)} that did not go through earlier. Premium is active again. ${invoice}`)
+      : p.kind === "change"
+        ? t(`platbu za zmenu predplatného ${strong(PRODUCT)} sme prijali. ${invoice}`, `We have received your payment for the change to your ${strong(PRODUCT)} subscription. ${invoice}`)
+        : t(`platbu za ďalšie obdobie predplatného ${strong(PRODUCT)} sme prijali. ${invoice}`, `We have received your payment for the next period of ${strong(PRODUCT)}. ${invoice}`);
     btns = buttons([invoiceButton]);
   }
   const inner = `
@@ -804,7 +808,7 @@ export function customerPaymentFailedHtml(p, webUrl, lang = "sk") {
   let body;
   if (p.kind === "new") {
     body = para(t(`platbu ${amount} za predplatné ${strong(PRODUCT)} sa nepodarilo uskutočniť. Predplatné sa preto neaktivovalo a nič sme vám neúčtovali.`,
-      `we could not take the payment of ${amount} for ${strong(PRODUCT)}. The subscription was therefore not activated and you have not been charged.`))
+      `We could not take the payment of ${amount} for ${strong(PRODUCT)}. The subscription was therefore not activated and you have not been charged.`))
       + para(t("Ak chcete Premium, skúste to prosím znova, napríklad inou kartou.", "If you would like Premium, please try again, for example with another card."))
       + buttons([[`${webUrl}/app/billing`, t("Skúsiť znova", "Try again"), "primary"]])
       + signOff(lang) + questionsLine(lang);
@@ -812,9 +816,9 @@ export function customerPaymentFailedHtml(p, webUrl, lang = "sk") {
     const next = !p.final && p.nextAttempt ? fmtDaySec(p.nextAttempt, lang) : null;
     body = para(p.final
       ? t(`platbu ${amount} za predplatné ${strong(PRODUCT)} sa nepodarilo strhnúť ani pri opakovaných pokusoch a automaticky ju už nezopakujeme. Premium je pozastavené; ak ho chcete ďalej používať, uhraďte prosím faktúru tlačidlom nižšie (aj inou kartou).`,
-        `we could not charge ${amount} for ${strong(PRODUCT)} after several attempts, and we will not retry automatically. Premium is paused; to keep using it, please pay the invoice with the button below (any card works).`)
+        `We could not charge ${amount} for ${strong(PRODUCT)} after several attempts, and we will not retry automatically. Premium is paused; to keep using it, please pay the invoice with the button below (any card works).`)
       : t(`platbu ${amount} za predplatné ${strong(PRODUCT)} sa nepodarilo strhnúť z vašej platobnej karty. Premium je pozastavené, kým platba neprejde; platbu automaticky zopakujeme${next ? ` ${next}` : ""}. Ak ju chcete uhradiť hneď alebo zmeniť kartu, použite tlačidlá nižšie.`,
-        `we could not charge ${amount} for ${strong(PRODUCT)} to your card. Premium is paused until the payment goes through; we will retry automatically${next ? ` on ${next}` : ""}. To pay now or change your card, use the buttons below.`))
+        `We could not charge ${amount} for ${strong(PRODUCT)} to your card. Premium is paused until the payment goes through; we will retry automatically${next ? ` on ${next}` : ""}. To pay now or change your card, use the buttons below.`))
       + buttons([p.hostedUrl ? [p.hostedUrl, t("Uhradiť faktúru", "Pay invoice"), "primary"] : null,
         [`${webUrl}/app/billing`, t("Zmeniť platobnú kartu", "Change card"), p.hostedUrl ? "outline" : "primary"]])
       + signOff(lang) + contactLine(lang);
@@ -844,8 +848,8 @@ export function customerCancelHtml(c, webUrl, lang = "sk") {
     ${para(helloLine(c.name, lang))}
     ${para(day
       ? t(`potvrdzujeme zrušenie predplatného ${strong(PRODUCT)}. Premium zostáva aktívne do ${strong(day)} a ďalšie platby už nebudú strhnuté.`,
-        `this confirms the cancellation of ${strong(PRODUCT)}. Premium stays active until ${strong(day)} and no further payments will be taken.`)
-      : t(`potvrdzujeme zrušenie predplatného ${strong(PRODUCT)}. Ďalšie platby už nebudú strhnuté.`, `this confirms the cancellation of ${strong(PRODUCT)}. No further payments will be taken.`))}
+        `This confirms the cancellation of ${strong(PRODUCT)}. Premium stays active until ${strong(day)} and no further payments will be taken.`)
+      : t(`potvrdzujeme zrušenie predplatného ${strong(PRODUCT)}. Ďalšie platby už nebudú strhnuté.`, `This confirms the cancellation of ${strong(PRODUCT)}. No further payments will be taken.`))}
     ${para(day
       ? t(`Ak si to rozmyslíte, zrušenie môžete do ${day} vrátiť v aplikácii v časti ${strong("Predplatné")}.`, `If you change your mind, you can undo the cancellation until ${day} in the app under ${strong("Plan &amp; billing")}.`)
       : t(`Predplatné môžete kedykoľvek znova aktivovať v časti ${strong("Predplatné")}.`, `You can restart the subscription at any time under ${strong("Plan &amp; billing")}.`))}
@@ -870,8 +874,8 @@ export function customerEndedHtml(c, webUrl, lang = "sk") {
     ${para(helloLine(c.name, lang))}
     ${para(c.unpaid
       ? t(`vaše predplatné ${strong(PRODUCT)} skončilo, pretože sa platbu nepodarilo strhnúť. Ďalšie platby už nebudú strhnuté.`,
-        `your ${strong(PRODUCT)} subscription has ended because the payment could not be taken. No further payments will be taken.`)
-      : t(`vaše predplatné ${strong(PRODUCT)} skončilo. Ďalšie platby už nebudú strhnuté.`, `your ${strong(PRODUCT)} subscription has ended. No further payments will be taken.`))}
+        `Your ${strong(PRODUCT)} subscription has ended because the payment could not be taken. No further payments will be taken.`)
+      : t(`vaše predplatné ${strong(PRODUCT)} skončilo. Ďalšie platby už nebudú strhnuté.`, `Your ${strong(PRODUCT)} subscription has ended. No further payments will be taken.`))}
     ${para(t(`Účet vám zostáva, len bez funkcií Premium. Predplatné môžete kedykoľvek znova aktivovať v aplikácii v časti ${strong("Predplatné")}.`,
       `Your account stays, just without the Premium features. You can restart the subscription at any time in the app under ${strong("Plan &amp; billing")}.`))}
     ${buttons([[`${webUrl}/app/billing`, t("Obnoviť predplatné", "Restart subscription"), "primary"]])}
@@ -879,6 +883,41 @@ export function customerEndedHtml(c, webUrl, lang = "sk") {
     ${questionsLine(lang)}`;
   return shell({ lang, title,
     preheader: t("Účet zostáva, len bez Premium.", "Your account stays, without Premium."), inner });
+}
+
+/**
+ * The customer's note that money was given back (review 9 Oct 2026 — only Boss heard of a refund, and
+ * Stripe's own e-mails are off). `r` = { amount (this refund), total (refunded so far), original,
+ * number, paidAt, currency, name }. Says nothing about the subscription: a refund does not change it,
+ * and when it is also cancelled, that has its own e-mail. Same content as KamhalCo's (platby.py).
+ */
+export function customerRefundSubject(lang = "sk") {
+  return lang === "sk" ? "Vrátenie platby – Residata" : "Your refund – Residata";
+}
+
+export function customerRefundHtml(r, webUrl, lang = "sk") {
+  const t = (a, b) => (lang === "sk" ? a : b);
+  const amount = fmtMoney(r.amount, r.currency, lang);
+  const inv = r.number ? t(` (faktúra ${escHtml(r.number)})`, ` (invoice ${escHtml(r.number)})`) : "";
+  const title = t("Vrátili sme vám peniaze", "We have refunded your payment");
+  const inner = `
+    <h1 style="${S.h1}">${title}</h1>
+    ${para(helloLine(r.name, lang))}
+    ${para(t(`vrátili sme vám ${strong(amount)} z platby za predplatné ${strong(PRODUCT)}${inv}. Peniaze sa vrátia rovnakou cestou, akou ste platili — na účte ich uvidíte spravidla do 5–10 pracovných dní, podľa banky.`,
+      `We have refunded ${strong(amount)} of your payment for ${strong(PRODUCT)}${inv}. The money goes back the way you paid — it usually shows up in your account within 5–10 business days, depending on your bank.`))}
+    ${kvTable([
+      [t("Vrátená suma", "Refunded"), `<strong>${amount}</strong>`],
+      [t("Pôvodná platba", "Original payment"), r.original ? fmtMoney(r.original, r.currency, lang) : null],
+      [t("Vrátené spolu", "Refunded in total"), r.total > r.amount ? fmtMoney(r.total, r.currency, lang) : null],
+      [t("Číslo faktúry", "Invoice number"), r.number ? escHtml(r.number) : null],
+      [t("Dátum platby", "Payment date"), r.paidAt ? fmtDaySec(r.paidAt, lang) : null],
+    ])}
+    ${signOff(lang)}
+    ${questionsLine(lang)}`;
+  return shell({ lang, title,
+    preheader: t(`Vrátili sme vám ${amount}${r.number ? ` z platby za faktúru ${r.number}` : ""}.`,
+      `We have refunded ${amount}${r.number ? ` of your payment for invoice ${r.number}` : ""}.`),
+    inner });
 }
 
 // ── owner (Boss) — English, like the sign-up note ──────────────────────────

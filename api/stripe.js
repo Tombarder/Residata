@@ -485,8 +485,9 @@ async function sendInvoiceEmail(admin, inv, stripe = null) {
     const facts = await paymentFacts(stripe, inv);
     // OUR invoice (api/_lib/invoicePdf.js — the same template as KamhalCo's), Stripe's PDF only
     // when ours cannot be drawn. A 0 € invoice is a document too.
-    const pdf = (await ourInvoicePdf(stripe, inv.id, lang)) || await fetchInvoicePdf(inv.invoice_pdf);
-    const p = { ...facts, name, pdfAttached: Boolean(pdf) };
+    const pdf = (await ourInvoicePdf(stripe, inv.id, lang, admin)) || await fetchInvoicePdf(inv.invoice_pdf);
+    // a renewal that failed first (Stripe counts every attempt): Premium was paused, now it is back
+    const p = { ...facts, name, pdfAttached: Boolean(pdf), recovered: facts.kind !== "new" && facts.attempts > 1 };
     const { customerPaymentHtml, customerPaymentSubject, sendEmail } = await import("./_lib/emails.js");
     // No `conversational` flag: an invoice is machine mail, so it goes from
     // noreply@ per api/_lib/senders.js, which names invoices explicitly.
@@ -540,14 +541,57 @@ const stripeDashUrl = (path) =>
  * paid invoice and differed from KamhalCo's). Null when it cannot be drawn — the caller falls back
  * to Stripe's PDF, a true document in Stripe's layout. Never throws.
  */
-async function ourInvoicePdf(stripe, invoiceId, lang = "sk") {
-  if (!stripe || !invoiceId) return null;
+// THE ISSUED INVOICE IS KEPT, NOT REDRAWN (review 9 Oct 2026, accounting act § 35): the PDF the customer
+// got by e-mail is the one they download a year later — even after a company move, a product rename or a
+// template change. Paid and void only (final states); an unpaid one is drawn afresh until it is paid.
+// Private Supabase Storage bucket, created on first use; one file per invoice and language.
+const INVOICE_BUCKET = "invoices";
+const ARCHIVED = ["paid", "void"];
+
+async function archivedPdf(admin, path) {
   try {
-    const { loadInvoice, invoicePdf } = await import("./_lib/invoicePdf.js");
-    const { inv, products } = await loadInvoice(stripe, invoiceId);
-    return (await invoicePdf(inv, { brand: "residata", products, lang })).pdf;
+    const { data, error } = await admin.storage.from(INVOICE_BUCKET).download(path);
+    return !error && data ? Buffer.from(await data.arrayBuffer()) : null;
+  } catch { return null; }
+}
+
+async function archivePdf(admin, path, pdf) {
+  const put = () => admin.storage.from(INVOICE_BUCKET).upload(path, pdf, { contentType: "application/pdf", upsert: false });
+  try {
+    let { error } = await put();
+    if (error && /bucket.*not.*found|not found/i.test(String(error.message || error.error || ""))) {
+      await admin.storage.createBucket(INVOICE_BUCKET, { public: false });
+      ({ error } = await put());
+    }
+    // "already exists" = somebody archived it first; the first copy wins (an issued document is not rewritten)
+    if (error && !/exist|duplicate/i.test(String(error.message || error.error || ""))) console.error("RESIDATA-ALERT invoice archive:", error.message || error);
   } catch (e) {
-    console.warn("[stripe] our invoice PDF failed, using Stripe's:", e?.message || e);
+    console.error("RESIDATA-ALERT invoice archive:", e?.message || e);
+  }
+}
+
+/**
+ * OUR invoice PDF — the archived copy of the issued document, drawn once. Null = our template cannot
+ * draw this invoice truthfully (the caller sends Stripe's PDF, a true document) — logged as an alert.
+ * A Stripe/network outage THROWS: the webhook answers 500 and Stripe redelivers, rather than the
+ * customer getting Stripe's English template under our file name (review 9 Oct 2026).
+ */
+async function ourInvoicePdf(stripe, invoiceId, lang = "sk", admin = null) {
+  if (!stripe || !invoiceId) return null;
+  const path = `${invoiceId}-${lang === "en" ? "en" : "sk"}.pdf`;
+  if (admin) {
+    const kept = await archivedPdf(admin, path);
+    if (kept) return kept;
+  }
+  const { loadInvoice, invoicePdf, isTransient } = await import("./_lib/invoicePdf.js");
+  try {
+    const { inv, products } = await loadInvoice(stripe, invoiceId);
+    const { pdf } = await invoicePdf(inv, { brand: "residata", products, lang });
+    if (admin && ARCHIVED.includes(inv.status)) await archivePdf(admin, path, pdf);
+    return pdf;
+  } catch (e) {
+    if (isTransient(e)) throw e;
+    console.error("RESIDATA-ALERT invoice template: our PDF failed, using Stripe's:", invoiceId, e?.message || e);
     return null;
   }
 }
@@ -879,6 +923,28 @@ async function notifyRefund(admin, stripe, charge) {
       stripeUrl: stripeDashUrl(`payments/${typeof charge.payment_intent === "string" ? charge.payment_intent : charge.id}`) };
     return { subject: em.ownerRefundSubject(r), html: em.ownerRefundHtml(r, "https://residata.eu"), test: charge.livemode === false };
   }, { customerId, amount: total, currency: charge.currency });
+  // THE CUSTOMER TOO (review 9 Oct 2026): Stripe's own e-mails are off, so nobody told them why money
+  // came back. One e-mail per new cumulative total; a second partial refund reports only the new part.
+  const key = `refund:${charge.id}:${total}`;
+  const { data: earlier } = await admin.from("invoice_emails_sent").select("invoice_id").like("invoice_id", `refund:${charge.id}:%`);
+  const before = Math.max(0, ...(earlier || []).map((x) => Number(String(x.invoice_id).split(":").pop()) || 0).filter((n) => n < total));
+  const who = await personOrStripe(admin, stripe, { customerId, email: charge.billing_details?.email, name: charge.billing_details?.name });
+  let inv = null;
+  const pi = typeof charge.payment_intent === "string" ? charge.payment_intent : charge.payment_intent?.id;
+  if (pi && stripe.invoicePayments?.list) {
+    try {
+      const ip = (await stripe.invoicePayments.list({ payment: { type: "payment_intent", payment_intent: pi }, limit: 1 }))?.data?.[0];
+      const iid = typeof ip?.invoice === "string" ? ip.invoice : ip?.invoice?.id;
+      if (iid) inv = await stripe.invoices.retrieve(iid);
+    } catch { /* the e-mail goes without the invoice number */ }
+  }
+  await mailCustomer(admin, stripe, key, { to: who.user?.email, customerId, userId: inv ? userOfInvoice(inv) : null,
+    amount: total - before, currency: charge.currency }, async (lang, name) => {
+    const em = await import("./_lib/emails.js");
+    const r = { amount: total - before, total, original: Number(charge.amount || 0), number: inv?.number || null,
+      paidAt: inv?.status_transitions?.paid_at || charge.created || null, currency: charge.currency, name };
+    return { subject: em.customerRefundSubject(lang), html: em.customerRefundHtml(r, "https://residata.eu", lang) };
+  });
 }
 
 /** A chargeback: it has a deadline and costs a fee — Boss hears at once, and when it closes. */
@@ -916,14 +982,89 @@ async function handleAdminInvoicePdf(req, res) {
   if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = {}; } }
   const id = String(body?.invoice_id || "").trim();
   if (!/^in_[A-Za-z0-9]+$/.test(id)) return res.status(400).json({ error: "invoice_id" });
-  const lang = body?.lang === "en" ? "en" : "sk";
   const stripe = getStripe();
-  const pdf = await ourInvoicePdf(stripe, id, lang);
+  let inv;
+  try { inv = await stripe.invoices.retrieve(id); } catch (e) {
+    if (e?.code === "resource_missing" || e?.statusCode === 404) return res.status(404).json({ error: "not found" });
+    return res.status(503).json({ error: "Stripe is unavailable, try again in a minute" });
+  }
+  // the document the CUSTOMER got — in their language, not the admin's (review 9 Oct 2026)
+  const lang = (await customerLang(admin, stripe, { customerId: customerOf(inv) })).lang;
+  let pdf;
+  try { pdf = await ourInvoicePdf(stripe, id, lang, admin); } catch {
+    return res.status(503).json({ error: "Stripe is unavailable, try again in a minute" });
+  }
+  if (!pdf) pdf = await fetchInvoicePdf(inv.invoice_pdf);
   if (!pdf) return res.status(502).json({ error: "invoice PDF could not be drawn" });
-  let number = id;
-  try { number = (await stripe.invoices.retrieve(id))?.number || id; } catch { /* the id names the file */ }
+  const number = inv.number || id;
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", `attachment; filename="${lang === "sk" ? "Faktura" : "Invoice"}-${String(number).replace(/[^A-Za-z0-9-]/g, "")}.pdf"`);
+  return res.status(200).send(pdf);
+}
+
+// ─── the customer's own invoices (Boss 2026-10-08) ──────────────────────────
+// Stripe's portal no longer lists invoices (its English template, not the document the customer
+// got — `features.invoice_history` is switched off in the portal settings), so the Billing page
+// does: the caller's invoices, and each one as OUR PDF — the same document the e-mail carried.
+// Only the caller's own: the Stripe customer comes from their profile, never from the request.
+const INVOICE_STATUS = new Set(["paid", "open", "void", "uncollectible"]);
+
+async function handleInvoices(req, res) {
+  if (!isTrustedRequest(req)) return res.status(403).json({ error: "untrusted origin" });
+  const admin = getSupabaseAdmin();
+  const { profile, error, status } = await getUserFromRequest(req, admin);
+  if (error) return res.status(status).json({ error });
+  const cid = profile?.stripe_customer_id;
+  if (!cid) return res.status(200).json({ invoices: [] });
+  const out = [];
+  for await (const inv of getStripe().invoices.list({ customer: cid, limit: 100 })) {
+    if (!INVOICE_STATUS.has(inv.status) || !inv.number) continue;
+    out.push({
+      id: inv.id,
+      number: inv.number,
+      status: inv.status,
+      date: inv.status_transitions?.paid_at || inv.status_transitions?.finalized_at || inv.created || null,
+      amount: inv.status === "paid" ? Number(inv.amount_paid || 0) : Number(inv.amount_due ?? inv.total ?? 0),
+      currency: inv.currency || "eur",
+      // "Pay" only for the CURRENT subscription's unpaid invoice — an open one from an abandoned
+      // checkout would start a second subscription's worth of money (as KamhalCo, 8. 10. 2026)
+      pay_url: inv.status === "open" && subOfInvoice(inv) && subOfInvoice(inv) === profile?.stripe_subscription_id
+        ? inv.hosted_invoice_url || null : null,
+    });
+    if (out.length >= 100) break;
+  }
+  return res.status(200).json({ invoices: out });
+}
+
+async function handleInvoicePdf(req, res) {
+  if (!isTrustedRequest(req)) return res.status(403).json({ error: "untrusted origin" });
+  const admin = getSupabaseAdmin();
+  const { profile, error, status } = await getUserFromRequest(req, admin);
+  if (error) return res.status(status).json({ error });
+  let body = req.body;
+  if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = {}; } }
+  const id = String(body?.invoice_id || "").trim();
+  if (!/^in_[A-Za-z0-9]+$/.test(id)) return res.status(400).json({ error: "invoice_id" });
+  const cid = profile?.stripe_customer_id;
+  if (!cid) return res.status(404).json({ error: "not found" });
+  const stripe = getStripe();
+  let inv;
+  try { inv = await stripe.invoices.retrieve(id); } catch (e) {
+    if (e?.code === "resource_missing" || e?.statusCode === 404) return res.status(404).json({ error: "not found" });
+    return res.status(503).json({ error: body?.lang === "en" ? "Stripe is unavailable, try again in a minute." : "Stripe je dočasne nedostupný, skúste to o chvíľu." });
+  }
+  // somebody else's invoice is "not found", not "forbidden" — the answer must not confirm it exists
+  if (customerOf(inv) !== cid || !INVOICE_STATUS.has(inv.status)) return res.status(404).json({ error: "not found" });
+  const lang = body?.lang === "en" || body?.lang === "sk" ? body.lang
+    : (await customerLang(admin, stripe, { customerId: cid, userId: profile?.id })).lang;
+  let pdf;
+  try { pdf = await ourInvoicePdf(stripe, id, lang, admin); } catch {
+    return res.status(503).json({ error: lang === "sk" ? "Stripe je dočasne nedostupný, skúste to o chvíľu." : "Stripe is unavailable, try again in a minute." });
+  }
+  if (!pdf) pdf = await fetchInvoicePdf(inv.invoice_pdf);
+  if (!pdf) return res.status(502).json({ error: "invoice PDF could not be drawn" });
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="${lang === "sk" ? "Faktura" : "Invoice"}-${String(inv.number || id).replace(/[^A-Za-z0-9-]/g, "")}.pdf"`);
   return res.status(200).send(pdf);
 }
 
@@ -1020,9 +1161,17 @@ async function handlePortal(req, res) {
     return res.status(400).json({ error: "no billing account yet — subscribe first" });
   }
   const stripe = getStripe();
+  // the portal in the customer's language (Stripe's default follows the browser — an English
+  // portal for a Slovak customer, review 9 Oct 2026)
+  const { lang } = await customerLang(admin, stripe, { customerId: profile.stripe_customer_id, userId: user?.id });
+  if (!portalChecked) {
+    try { await ensurePortalWithoutInvoices(stripe); portalChecked = true; }
+    catch (e) { console.warn("[stripe] portal invoice history not checked:", e?.message || e); }
+  }
   const portal = await stripe.billingPortal.sessions.create({
     customer: profile.stripe_customer_id,
     return_url: `${requestOrigin(req)}/app/billing`,
+    locale: lang === "sk" ? "sk" : "en",
   });
   return res.status(200).json({ url: portal.url });
 }
@@ -1295,6 +1444,9 @@ async function handleReconcile(req, res) {
   let webhook = null;
   try { webhook = await ensureWebhookEvents(stripe); }
   catch (e) { console.warn("[stripe reconcile] webhook events not checked:", e?.message || e); }
+  let portal = null;
+  try { portal = await ensurePortalWithoutInvoices(stripe); }
+  catch (e) { console.warn("[stripe reconcile] portal not checked:", e?.message || e); }
 
   // Loud in the log when something did not apply — a reconcile that quietly
   // fails is the same blind spot it was built to remove.
@@ -1316,14 +1468,14 @@ async function handleReconcile(req, res) {
       // not ok when no endpoint of ours exists at Stripe: every webhook-driven e-mail
       // and access change would silently stop (a transient read error is only noted)
       p_ok: failed === 0 && webhook?.ours !== 0,
-      p_detail: `scanned=${scanned} applied=${applied} skipped=${skipped} failed=${failed} ${webhookNote(webhook)}`,
+      p_detail: `scanned=${scanned} applied=${applied} skipped=${skipped} failed=${failed} portal=${portal?.checked ? (portal.off ? `fixed(${portal.off})` : "ok") : "not-checked"} ${webhookNote(webhook)}`,
     });
   } catch (e) {
     console.error("[stripe reconcile] heartbeat not recorded", String(e?.message || e));
   }
 
   return res.status(failed ? 500 : 200).json({
-    ok: failed === 0, scanned, applied, skipped, failed, truncated, problems, webhook,
+    ok: failed === 0, scanned, applied, skipped, failed, truncated, problems, webhook, portal,
   });
 }
 
@@ -1354,6 +1506,28 @@ async function ensureWebhookEvents(stripe) {
   }
   return { ours, added };
 }
+
+/**
+ * STRIPE'S PORTAL LISTS NO INVOICES (Boss 2026-10-08, "fix all"): its invoice history shows Stripe's
+ * English template — "Invoice / Bill to / Pay online" — next to the Slovak invoice the customer got by
+ * e-mail, two different documents for one payment. Our Billing page lists the invoices (as OUR PDF), so
+ * the portal's history is switched off on the default configuration — only that one flag; every other
+ * portal setting stays as it was set in the Dashboard. Runs nightly and on the first portal visit of
+ * an instance, so the live account is right without anyone pasting a key. Never throws to its caller.
+ */
+async function ensurePortalWithoutInvoices(stripe) {
+  const list = stripe?.billingPortal?.configurations?.list;
+  if (!list) return { checked: false };
+  let off = 0;
+  for await (const c of stripe.billingPortal.configurations.list({ limit: 20, active: true })) {
+    if (!c.is_default || c.features?.invoice_history?.enabled === false) continue;
+    await stripe.billingPortal.configurations.update(c.id, { features: { invoice_history: { enabled: false } } });
+    console.log(`[stripe] portal ${c.id}: invoice history switched off`);
+    off++;
+  }
+  return { checked: true, off };
+}
+let portalChecked = false;
 
 /** One short line for the heartbeat — the console line is gone after an hour on Hobby. */
 function webhookNote(w) {
@@ -1551,6 +1725,8 @@ const METHODS = {
   mode: ["GET"],                  // public: "live" | "test" | "missing", no secret in it
   "admin-billing": ["POST"],      // admin → Revenue and a person's payments (admin token)
   "admin-invoice-pdf": ["POST"],  // admin → our invoice PDF (the one the customer got), admin token
+  invoices: ["POST"],             // (authed) the caller's own invoices — the list on the Billing page
+  "invoice-pdf": ["POST"],        // (authed) one of the caller's own invoices as OUR PDF
 };
 
 export default async function handler(req, res) {
@@ -1571,6 +1747,8 @@ export default async function handler(req, res) {
     if (action === "mode") return await handleMode(req, res);
     if (action === "admin-billing") return await handleAdminBilling(req, res);
     if (action === "admin-invoice-pdf") return await handleAdminInvoicePdf(req, res);
+    if (action === "invoices") return await handleInvoices(req, res);
+    if (action === "invoice-pdf") return await handleInvoicePdf(req, res);
     return res.status(400).json({ error: "unknown action" });
   } catch (e) {
     console.error("[stripe] crash", e);

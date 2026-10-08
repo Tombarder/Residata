@@ -104,3 +104,46 @@ export async function getCardSubscription() {
     return UNKNOWN;
   }
 }
+
+// ─── the caller's own invoices (Boss 2026-10-08) ─────────────────────────
+// Stripe's portal no longer lists invoices (its own English template); the Billing page does,
+// and each one downloads as OUR PDF — the document the e-mail carried. A 401 retries once with a
+// refreshed token, like getCardSubscription. null = could not load (the page says so, no guess).
+async function postAction(action, body) {
+  const call = (token) => fetch(`/api/stripe?action=${action}`, { method: "POST", headers: authHeaders(token), body: JSON.stringify(body || {}) });
+  let r = await call(await getFreshAccessToken());
+  if (r.status === 401) {
+    const token = await forceTokenRefresh();
+    if (token) r = await call(token);
+  }
+  return r;
+}
+
+export async function listInvoices() {
+  try {
+    const r = await postAction("invoices");
+    if (!r.ok) return null;
+    const data = await r.json().catch(() => null);
+    return Array.isArray(data?.invoices) ? data.invoices : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Download one invoice as our PDF. Returns null on success, an error text otherwise. */
+export async function downloadInvoice(invoiceId, lang) {
+  try {
+    const r = await postAction("invoice-pdf", { invoice_id: invoiceId, lang });
+    if (!r.ok) return lang === "sk" ? "Faktúru sa nepodarilo stiahnuť. Skús to znova alebo nám napíš." : "The invoice could not be downloaded. Try again or write to us.";
+    // a download, not window.open: after the await a pop-up blocker would swallow a new window
+    const name = (/filename="([^"]+)"/.exec(r.headers.get("Content-Disposition") || "") || [])[1] || `${invoiceId}.pdf`;
+    const url = URL.createObjectURL(await r.blob());
+    const a = Object.assign(document.createElement("a"), { href: url, download: name });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    track("invoice_downloaded");
+    return null;
+  } catch {
+    return lang === "sk" ? "Faktúru sa nepodarilo stiahnuť. Skús to znova alebo nám napíš." : "The invoice could not be downloaded. Try again or write to us.";
+  }
+}

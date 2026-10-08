@@ -64,6 +64,7 @@ class FakeStripe {
     };
     this.invoices = {
       retrieve: async (id) => {
+        if (ST.retrieveFails === "outage") throw Object.assign(new Error("connection reset"), { type: "StripeConnectionError" });
         if (ST.retrieveFails) throw new Error("stripe down");
         return { ...copy(ST.invoices.get(id)), discounts: [discountObj()] };
       },
@@ -73,6 +74,10 @@ class FakeStripe {
     Object.defineProperty(this.invoices, "createPreview", { get: () => (ST.preview === undefined ? undefined
       : async () => (ST.preview === "fail" ? Promise.reject(new Error("no preview")) : { amount_due: ST.preview })) });
     this.charges = { list: (p = {}) => listOf(ST.charges.filter((c) => !p.customer || c.customer === p.customer).map(copy)) };
+    // like Stripe: the invoice behind a payment intent (invoice.payments[].payment.payment_intent)
+    this.invoicePayments = { list: async (p = {}) => ({ data: [...ST.invoices.values()]
+      .filter((i) => (i.payments?.data || []).some((x) => x.payment?.payment_intent === p.payment?.payment_intent))
+      .slice(0, 1).map((i) => ({ object: "invoice_payment", invoice: i.id })) }) };
     this.disputes = { list: () => listOf(ST.disputes.map(copy)) };
     this.paymentIntents = { retrieve: async (id) => ({ id, customer: "cus_1" }) };
     this.customers = { retrieve: async (id) => ({ id, metadata: {}, ...(ST.customers[id] || {}) }) };
@@ -116,8 +121,30 @@ function query(table) {
   }
   return q;
 }
+// Supabase Storage: the invoice archive (one private bucket, created on first use like the real one)
+const STORE = { buckets: new Map(), created: [] };
+const storage = {
+  from: (bucket) => ({
+    download: async (path) => {
+      const b = STORE.buckets.get(bucket);
+      if (!b) return { data: null, error: { message: "Bucket not found" } };
+      const f = b.get(path);
+      return f ? { data: { arrayBuffer: async () => f.buffer.slice(f.byteOffset, f.byteOffset + f.byteLength) }, error: null }
+        : { data: null, error: { message: "Object not found" } };
+    },
+    upload: async (path, body, { upsert } = {}) => {
+      const b = STORE.buckets.get(bucket);
+      if (!b) return { data: null, error: { message: "Bucket not found" } };
+      if (b.has(path) && !upsert) return { data: null, error: { message: "The resource already exists" } };
+      b.set(path, Buffer.from(body));
+      return { data: { path }, error: null };
+    },
+  }),
+  createBucket: async (name, opts) => { STORE.created.push([name, opts]); STORE.buckets.set(name, new Map()); return { data: { name }, error: null }; },
+};
 const createClient = () => ({
   from: query,
+  storage,
   rpc: async (name, args) => { (DB.rpc ||= []).push([name, args]); return { data: null, error: null }; },
   auth: {
     getUser: async (tok) => (DB.tokens[tok] ? { data: { user: DB.tokens[tok] }, error: null } : { data: { user: null }, error: { message: "bad" } }),
@@ -190,7 +217,7 @@ const text = (m) => String(m.html).replace(/ /g, " ").replace(/&amp;/g, "&");
 beforeEach(() => {
   sent.length = 0; smtpFails = false; ST.subs.clear(); ST.invoices.clear(); ST.coupon = "forever"; ST.retrieveFails = false;
   ST.charges = []; ST.disputes = []; ST.customers = {}; ST.cancelled = []; ST.preview = undefined;
-  DB.tables = {}; DB.tokens = {}; DB.meta = {};
+  DB.tables = {}; DB.tokens = {}; DB.meta = {}; STORE.buckets.clear(); STORE.created = [];
   person(); sub();
 });
 
@@ -231,6 +258,8 @@ test("a customer who uses Residata in English gets the welcome in English", asyn
   await webhook("invoice.paid", invoice());
   assert.equal(toEva()[0].subject, "Your Residata Premium subscription is active");
   assert.ok(text(toEva()[0]).includes("Your invoice is attached"));
+  assert.ok(!text(toEva()[0]).includes("dáta o trhu") && text(toEva()[0]).includes("new-build market intelligence"),
+    "no Slovak tagline in an English e-mail (review 9 Oct 2026)");
   const { PDFDocument } = await import("pdf-lib");
   assert.equal((await PDFDocument.load(toEva()[0].attachments[0].content)).getTitle(), "Invoice RES-0001", "the invoice in English too");
   assert.equal(toEva()[0].attachments[0].filename, "Invoice-RES-0001.pdf");
@@ -388,6 +417,12 @@ test("a refund and a chargeback: Boss once each; revenue in admin is net of them
   assert.ok(text(toBoss()[0]).includes("Partial refund"));
   await webhook("charge.refunded", { ...charge, amount_refunded: 560 });     // the rest later: a new total, a new note
   assert.equal(toBoss().length, 2);
+  // the customer: one note per refund, the second one reports only the new part (review 9 Oct 2026)
+  const back = toEva().filter((m) => m.subject === "Vrátenie platby – Residata");
+  assert.equal(back.length, 2, "one per refund, none for the redelivery");
+  const plain = (m) => text(m).replace(/<[^>]+>/g, "");
+  assert.ok(plain(back[0]).includes("vrátili sme vám 2,00 €") && plain(back[0]).includes("RES-0001") && !plain(back[0]).includes("Vrátené spolu"), plain(back[0]));
+  assert.ok(plain(back[1]).includes("vrátili sme vám 3,60 €") && plain(back[1]).includes("Vrátené spolu") && plain(back[1]).includes("5,60 €"), plain(back[1]));
 
   const d = { id: "dp_1", object: "dispute", payment_intent: "pi_1", amount: 560, currency: "eur", status: "needs_response",
     reason: "fraudulent", evidence_details: { due_by: NOW + 7 * 86400 }, livemode: true };
@@ -491,8 +526,20 @@ test("the nightly reconcile adds a missing event to OUR webhook endpoint — and
     list: () => listOf(eps.map(copy)),
     update: async (id, p) => { updates.push([id, p.enabled_events]); return { id }; },
   };
+  // Stripe's portal: the DEFAULT configuration gets invoice history off — that flag only (Boss 2026-10-08)
+  const confs = [
+    { id: "bpc_default", is_default: true, active: true, features: { invoice_history: { enabled: true }, subscription_cancel: { enabled: true } } },
+    { id: "bpc_other", is_default: false, active: true, features: { invoice_history: { enabled: true } } },
+  ];
+  const portalUpdates = [];
+  getStripe().billingPortal = { configurations: {
+    list: () => listOf(confs.map(copy)),
+    update: async (id, p) => { portalUpdates.push([id, p]); return { id }; },
+  } };
   const r = await call({ query: { action: "reconcile" }, headers: { authorization: "Bearer cron-test" } });
   assert.equal(r.statusCode, 200);
+  assert.deepEqual(portalUpdates, [["bpc_default", { features: { invoice_history: { enabled: false } } }]]);
+  assert.deepEqual(r.body.portal, { checked: true, off: 1 });
   assert.deepEqual(updates.map((u) => u[0]), ["we_ours"]);
   assert.ok(updates[0][1].includes("invoice.payment_failed"));
   assert.equal(updates[0][1].length, 11, "nothing removed, nothing doubled");
@@ -501,13 +548,143 @@ test("the nightly reconcile adds a missing event to OUR webhook endpoint — and
   // the heartbeat outlives Hobby's one-hour log: "did the webhook check run, what did it add?"
   const beat = (DB.rpc || []).find(([n]) => n === "record_cron_heartbeat");
   assert.ok(beat[1].p_detail.endsWith(`webhook=ok(1) added:${added.join("+")}`), beat[1].p_detail);
+  assert.ok(beat[1].p_detail.includes("portal=fixed(1)"), beat[1].p_detail);
   assert.equal(beat[1].p_ok, true);
+  confs[0].features.invoice_history.enabled = false;           // already off → nothing to write
+  portalUpdates.length = 0;
+  assert.deepEqual((await call({ query: { action: "reconcile" }, headers: { authorization: "Bearer cron-test" } })).body.portal, { checked: true, off: 0 });
+  assert.equal(portalUpdates.length, 0);
 
   // no endpoint of ours at Stripe: every webhook e-mail would silently stop → the heartbeat is NOT ok
   eps.splice(0, 1);
+  delete getStripe().billingPortal;
   DB.rpc = [];
   await call({ query: { action: "reconcile" }, headers: { authorization: "Bearer cron-test" } });
   assert.equal(DB.rpc.find(([n]) => n === "record_cron_heartbeat")[1].p_ok, false);
+});
+
+// ── the customer's own invoices (Boss 2026-10-08: Stripe's portal no longer lists them) ──
+const asEva = (fields = {}) => {
+  Object.assign(rows("user_profiles").find((r) => r.id === U), fields);
+  DB.tokens["tok-eva"] = { id: U, email: "eva@firma.sk" };
+  return { authorization: "Bearer tok-eva" };
+};
+
+test("customer → invoices: only their own, newest data from Stripe; Pay only on the current subscription's unpaid one", async () => {
+  invoice();                                                                       // paid, cus_1
+  invoice({ id: "in_open", number: "RES-0002", status: "open", amount_paid: 0, amount_due: 27999, billing_reason: "subscription_cycle" });
+  invoice({ id: "in_old", number: "RES-0003", status: "open", amount_paid: 0, amount_due: 27999,
+    parent: { type: "subscription_details", subscription_details: { subscription: "sub_abandoned", metadata: {} } } });
+  invoice({ id: "in_draft", number: null, status: "draft" });
+  invoice({ id: "in_other", number: "RES-0099", customer: "cus_2", customer_email: "iny@firma.sk" });
+  const r = await call({ query: { action: "invoices" }, headers: asEva({ stripe_subscription_id: "sub_1" }), body: {} });
+  assert.equal(r.statusCode, 200);
+  const byNo = Object.fromEntries(r.body.invoices.map((x) => [x.number, x]));
+  assert.deepEqual(Object.keys(byNo).sort(), ["RES-0001", "RES-0002", "RES-0003"], "own, finalized invoices only");
+  assert.equal(byNo["RES-0001"].status, "paid");
+  assert.equal(byNo["RES-0001"].amount, 560);
+  assert.equal(byNo["RES-0001"].pay_url, null);
+  assert.equal(byNo["RES-0002"].pay_url, "https://invoice.stripe.com/i/acct_x/inv", "the current subscription's unpaid invoice can be paid");
+  assert.equal(byNo["RES-0003"].pay_url, null, "an abandoned checkout's invoice is not offered for payment");
+  assert.equal((await call({ query: { action: "invoices" }, body: {} })).statusCode, 401);
+  rows("user_profiles").find((x) => x.id === U).stripe_customer_id = null;
+  assert.deepEqual((await call({ query: { action: "invoices" }, headers: asEva(), body: {} })).body, { invoices: [] });
+});
+
+test("customer → invoice PDF: their own as OUR PDF; somebody else's is 'not found'", async () => {
+  invoice();
+  invoice({ id: "in_other", number: "RES-0099", customer: "cus_2", customer_email: "iny@firma.sk" });
+  const r = await call({ query: { action: "invoice-pdf" }, headers: asEva(), body: { invoice_id: "in_1", lang: "sk" } });
+  assert.equal(r.statusCode, 200);
+  assert.match(r.headers["Content-Disposition"], /filename="Faktura-RES-0001\.pdf"/);
+  const { PDFDocument } = await import("pdf-lib");
+  assert.equal((await PDFDocument.load(r.body)).getTitle(), "Faktúra RES-0001");
+  assert.ok(!Buffer.from(r.body).equals(PDF), "our invoice, not Stripe's PDF");
+  assert.equal((await call({ query: { action: "invoice-pdf" }, headers: asEva(), body: { invoice_id: "in_other" } })).statusCode, 404);
+  assert.equal((await call({ query: { action: "invoice-pdf" }, headers: asEva(), body: { invoice_id: "../x" } })).statusCode, 400);
+  assert.equal((await call({ query: { action: "invoice-pdf" }, body: { invoice_id: "in_1" } })).statusCode, 401);
+});
+
+test("a renewal that failed first and then went through: the customer is told Premium is back", async () => {
+  await webhook("invoice.paid", invoice({ id: "in_5", number: "RES-0005", billing_reason: "subscription_cycle", attempt_count: 3,
+    amount_paid: 27999, total_discount_amounts: [], discounts: [] }));
+  const m = toEva()[0];
+  assert.equal(m.subject, "Faktúra RES-0005 – Residata");
+  assert.ok(text(m).includes("ktorá predtým neprešla") && text(m).includes("Premium je znova aktívne"), text(m));
+  sent.length = 0;
+  await webhook("invoice.paid", invoice({ id: "in_6", number: "RES-0006", billing_reason: "subscription_cycle", attempt_count: 1,
+    amount_paid: 27999, total_discount_amounts: [], discounts: [] }));
+  assert.ok(!text(toEva()[0]).includes("predtým neprešla"), "an ordinary renewal says nothing about a failure");
+});
+
+test("Stripe portal: in the customer's language, and its invoice history is switched off on the first visit", async () => {
+  const { getStripe } = await import("../../api/_lib/stripe.js");
+  const sessions = [], portalUpdates = [];
+  const confs = [{ id: "bpc_default", is_default: true, active: true, features: { invoice_history: { enabled: true } } }];
+  getStripe().billingPortal = {
+    sessions: { create: async (p) => { sessions.push(p); return { url: "https://billing.stripe.test/p" }; } },
+    configurations: { list: () => listOf(confs.map(copy)),
+      update: async (id, p) => { portalUpdates.push(id); confs[0].features.invoice_history.enabled = false; return { id }; } },
+  };
+  const r = await call({ query: { action: "portal" }, headers: asEva(), body: {} });
+  assert.equal(r.statusCode, 200);
+  assert.equal(sessions[0].locale, "sk", "a Slovak customer gets the Slovak portal");
+  assert.deepEqual(portalUpdates, ["bpc_default"]);
+  rows("user_profiles").find((x) => x.id === U).ui_prefs = { language: "en" };
+  await call({ query: { action: "portal" }, headers: asEva(), body: {} });
+  assert.equal(sessions[1].locale, "en");
+  assert.deepEqual(portalUpdates, ["bpc_default"], "checked once per instance, not on every visit");
+});
+
+// ── the issued invoice is KEPT (review 9 Oct 2026) ─────────────────────
+test("archive: the paid invoice's PDF is stored once and the same bytes come back later, even after the data changed", async () => {
+  await webhook("invoice.paid", invoice());
+  const mailed = toEva()[0].attachments[0].content;
+  assert.deepEqual(STORE.created, [["invoices", { public: false }]], "a PRIVATE bucket, created on first use");
+  const kept = STORE.buckets.get("invoices").get("in_1-sk.pdf");
+  assert.ok(kept && Buffer.from(mailed).equals(kept), "the archived copy is the one the customer got");
+  // a year later the company has a new name — the issued document does not change
+  ST.invoices.get("in_1").customer_name = "Úplne Iná Firma a.s.";
+  const r = await call({ query: { action: "invoice-pdf" }, headers: asEva(), body: { invoice_id: "in_1", lang: "sk" } });
+  assert.equal(r.statusCode, 200);
+  assert.ok(Buffer.from(r.body).equals(kept), "the download is the archived document, not a fresh drawing");
+});
+
+test("archive: an unpaid (open) invoice is drawn afresh and not stored", async () => {
+  invoice({ id: "in_open", number: "RES-0007", status: "open", amount_paid: 0, status_transitions: {} });
+  const r = await call({ query: { action: "invoice-pdf" }, headers: asEva(), body: { invoice_id: "in_open", lang: "sk" } });
+  assert.equal(r.statusCode, 200);
+  assert.ok(!STORE.buckets.get("invoices")?.has("in_open-sk.pdf"), "an open invoice can still change — not archived");
+});
+
+test("Stripe outage while drawing the invoice: the webhook answers 500 (Stripe redelivers), no e-mail with Stripe's PDF", async () => {
+  ST.retrieveFails = "outage";
+  const r = await webhook("invoice.paid", invoice());
+  assert.equal(r.statusCode, 500, "a transient outage must make Stripe redeliver");
+  assert.equal(toEva().length, 0, "no customer e-mail with Stripe's English template under our name");
+  assert.equal(rows("invoice_emails_sent").filter((x) => x.invoice_id === "in_1").length, 0, "the claim is released");
+  ST.retrieveFails = false;
+  assert.equal((await webhook("invoice.paid", invoice())).statusCode, 200);
+  const m = toEva()[0];
+  assert.ok(m && !Buffer.from(m.attachments[0].content).equals(PDF), "the redelivery carries OUR invoice");
+});
+
+test("Stripe outage on the download: 503 'try again', not Stripe's PDF", async () => {
+  invoice();
+  ST.retrieveFails = "outage";
+  const r = await call({ query: { action: "invoice-pdf" }, headers: asEva(), body: { invoice_id: "in_1", lang: "sk" } });
+  assert.equal(r.statusCode, 503);
+  assert.match(r.body.error, /dočasne nedostupný/);
+});
+
+test("an invoice our template refuses (not EUR): the customer still gets Stripe's true PDF, and it is alerted", async () => {
+  console.error.mock.resetCalls();
+  await webhook("invoice.paid", invoice({ currency: "usd" }));
+  const m = toEva()[0];
+  assert.ok(m, "the e-mail still goes");
+  assert.ok(Buffer.from(m.attachments[0].content).equals(PDF), "Stripe's PDF — ours cannot draw a USD invoice truthfully");
+  assert.ok(console.error.mock.calls.some((c) => String(c.arguments[0]).startsWith("RESIDATA-ALERT invoice template")), "alerted");
+  assert.ok(!STORE.buckets.get("invoices")?.size, "nothing archived");
 });
 
 // ── admin → our invoice PDF ─────────────────────────────────────────────
@@ -522,4 +699,10 @@ test("admin → PDF: our invoice (the one the customer got), admins only", async
   assert.equal((await call({ query: { action: "admin-invoice-pdf" }, headers: asTier("free"), body: { invoice_id: "in_1" } })).statusCode, 403);
   assert.equal((await call({ query: { action: "admin-invoice-pdf" }, body: { invoice_id: "in_1" } })).statusCode, 401);
   assert.equal((await call({ query: { action: "admin-invoice-pdf" }, headers: asTier("admin"), body: { invoice_id: "../x" } })).statusCode, 400);
+
+  // the document the CUSTOMER got, in their language — not the admin's
+  rows("user_profiles").find((x) => x.id === U).ui_prefs = { language: "en" };
+  invoice({ id: "in_8", number: "RES-0008" });
+  const en = await call({ query: { action: "admin-invoice-pdf" }, headers: asTier("admin"), body: { invoice_id: "in_8", lang: "sk" } });
+  assert.equal((await PDFDocument.load(en.body)).getTitle(), "Invoice RES-0008");
 });

@@ -32,7 +32,7 @@ import { usePricing } from "../lib/pricing";
 import { FALLBACK_MONTHLY_DISPLAY, FALLBACK_ANCHOR_DISPLAY } from "../lib/pricingDefaults";
 import {
   COMPANY, DPA_AUTHORITY, TRADE_AUTHORITY,
-  statutoryWebsiteData, operatorInSentence, vatNotice,
+  statutoryWebsiteData, operatorInSentence, vatNotice, isVatRegistered,
   addressOneLine, registrationLine,
 } from "../lib/company";
 
@@ -459,8 +459,8 @@ export function TermsPage({ lang }) {
           : `The Service is offered in several tiers (free, trial, and paid). The free trial (typically 7 days) provides extended access without requiring a payment card. The paid tier is provided for a recurring fee (currently ${priceStr} / month${anchorStr ? ` — launch price, regularly ${anchorStr}` : ""}), billed monthly via our online checkout (Stripe); you can cancel anytime in the billing section. An already-paid period is generally non-refundable unless agreed otherwise.`}</p>
 
         <p>{isSK
-          ? `${vatNotice("sk")} Ku každej platbe vystavíme faktúru (daňový doklad) elektronicky a zašleme vám ju na e-mail uvedený v účte; dostupná je aj v sekcii fakturácie. Ak objednávate ako podnikateľ, uveďte pri objednávke obchodné meno, sídlo a IČO — bez týchto údajov nevieme vystaviť faktúru použiteľnú pre vaše účtovníctvo.`
-          : `${vatNotice("en")} We issue an invoice (tax document) electronically for every payment and email it to the address on your account; it is also available in the billing section. If you are ordering as a business, provide your business name, registered seat and company ID at checkout — without them we cannot issue an invoice your accounting can use.`}</p>
+          ? `${vatNotice("sk")} Ku každej platbe vystavíme faktúru${isVatRegistered() ? " (daňový doklad)" : ""} elektronicky a zašleme vám ju na e-mail uvedený v účte; dostupná je aj v sekcii fakturácie. Ak objednávate ako podnikateľ, uveďte pri objednávke obchodné meno, sídlo a IČO — bez týchto údajov nevieme vystaviť faktúru použiteľnú pre vaše účtovníctvo.`
+          : `${vatNotice("en")} We issue an invoice${isVatRegistered() ? " (tax document)" : ""} electronically for every payment and email it to the address on your account; it is also available in the billing section. If you are ordering as a business, provide your business name, registered seat and company ID at checkout — without them we cannot issue an invoice your accounting can use.`}</p>
       </Section>
 
       <Section title={isSK ? "6. Prijateľné používanie" : "6. Acceptable use"}>

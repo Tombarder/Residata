@@ -32,7 +32,7 @@ import { supabaseData, SUPABASE_URL, SUPABASE_ANON_KEY } from "../lib/supabase";
 import { getFreshAccessToken } from "../lib/sessionGuard";
 import { useActivateTrial } from "../lib/useActivateTrial";
 import { daysLeftText } from "../lib/dates";
-import { startCheckout, openBillingPortal, getCardSubscription } from "../lib/billing";
+import { startCheckout, openBillingPortal, getCardSubscription, listInvoices, downloadInvoice } from "../lib/billing";
 import { pushRoute } from "../lib/routing";
 import { track } from "../lib/track";
 import { PAGE_TITLES } from "../lib/pageTitles";
@@ -1334,6 +1334,86 @@ function PlatformBilling({ lang, setCurrent }) {
           )}
         </div>
       )}
+
+      {/* The customer's invoices (Boss 2026-10-08) — Stripe's portal no longer lists them. */}
+      {profile?.stripe_customer_id && <InvoiceList lang={lang} />}
+    </div>
+  );
+}
+
+/**
+ * The caller's invoices, newest first, each one downloadable as OUR PDF — the same document the
+ * e-mail carried. "Pay" only on the current subscription's unpaid invoice (the server decides).
+ */
+const INVOICE_STATUS_TEXT = {
+  sk: { paid: "Uhradená", open: "Na úhradu", void: "Stornovaná", uncollectible: "Neuhradená" },
+  en: { paid: "Paid", open: "Due", void: "Void", uncollectible: "Unpaid" },
+};
+function InvoiceList({ lang }) {
+  const sk = lang === "sk";
+  const [items, setItems] = useState(undefined);   // undefined = loading · null = could not load · [] = none
+  const [busy, setBusy] = useState(null);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    let live = true;
+    listInvoices().then((x) => { if (live) setItems(x); });
+    return () => { live = false; };
+  }, []);
+  const money = (cents, cur) => {
+    try {
+      return new Intl.NumberFormat(sk ? "sk-SK" : "en-IE", { style: "currency", currency: String(cur || "eur").toUpperCase() }).format(Number(cents || 0) / 100);
+    } catch {
+      return `${(Number(cents || 0) / 100).toFixed(2)} ${String(cur || "eur").toUpperCase()}`;
+    }
+  };
+  const day = (sec) => (sec ? new Date(sec * 1000).toLocaleDateString(sk ? "sk-SK" : "en-GB",
+    { day: "numeric", month: sk ? "numeric" : "short", year: "numeric", timeZone: "Europe/Bratislava" }) : "");
+  const pill = (s) => {
+    const c = s === "paid" ? green : s === "open" ? orangeInk : dim;
+    return { fontFamily: mono, fontSize: "0.62rem", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 700,
+      color: c, border: `1px solid color-mix(in srgb, ${c} 40%, transparent)`, borderRadius: 999, padding: "0.15rem 0.55rem", whiteSpace: "nowrap" };
+  };
+  async function download(inv) {
+    setBusy(inv.id); setErr("");
+    const e = await downloadInvoice(inv.id, lang);
+    if (e) setErr(e);
+    setBusy(null);
+  }
+  return (
+    <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: "1.25rem 1.75rem", marginBottom: "1.25rem" }}>
+      <div style={{ fontFamily: mono, fontSize: "0.65rem", color: dim, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.6rem", fontWeight: 700 }}>
+        {sk ? "Faktúry" : "Invoices"}
+      </div>
+      {items === undefined && <div style={{ color: dim, fontSize: "0.86rem" }}>{sk ? "Načítavam faktúry…" : "Loading invoices…"}</div>}
+      {items === null && (
+        <div style={{ color: "var(--text-2)", fontSize: "0.86rem", lineHeight: 1.55 }}>
+          {sk ? "Faktúry sa teraz nepodarilo načítať. Skús to o chvíľu znova alebo nám napíš na " : "Your invoices could not be loaded right now. Try again in a moment or email "}
+          <a href="mailto:info@residata.eu" style={{ color: accentInk }}>info@residata.eu</a>.
+        </div>
+      )}
+      {items && items.length === 0 && <div style={{ color: dim, fontSize: "0.86rem" }}>{sk ? "Zatiaľ tu nie je žiadna faktúra." : "No invoices yet."}</div>}
+      {items && items.map((inv) => (
+        <div key={inv.id} style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap", padding: "0.65rem 0", borderTop: `1px solid ${border}` }}>
+          <div style={{ flex: "1 1 150px", minWidth: 0 }}>
+            <div style={{ color: textLight, fontSize: "0.9rem", fontWeight: 600 }}>{inv.number}</div>
+            <div style={{ color: dim, fontSize: "0.76rem", fontFamily: mono }}>{day(inv.date)}</div>
+          </div>
+          <div style={{ color: textLight, fontSize: "0.9rem", fontVariantNumeric: "tabular-nums", minWidth: 80, textAlign: "right" }}>{money(inv.amount, inv.currency)}</div>
+          <span style={pill(inv.status)}>{INVOICE_STATUS_TEXT[sk ? "sk" : "en"][inv.status] || inv.status}</span>
+          <div style={{ display: "flex", gap: "0.4rem", marginLeft: "auto" }}>
+            {inv.pay_url && (
+              <a href={inv.pay_url} target="_blank" rel="noopener noreferrer" className="btn-p" style={{ fontSize: "0.8rem", textDecoration: "none" }}>
+                {sk ? "Zaplatiť" : "Pay"}
+              </a>
+            )}
+            <button type="button" className="btn-s" onClick={() => download(inv)} disabled={busy === inv.id} style={{ fontSize: "0.8rem", cursor: "pointer" }}
+              aria-label={sk ? `Stiahnuť faktúru ${inv.number}` : `Download invoice ${inv.number}`}>
+              {busy === inv.id ? "…" : (sk ? "Stiahnuť PDF" : "Download PDF")}
+            </button>
+          </div>
+        </div>
+      ))}
+      {err && <div style={{ marginTop: "0.6rem", fontSize: "0.82rem", color: dangerInk, fontFamily: mono }}>{err}</div>}
     </div>
   );
 }
@@ -1484,8 +1564,8 @@ function SubscriptionCard({ lang, paused, paidWindowActive, paidUntil, paidStart
       <p style={{ color: dim, fontSize: "0.78rem", lineHeight: 1.55, margin: "1rem 0 0", fontFamily: mono }}>
         {billing.byCard
           ? (lang === "sk"
-            ? <>Faktúry, zmena obdobia, zrušenie — spravuj cez <strong style={{ color: "var(--text-2)" }}>Spravovať platbu</strong> alebo napíš na <a href="mailto:info@residata.eu" style={{ color: accentInk }}>info@residata.eu</a>.</>
-            : <>Invoices, period changes, cancellation — use <strong style={{ color: "var(--text-2)" }}>Manage billing</strong> above, or email <a href="mailto:info@residata.eu" style={{ color: accentInk }}>info@residata.eu</a>.</>)
+            ? <>Kartu, fakturačné údaje a zrušenie spravuješ cez <strong style={{ color: "var(--text-2)" }}>Spravovať platbu</strong>; faktúry nájdeš nižšie. S otázkami napíš na <a href="mailto:info@residata.eu" style={{ color: accentInk }}>info@residata.eu</a>.</>
+            : <>Card, billing details and cancellation — use <strong style={{ color: "var(--text-2)" }}>Manage billing</strong> above; your invoices are below. Questions: <a href="mailto:info@residata.eu" style={{ color: accentInk }}>info@residata.eu</a>.</>)
           : (lang === "sk"
             ? <>Predĺženie, zmena obdobia alebo otázky — napíš na <a href="mailto:info@residata.eu" style={{ color: accentInk }}>info@residata.eu</a>.</>
             : <>To extend or change the period, or with any question — email <a href="mailto:info@residata.eu" style={{ color: accentInk }}>info@residata.eu</a>.</>)}
